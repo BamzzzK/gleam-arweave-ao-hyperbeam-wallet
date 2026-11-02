@@ -136,11 +136,18 @@ export function createAssetScanner(options: AssetScannerOptions) {
     const batches: string[][] = [];
     for (let i = 0; i < ids.length; i += SCAN_PAGE_SIZE) batches.push(ids.slice(i, i + SCAN_PAGE_SIZE));
     const found = new Map<string, Tag[]>();
+    const failures: unknown[] = [];
     await mapLimit(batches, concurrency, async (batch) => {
       if (Date.now() >= deadline) return;
-      const connection = await query(DESCRIPTOR_QUERY, { ids: batch, first: SCAN_PAGE_SIZE });
-      for (const { node } of connection?.edges ?? []) found.set(node.id, node.tags);
+      try {
+        const connection = await query(DESCRIPTOR_QUERY, { ids: batch, first: SCAN_PAGE_SIZE });
+        for (const { node } of connection?.edges ?? []) found.set(node.id, node.tags);
+      } catch (error) {
+        failures.push(error);
+      }
     });
+    // One failed batch must not discard the descriptors that did load.
+    if (failures.length > 0 && found.size === 0) throw failures[0];
     return found;
   };
 
