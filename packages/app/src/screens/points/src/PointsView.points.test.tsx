@@ -436,17 +436,17 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    const notice = within(await screen.findByRole("region", { name: "Reconnect" }));
-    expect(notice.getByRole("heading", { name: "Linked to another browser" })).toBeTruthy();
+    const notice = within(await screen.findByRole("region", { name: "Left on another browser" }));
+    expect(notice.getByRole("heading", { name: "Left on another browser" })).toBeTruthy();
     expect(screen.getByText("Rank").nextElementSibling?.textContent).toBe("—");
     expect(screen.queryByRole("heading", { name: "Ways to earn" })).toBeNull();
-    fireEvent.click(notice.getByRole("button", { name: "Reconnect this browser" }));
+    fireEvent.click(notice.getByRole("button", { name: "Join again" }));
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id } }),
     );
     expect(await screen.findByRole("heading", { name: "Ways to earn" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Reconnect" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Left on another browser" })).toBeNull();
   });
 
   it("shows why a reconnect failed", async () => {
@@ -460,7 +460,7 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Reconnect this browser" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Join again" }));
 
     expect(await screen.findByText("Couldn't join Gleam Points: HTTP 503")).toBeTruthy();
   });
@@ -476,7 +476,7 @@ describe("PointsView", () => {
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
     expect(standing.getByText("Rank").nextElementSibling?.textContent).toBe("—");
-    expect(screen.queryByRole("region", { name: "Reconnect" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Left on another browser" })).toBeNull();
   });
 
   it("shows rank in the bottom half too", async () => {
