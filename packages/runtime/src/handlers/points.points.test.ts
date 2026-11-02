@@ -349,6 +349,15 @@ describe("PointsHandler.scores", () => {
     expect(await verifyDeviceSignature(device.publicKey, body.message, body.signature)).toBe(true);
   });
 
+  it("forgets the local memberships when the server no longer knows the device", async () => {
+    const { handler, storage } = await setup({ registered: true, lastHeartbeatAt: NOW }, 404);
+    storage.store.set(POINTS_MEMBERSHIPS_KEY, { w1: { address: "x", inviteCode: "MYCODE22", referred: false, joinedAt: 1 } });
+
+    expect(await handler.scores()).toBeNull();
+    expect(storage.store.get(POINTS_MEMBERSHIPS_KEY)).toEqual({});
+    expect(storage.store.get(POINTS_DEVICE_STATE_KEY)).toEqual({ registered: false, lastHeartbeatAt: null });
+  });
+
   it("throws on a server error", async () => {
     const { handler } = await setup({ registered: true, lastHeartbeatAt: NOW }, 500);
 

@@ -439,12 +439,18 @@ export class PointsHandler {
 
   /**
    * Reads this install's standing with a device-signed `POST /me`. Returns
-   * null before any wallet has joined, since the server doesn't know the
-   * device yet.
+   * null before any wallet has joined, or once the server has dropped this
+   * device, since it doesn't know the device then.
    */
   async scores(): Promise<PointsScores | null> {
     if (!(await this.loadState()).registered) return null;
     const response = await this.postDeviceSigned("me");
+    if (response.status === 404) {
+      // The server forgot this device (a leave on another install deletes the wallet everywhere), so the local memberships no longer mean anything.
+      await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, {});
+      await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
+      return null;
+    }
     if (!response.ok) throw new Error(`Couldn't load Gleam Points (HTTP ${response.status}).`);
     const body = (await response.json()) as PointsScores;
     if (!Array.isArray(body?.wallets)) throw new Error("The points server sent an unexpected response.");

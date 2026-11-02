@@ -355,14 +355,14 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
   const join = useJoinPoints(runtime);
 
   return (
-    <section aria-label="Reconnect" className="flex flex-col gap-3">
-      <h2 className="text-h3 font-semibold text-foreground">Linked to another browser</h2>
+    <section aria-label="Left on another browser" className="flex flex-col gap-3">
+      <h2 className="text-h3 font-semibold text-foreground">Left on another browser</h2>
       <p className="text-label text-muted">
-        Your points are linked to another browser and stop growing when Gleam stops running there. Reconnect to earn
-        here. You'll keep your points and invite link.
+        This wallet left Gleam Points on another browser, which removed its points data, so it isn't earning here. Join
+        again to start earning.
       </p>
       <Button type="button" disabled={join.isPending} onClick={() => join.mutate({ walletId: wallet.id })}>
-        {join.isPending ? "Reconnecting…" : "Reconnect this browser"}
+        {join.isPending ? "Joining…" : "Join again"}
       </Button>
       {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
       {join.error instanceof Error ? <p className="text-caption text-warning">{join.error.message}</p> : null}

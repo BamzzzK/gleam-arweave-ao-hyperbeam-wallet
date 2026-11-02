@@ -130,8 +130,8 @@ export type PointsStanding =
       score: PointsWalletScore | null;
       /**
        * The server answered for this install but doesn't list the wallet:
-       * a later join from another install moved it there, so it earns only
-       * while that install sends heartbeats.
+       * it left Points on another install, which deletes its data
+       * everywhere, while this install is still registered for other wallets.
        */
       linkedElsewhere: boolean;
       /** Settled total projected forward to now; ticks while mounted. */
