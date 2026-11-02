@@ -1072,6 +1072,7 @@ export class ReadsHandler {
 
     const arPriceAt = buildPriceAtFromSeries(arPriceSeries);
     const tokens = [{ balance: arBalance, priceAt: arPriceAt }];
+    const spotSources = [AR_TOKEN.priceSource];
     let aoPriceSeries: HistoricalPricePoint[] | null = null;
     const loadAoPriceSeries = async () =>
       (aoPriceSeries ??= AO_TOKEN.priceSource ? await getHistoricalUsdPrices(AO_TOKEN.priceSource, req.range, this.pricesApiUrl) : []);
@@ -1103,6 +1104,7 @@ export class ReadsHandler {
         const series = await loadAoPriceSeries();
         if (series.length > 0) {
           tokens.push({ balance: aoQuantity, priceAt: buildPriceAtFromSeries(series) });
+          spotSources.push(AO_TOKEN.priceSource);
         } else if (aoQuantity > 0) {
           // A held AO balance with no price series would silently drop out of
           // the total, so an AO-only portfolio would chart as $0. Reported as
@@ -1111,6 +1113,17 @@ export class ReadsHandler {
         }
       }
     }
+
+    // The last historical point lags the spot price the token rows use, so
+    // the headline total would drift from the rows' sum. The final point is
+    // re-priced at spot, falling back to the series price when spot is down.
+    const spotPrices = await Promise.all(
+      spotSources.map((source) => (source ? getUsdPrice(source, this.pricesApiUrl) : Promise.resolve(null))),
+    );
+    const lastTimestamp = arPriceSeries[arPriceSeries.length - 1]?.timestamp ?? 0;
+    const spotUsdValue = tokens.reduce((sum, token, i) => sum + token.balance * (spotPrices[i] ?? token.priceAt(lastTimestamp)), 0);
+    const spotUnitUsd = (ticker: "AR" | "AO", fallback: number) =>
+      spotPrices[spotSources.indexOf(ticker === "AR" ? AR_TOKEN.priceSource : AO_TOKEN.priceSource)] ?? fallback;
 
     let unitPriceAt: (timestamp: number) => number;
     if (currency === "AR") {
@@ -1125,9 +1138,11 @@ export class ReadsHandler {
       unitPriceAt = () => 1 / rate;
     }
 
-    const series = arPriceSeries.map((point) => {
-      const unitPrice = unitPriceAt(point.timestamp);
-      const usdValue = estimateHistoricalPortfolioValue(tokens, point.timestamp);
+    const series = arPriceSeries.map((point, index) => {
+      const isLast = index === arPriceSeries.length - 1;
+      let unitPrice = unitPriceAt(point.timestamp);
+      if (isLast && (currency === "AR" || currency === "AO")) unitPrice = spotUnitUsd(currency, unitPrice);
+      const usdValue = isLast ? spotUsdValue : estimateHistoricalPortfolioValue(tokens, point.timestamp);
       return { timestamp: point.timestamp, value: unitPrice > 0 ? usdValue / unitPrice : 0 };
     });
 
