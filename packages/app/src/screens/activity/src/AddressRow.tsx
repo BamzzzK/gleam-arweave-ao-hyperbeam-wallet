@@ -1,5 +1,6 @@
 import { AccountAvatar } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
+import { useT } from "../../../i18n";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 
 /**
@@ -11,6 +12,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
  * the same row.
  */
 export function AddressRow({ address, name, onSelect }: { address: string; name: string | null; onSelect: () => void }) {
+  const t = useT();
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(address);
   return (
@@ -19,7 +21,7 @@ export function AddressRow({ address, name, onSelect }: { address: string; name:
       onClick={onSelect}
       className="relative flex w-full items-center gap-2.5 px-3.5 py-3 text-left after:absolute after:inset-x-3.5 after:bottom-0 after:border-b after:border-line last:after:hidden hover:bg-mist"
     >
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={32} />
+      <AccountAvatar svgMarkup={avatarSvg} label={name ? t("activity.avatarOf", { name }) : t("activity.addressAvatar")} size={32} />
       {name ? (
         <span className="flex min-w-0 flex-1 flex-col gap-px">
           <span className="truncate text-label font-semibold text-foreground">{name}</span>

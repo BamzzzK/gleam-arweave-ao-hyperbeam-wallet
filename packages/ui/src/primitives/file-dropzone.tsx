@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "./cn";
+import { useUiLabels } from "../labels";
 
 /**
  * File drop target. Presentational and content-agnostic: hands the
@@ -18,14 +19,15 @@ export interface FileDropzoneProps {
 }
 
 export function FileDropzone({
-  label = "Drop a file here",
-  hint = "or click to browse",
+  label,
+  hint,
   fileName,
   errorMessage,
   accept,
   onFile,
   className,
 }: FileDropzoneProps) {
+  const labels = useUiLabels();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = React.useState(false);
 
@@ -53,8 +55,8 @@ export function FileDropzone({
         <span className={cn("text-faint", errorMessage && "text-warning")}>
           {errorMessage ? <ErrorGlyph /> : <UploadGlyph />}
         </span>
-        <span className="text-label font-semibold text-foreground">{fileName ?? label}</span>
-        <span className="text-caption text-faint">{fileName ? "Click to try another file" : hint}</span>
+        <span className="text-label font-semibold text-foreground">{fileName ?? label ?? labels.dropFile}</span>
+        <span className="text-caption text-faint">{fileName ? labels.tryAnotherFile : (hint ?? labels.browseHint)}</span>
         <input
           ref={inputRef}
           type="file"

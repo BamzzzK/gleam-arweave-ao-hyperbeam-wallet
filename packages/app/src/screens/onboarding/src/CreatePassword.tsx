@@ -8,6 +8,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
 
 /**
  * Create wallet — password, reused for both the create and import flows.
@@ -33,12 +34,13 @@ function strengthBars(password: string): number {
 }
 
 export function CreatePassword({
-  title = "Create a wallet",
+  title,
   onBack,
   onSubmit,
   submitting = false,
   serverError,
 }: CreatePasswordProps) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [touched, setTouched] = useState(false);
@@ -47,14 +49,14 @@ export function CreatePassword({
   const confirmMismatch = touched && confirm.length > 0 && confirm !== password;
 
   const passwordError = touched && !validation.valid ? validation.reason : serverError;
-  const confirmError = confirmMismatch ? "Passwords don't match." : undefined;
+  const confirmError = confirmMismatch ? t("onboarding.passwordsMismatch") : undefined;
 
   const canSubmit = validation.valid && password === confirm && !submitting;
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader
-        title={title}
+        title={title ?? t("onboarding.createWallet")}
         onBack={onBack}
         busy={submitting}
         subtitle={<StepDots total={2} current={1} />}
@@ -70,17 +72,16 @@ export function CreatePassword({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Set a password</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.setPasswordTitle")}</h1>
           <p className="text-body leading-relaxed text-muted">
-            This password encrypts your wallet on this device. We can&apos;t reset it for you. 
-            If you lose it, you&apos;ll need your backup instead.
+            {t("onboarding.setPasswordBody")}
           </p>
         </div>
 
         <div className="flex flex-col gap-2">
           <PasswordField
-            label="Password"
-            placeholder="At least 12 characters"
+            label={t("onboarding.passwordLabel")}
+            placeholder={t("onboarding.newPasswordPlaceholder")}
             autoFocus
             autoComplete="new-password"
             value={password}
@@ -92,8 +93,8 @@ export function CreatePassword({
         </div>
 
         <PasswordField
-          label="Confirm password"
-          placeholder="Re-enter your password"
+          label={t("onboarding.confirmPasswordLabel")}
+          placeholder={t("onboarding.confirmPasswordPlaceholder")}
           autoComplete="new-password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
@@ -103,7 +104,7 @@ export function CreatePassword({
 
         <ScreenFooter className="mt-8">
           <Button type="submit" disabled={!canSubmit}>
-            {submitting ? "Creating…" : "Continue"}
+            {submitting ? t("onboarding.creating") : t("onboarding.continue")}
           </Button>
         </ScreenFooter>
       </form>

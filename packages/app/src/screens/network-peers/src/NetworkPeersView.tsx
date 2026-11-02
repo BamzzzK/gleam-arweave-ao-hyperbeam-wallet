@@ -5,6 +5,7 @@ import { DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, 
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { useT } from "../../../i18n";
 
 /**
  * The gateway and the AO-peer list are both editable, writing the full
@@ -145,6 +146,7 @@ async function clearPendingEdit(store: EphemeralStatePort): Promise<void> {
 }
 
 export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
+  const t = useT();
   const { capabilities, hostPermissions, ephemeralState } = usePlatform();
   // Without runtime host permissions every origin is already reachable.
   const hasHostAccess = async (url: string): Promise<boolean> => {
@@ -228,7 +230,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         setCheckingGateway(false);
         if (!reachable) {
           setNewGatewayUrl(pending.url);
-          setGatewayError("That URL didn't answer as an Arweave gateway…");
+          setGatewayError(t("networkPeers.gatewayUnreachable"));
           setEditingGateway(true);
         } else {
           const settings = state.settings;
@@ -287,7 +289,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     if (!state.settings) return;
     const normalized = normalizeGatewayUrl(newGatewayUrl);
     if (normalized === null) {
-      setGatewayError("Enter a valid https:// gateway URL.");
+      setGatewayError(t("networkPeers.gatewayInvalid"));
       return;
     }
     if (normalized === state.settings.gatewayUrl) {
@@ -303,7 +305,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
     const granted = await requestHostAccess(normalized);
     if (!granted) {
-      setGatewayError("Permission denied for that origin — the gateway was not changed.");
+      setGatewayError(t("networkPeers.gatewayPermissionDenied"));
       await clearPendingEdit(ephemeralState);
       return;
     }
@@ -312,7 +314,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     const reachable = await isArweaveGateway(normalized);
     setCheckingGateway(false);
     if (!reachable) {
-      setGatewayError("That URL didn't answer as an Arweave gateway…");
+      setGatewayError(t("networkPeers.gatewayUnreachable"));
       await clearPendingEdit(ephemeralState);
       return;
     }
@@ -327,16 +329,16 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     if (!state.settings) return;
     // Only `https://*/*` is an optional host permission, so an http peer could never be granted.
     if (/^http:\/\//i.test(newPeerUrl.trim())) {
-      setAddError("Peers must use an https:// URL.");
+      setAddError(t("networkPeers.peerNotHttps"));
       return;
     }
     const normalized = normalizePeerUrl(newPeerUrl);
     if (normalized === null) {
-      setAddError("Enter a valid peer URL.");
+      setAddError(t("networkPeers.peerInvalid"));
       return;
     }
     if (state.settings.peers.some((peer) => peer.url === normalized)) {
-      setAddError("That peer is already in the list.");
+      setAddError(t("networkPeers.peerDuplicate"));
       return;
     }
 
@@ -344,7 +346,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
     const granted = await requestHostAccess(normalized);
     if (!granted) {
-      setAddError("Permission denied for that origin — the peer was not added.");
+      setAddError(t("networkPeers.peerPermissionDenied"));
       await clearPendingEdit(ephemeralState);
       return;
     }
@@ -359,13 +361,13 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Network & peers" onBack={onBack} />
+      <ScreenHeader title={t("networkPeers.title")} onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10">
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-            Gateway
+            {t("networkPeers.gateway")}
           </div>
           <div>
             {state.loading ? (
@@ -395,7 +397,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     onClick={() => void handleEditGateway()}
                     className="text-label font-semibold text-foreground disabled:opacity-60"
                   >
-                    {checkingGateway ? "Checking…" : "Save"}
+                    {checkingGateway ? t("networkPeers.checking") : t("networkPeers.save")}
                   </button>
                   <button
                     type="button"
@@ -406,7 +408,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     }}
                     className="text-label font-semibold text-muted"
                   >
-                    Cancel
+                    {t("networkPeers.cancel")}
                   </button>
                 </div>
               </div>
@@ -423,7 +425,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                   <span className="text-label font-semibold text-foreground">
                     {state.settings ? gatewayHostname(state.settings.gatewayUrl) : "—"}
                   </span>
-                  <span className="text-caption text-muted">Arweave gateway &amp; GraphQL</span>
+                  <span className="text-caption text-muted">{t("networkPeers.gatewayHint")}</span>
                 </span>
                 <span aria-hidden="true" className="h-2 w-2 flex-shrink-0 rounded-full bg-beam-green" />
               </button>
@@ -433,7 +435,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-            AO peers
+            {t("networkPeers.aoPeers")}
           </div>
           <div>
             {state.loading ? (
@@ -461,7 +463,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                           {peerHostname(peer.url)}
                         </span>
                         <span className={`text-caption ${isActive ? "text-beam-green" : "text-muted"}`}>
-                          {isActive ? "Active" : peer.enabled ? "Enabled" : "Disabled"}
+                          {isActive ? t("networkPeers.active") : peer.enabled ? t("networkPeers.enabled") : t("networkPeers.disabled")}
                         </span>
                       </button>
                       <div className="flex flex-shrink-0 items-center gap-2.5">
@@ -469,7 +471,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                           type="button"
                           role="switch"
                           aria-checked={peer.enabled}
-                          aria-label={`Enable ${peerHostname(peer.url)}`}
+                          aria-label={t("networkPeers.enablePeer", { host: peerHostname(peer.url) })}
                           disabled={saving}
                           onClick={() => handleToggleEnabled(peer.url)}
                           className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors disabled:opacity-60 phone:hit-target ${
@@ -486,7 +488,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         {isHardcodedPeer(peer.url) ? null : (
                           <button
                             type="button"
-                            aria-label={`Remove ${peerHostname(peer.url)}`}
+                            aria-label={t("networkPeers.removePeer", { host: peerHostname(peer.url) })}
                             disabled={saving}
                             onClick={() => handleRemovePeer(peer.url)}
                             className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
@@ -524,7 +526,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         onClick={() => void handleAddPeer()}
                         className="text-label font-semibold text-foreground disabled:opacity-60"
                       >
-                        Add
+                        {t("networkPeers.add")}
                       </button>
                       <button
                         type="button"
@@ -535,7 +537,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         }}
                         className="text-label font-semibold text-muted"
                       >
-                        Cancel
+                        {t("networkPeers.cancel")}
                       </button>
                     </div>
                   </div>
@@ -546,14 +548,14 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     className="flex w-full items-center gap-2 py-3.5 text-left text-label font-semibold text-muted hover:text-foreground"
                   >
                     <PlusIcon />
-                    Add peer
+                    {t("networkPeers.addPeer")}
                   </button>
                 )}
               </>
             )}
           </div>
           <p className="pt-2.5 text-caption leading-relaxed text-faint">
-            Enabled peers are tried in order. Disable a peer without removing it to keep the URL for later.
+            {t("networkPeers.peersHint")}
           </p>
         </div>
       </div>

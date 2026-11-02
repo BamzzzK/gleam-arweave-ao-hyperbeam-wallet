@@ -1,4 +1,5 @@
 import { base64UrlToBytes, bytesToBase64Url } from "@gleam/core";
+import { t } from "../i18n";
 
 /**
  * WebAuthn ceremonies for passkey unlock. They run on extension pages
@@ -25,8 +26,6 @@ export class PasskeyError extends Error {
 }
 
 const CEREMONY_TIMEOUT_MS = 120_000;
-const UNSUPPORTED_MESSAGE =
-  "This passkey can't unlock Gleam. Try another option, like your phone or a different password manager.";
 
 export function passkeysAvailable(): boolean {
   return typeof PublicKeyCredential !== "undefined" && typeof navigator.credentials?.create === "function";
@@ -40,12 +39,12 @@ function toPasskeyError(error: unknown): PasskeyError {
   if (error instanceof PasskeyError) return error;
   const name = error instanceof DOMException ? error.name : "";
   if (name === "NotAllowedError" || name === "AbortError") {
-    return new PasskeyError("cancelled", "The passkey request was cancelled or timed out.");
+    return new PasskeyError("cancelled", t("app.passkeyCancelled"));
   }
   if (name === "NotSupportedError" || name === "SecurityError") {
-    return new PasskeyError("unsupported", "Passkeys aren't available in this browser.");
+    return new PasskeyError("unsupported", t("app.passkeyNotAvailable"));
   }
-  return new PasskeyError("failed", "Something went wrong with the passkey. Try again.");
+  return new PasskeyError("failed", t("app.passkeyFailed"));
 }
 
 function prfFirst(credential: PublicKeyCredential): Uint8Array<ArrayBuffer> | null {
@@ -70,10 +69,10 @@ async function evaluatePrf(credentialId: string, prfSalt: string): Promise<Uint8
     throw toPasskeyError(error);
   }
   if (!(credential instanceof PublicKeyCredential)) {
-    throw new PasskeyError("cancelled", "The passkey request was cancelled or timed out.");
+    throw new PasskeyError("cancelled", t("app.passkeyCancelled"));
   }
   const output = prfFirst(credential);
-  if (!output) throw new PasskeyError("unsupported", UNSUPPORTED_MESSAGE);
+  if (!output) throw new PasskeyError("unsupported", t("app.passkeyUnsupported"));
   return output;
 }
 
@@ -110,7 +109,7 @@ export async function createUnlockPasskey(): Promise<CreatedPasskey> {
     throw toPasskeyError(error);
   }
   if (!(credential instanceof PublicKeyCredential)) {
-    throw new PasskeyError("cancelled", "The passkey request was cancelled or timed out.");
+    throw new PasskeyError("cancelled", t("app.passkeyCancelled"));
   }
 
   const credentialId = bytesToBase64Url(new Uint8Array(credential.rawId));
@@ -118,7 +117,7 @@ export async function createUnlockPasskey(): Promise<CreatedPasskey> {
   const prf = credential.getClientExtensionResults().prf;
   if (prf?.enabled === false || prf === undefined) {
     forgetPasskey(credentialId);
-    throw new PasskeyError("unsupported", UNSUPPORTED_MESSAGE);
+    throw new PasskeyError("unsupported", t("app.passkeyUnsupported"));
   }
 
   let output = prfFirst(credential);

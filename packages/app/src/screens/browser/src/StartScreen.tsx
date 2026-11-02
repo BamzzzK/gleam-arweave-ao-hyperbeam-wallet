@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { useT, type TFunction } from "../../../i18n";
 import { BUILT_IN_SITES, knownSite, matchSites, parseAddress, siteHost, type KnownSite } from "./address";
 
 export interface StartScreenProps {
@@ -24,6 +25,7 @@ function sitesOf(urls: readonly string[]): KnownSite[] {
  * fetched icon, so showing this screen makes no network request.
  */
 export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved, onClearSiteData, onClearRecent }: StartScreenProps) {
+  const t = useT();
   const savedSites = sitesOf(saved);
   const builtIn = sitesOf(BUILT_IN_SITES);
   const shown = new Set([...savedSites, ...builtIn].map((site) => site.host));
@@ -39,10 +41,10 @@ export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved, onCle
           <SiteRow key={site.url} host={site.host} onOpen={() => onOpen(site.url)} />
         ))}
         {address && typed ? (
-          <SiteRow host={typed.host} insecure={typed.insecure} caption="Open this address" onOpen={() => onOpen(address)} />
+          <SiteRow host={typed.host} insecure={typed.insecure} caption={t("browser.openAddress")} onOpen={() => onOpen(address)} />
         ) : null}
         {!address && matches.length === 0 ? (
-          <p className="px-0 py-4 text-label text-muted">No saved site matches. Enter an address like example.com.</p>
+          <p className="px-0 py-4 text-label text-muted">{t("browser.noMatch")}</p>
         ) : null}
       </div>
     );
@@ -51,7 +53,7 @@ export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved, onCle
   return (
     <div className="flex flex-col gap-6 px-5 pb-6 pt-2">
       {savedSites.length > 0 ? (
-        <Section title="Saved" hint="Press and hold a site to remove it.">
+        <Section title={t("browser.saved")} hint={t("browser.savedHint")}>
           {savedSites.map((site) => (
             <SiteRow
               key={site.url}
@@ -62,15 +64,15 @@ export function StartScreen({ query, saved, recent, onOpen, onRemoveSaved, onCle
           ))}
         </Section>
       ) : null}
-      <Section title="dApps">
+      <Section title={t("browser.dapps")}>
         {builtIn.map((site) => (
           <SiteRow key={site.url} host={site.host} onOpen={() => onOpen(site.url)} />
         ))}
       </Section>
       {recentSites.length > 0 ? (
         <Section
-          title="Recent"
-          action={onClearRecent ? <ClearButton label="Clear" ariaLabel="Clear recent sites" clear={onClearRecent} /> : undefined}
+          title={t("browser.recent")}
+          action={onClearRecent ? <ClearButton label={t("browser.clear")} ariaLabel={t("browser.clearRecent")} clear={onClearRecent} /> : undefined}
         >
           {recentSites.map((site) => (
             <SiteRow key={site.url} host={site.host} onOpen={() => onOpen(site.url)} />
@@ -98,14 +100,15 @@ function useClear(clear: () => Promise<unknown>) {
   return { state, run };
 }
 
-const clearLabel = (state: ClearState, idle: string) =>
-  state === "done" ? "Cleared" : state === "failed" ? "Couldn't clear" : idle;
+const clearLabel = (t: TFunction, state: ClearState, idle: string) =>
+  state === "done" ? t("browser.cleared") : state === "failed" ? t("browser.clearFailed") : idle;
 
 const CLEAR_BUTTON =
   "-mx-3 min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:opacity-60";
 
 /** Wipes something and says so; recents hold nothing worth a second tap. */
 function ClearButton({ label, ariaLabel, clear }: { label: string; ariaLabel?: string; clear: () => Promise<unknown> }) {
+  const t = useT();
   const { state, run } = useClear(clear);
   return (
     <button
@@ -115,7 +118,7 @@ function ClearButton({ label, ariaLabel, clear }: { label: string; ariaLabel?: s
       onClick={run}
       className={CLEAR_BUTTON}
     >
-      {clearLabel(state, label)}
+      {clearLabel(t, state, label)}
     </button>
   );
 }
@@ -125,18 +128,19 @@ function ClearButton({ label, ariaLabel, clear }: { label: string; ariaLabel?: s
  * the same Cancel / confirm pair a held saved site uses before it is removed.
  */
 function ClearSiteData({ clear }: { clear: () => Promise<unknown> }) {
+  const t = useT();
   const { state, run } = useClear(clear);
   const [asking, setAsking] = useState(false);
   if (asking && state === "idle") {
     return (
-      <div role="group" aria-label="Clear site data" className="flex flex-col items-start gap-1">
-        <p className="text-label text-foreground">Sign out of all sites and delete what they stored?</p>
+      <div role="group" aria-label={t("browser.clearSiteData")} className="flex flex-col items-start gap-1">
+        <p className="text-label text-foreground">{t("browser.clearSiteDataAsk")}</p>
         <div className="-mx-3 flex items-center">
           <button type="button" onClick={() => setAsking(false)} className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted active:bg-mist">
-            Cancel
+            {t("browser.cancel")}
           </button>
           <button type="button" onClick={run} className="min-h-11 rounded-lg px-3 text-label font-semibold text-warning active:bg-mist">
-            Clear
+            {t("browser.clear")}
           </button>
         </div>
       </div>
@@ -145,9 +149,9 @@ function ClearSiteData({ clear }: { clear: () => Promise<unknown> }) {
   return (
     <div className="flex flex-col items-start gap-0.5">
       <button type="button" disabled={state === "busy"} onClick={() => setAsking(true)} className={CLEAR_BUTTON}>
-        {clearLabel(state, "Clear site data")}
+        {clearLabel(t, state, t("browser.clearSiteData"))}
       </button>
-      <p className="text-caption text-faint">Signs you out of sites and deletes what they stored.</p>
+      <p className="text-caption text-faint">{t("browser.clearSiteDataHint")}</p>
     </div>
   );
 }
@@ -187,6 +191,7 @@ interface SiteRowProps {
 }
 
 function SiteRow({ host, insecure = false, caption, onOpen, onRemove }: SiteRowProps) {
+  const t = useT();
   const [removing, setRemoving] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
@@ -231,7 +236,7 @@ function SiteRow({ host, insecure = false, caption, onOpen, onRemove }: SiteRowP
           <span className="truncate text-body font-semibold text-foreground">{host}</span>
           {caption || insecure ? (
             <span className={cn("text-caption", insecure ? "text-warning" : "text-muted")}>
-              {insecure ? "Not secure (http)" : caption}
+              {insecure ? t("browser.notSecureHttp") : caption}
             </span>
           ) : null}
         </span>
@@ -243,14 +248,14 @@ function SiteRow({ host, insecure = false, caption, onOpen, onRemove }: SiteRowP
             onClick={() => setRemoving(false)}
             className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted"
           >
-            Cancel
+            {t("browser.cancel")}
           </button>
           <button
             type="button"
             onClick={onRemove}
             className="min-h-11 rounded-lg px-3 text-label font-semibold text-warning"
           >
-            Remove
+            {t("browser.remove")}
           </button>
         </>
       ) : null}

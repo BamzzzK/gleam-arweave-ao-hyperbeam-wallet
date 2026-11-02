@@ -3,6 +3,7 @@ import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
 
 /**
  * Asks for the existing vault password when adding a wallet. Every wallet
@@ -24,6 +25,7 @@ export function VaultPassword({
   submitting = false,
   serverError,
 }: VaultPasswordProps) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
 
@@ -48,15 +50,15 @@ export function VaultPassword({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Enter your password</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.enterPasswordTitle")}</h1>
           <p className="text-body leading-relaxed text-muted">
-            The new wallet is encrypted with the password you already use to unlock Gleam.
+            {t("onboarding.vaultPasswordBody")}
           </p>
         </div>
 
         <PasswordField
-          label="Password"
-          placeholder="Enter your password"
+          label={t("onboarding.passwordLabel")}
+          placeholder={t("onboarding.enterPasswordPlaceholder")}
           autoFocus
           autoComplete="current-password"
           value={password}
@@ -69,7 +71,7 @@ export function VaultPassword({
 
         <ScreenFooter className="mt-8">
           <Button type="submit" disabled={submitting || password.length === 0}>
-            {submitting ? "Adding…" : "Continue"}
+            {submitting ? t("onboarding.adding") : t("onboarding.continue")}
           </Button>
         </ScreenFooter>
       </form>

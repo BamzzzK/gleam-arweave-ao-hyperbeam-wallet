@@ -3,6 +3,7 @@ import type { Grant, RuntimePort } from "@gleam/core";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { useT, type TFunction } from "../../../i18n";
 
 /**
  * Per-origin grant list with scope + expiry inline (never hidden behind
@@ -35,19 +36,20 @@ function canRequestPayments(grant: Grant): boolean {
   return grant.permissions.some((permission) => permission === "SIGN_TRANSACTION" || permission === "DISPATCH");
 }
 
-function scopeSummary(grant: Grant): string {
-  if (canRequestPayments(grant)) return "Sees your address, can request payments";
-  if (grant.permissions.length > 1) return "Sees your address and more";
-  return "Sees your address only";
+function scopeSummary(grant: Grant, t: TFunction): string {
+  if (canRequestPayments(grant)) return t("connectedApps.scopePayments");
+  if (grant.permissions.length > 1) return t("connectedApps.scopeMore");
+  return t("connectedApps.scopeAddress");
 }
 
-function expirySummary(grant: Grant): string {
-  if (grant.expiresAt === null) return "No expiry · until revoked";
+function expirySummary(grant: Grant, t: TFunction): string {
+  if (grant.expiresAt === null) return t("connectedApps.noExpiry");
   const daysLeft = Math.max(0, Math.ceil((grant.expiresAt - Date.now()) / (24 * 60 * 60 * 1000)));
-  return `Expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+  return t(daysLeft === 1 ? "connectedApps.expiresOneDay" : "connectedApps.expiresDays", { days: daysLeft });
 }
 
 export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: ConnectedAppsViewProps) {
+  const t = useT();
   const [grants, setGrants] = useState<Grant[] | null>(null);
   const [error, setError] = useState<string>();
 
@@ -72,7 +74,7 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: Connecte
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Connected apps" onBack={onBack} />
+      <ScreenHeader title={t("connectedApps.title")} onBack={onBack} />
       {error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
       <div className="flex flex-1 flex-col px-5 py-4">
         {grants === null ? (
@@ -81,7 +83,7 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: Connecte
             <SkeletonRow />
           </>
         ) : grants.length === 0 ? (
-          <EmptyState message="No apps connected yet. Grants you approve will show up here." />
+          <EmptyState message={t("connectedApps.empty")} />
         ) : (
           <div className="flex flex-col">
             {[...grants].sort((a, b) => Number(b.origin === highlightOrigin) - Number(a.origin === highlightOrigin)).map((grant) => (
@@ -99,15 +101,15 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: Connecte
                     </span>
                   </div>
                   <span className="font-mono text-caption text-faint">{hostnameOf(grant.origin)}</span>
-                  <span className="text-label leading-snug text-muted">{scopeSummary(grant)}</span>
-                  <span className="text-caption text-faint">{expirySummary(grant)}</span>
+                  <span className="text-label leading-snug text-muted">{scopeSummary(grant, t)}</span>
+                  <span className="text-caption text-faint">{expirySummary(grant, t)}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleRevoke(grant.origin)}
                   className="mt-px flex-shrink-0 rounded-md border border-line bg-background px-3 py-1.5 text-label font-semibold text-foreground hover:border-warning hover:text-warning"
                 >
-                  Revoke
+                  {t("connectedApps.revoke")}
                 </button>
               </div>
             ))}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import type { UREncoder } from "@ngraveio/bc-ur";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { AnimatedQr } from "./AnimatedQr";
-import { CAMERA_UNAVAILABLE_MESSAGE, CameraDeniedNotice } from "./CameraDeniedNotice";
+import { CameraDeniedNotice, type CameraDeniedHelp } from "./CameraDeniedNotice";
 import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
 import {
   buildKeystoneSignRequest,
@@ -12,6 +12,7 @@ import {
   KeystoneSignatureError,
 } from "./sign-request";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
+import { t, useT, type MessageKey } from "@gleam/app/src/i18n/index.tsx";
 
 interface PreparedRequest {
   requestId: string;
@@ -27,12 +28,11 @@ type Step =
   | { kind: "scan"; attempt: number; percent: number }
   | { kind: "scan-error"; error: ScanFailure };
 
-const SCAN_ERROR: Record<Exclude<ScanFailure, "camera-denied">, string> = {
-  "camera-unavailable": CAMERA_UNAVAILABLE_MESSAGE,
-  "wrong-type": "That's not a Keystone signature QR. On the Keystone, confirm the request, then scan the QR it shows.",
-  "wrong-request":
-    "That signature is for a different request. Show the QR again, scan it with your Keystone, then scan the new signature.",
-  invalid: "Gleam couldn't read that QR. Hold the Keystone steady and try again.",
+const SCAN_ERROR: Record<Exclude<ScanFailure, "camera-denied">, MessageKey> = {
+  "camera-unavailable": "extension.cameraUnavailable",
+  "wrong-type": "extension.scanWrongSignature",
+  "wrong-request": "extension.scanWrongRequest",
+  invalid: "extension.scanInvalid",
 };
 
 /** Keeps the background's request open while the user works the device without a message per QR frame. */
@@ -44,7 +44,7 @@ const ACTIVITY_THROTTLE_MS = 10_000;
  */
 function prepare({ payloads, wallet }: Pick<DeviceSignPanelProps, "payloads" | "wallet">): Prepared {
   if (wallet.device?.kind !== "keystone") {
-    return { ok: false, message: "This Keystone wallet has no master fingerprint. Remove it and connect it again." };
+    return { ok: false, message: t("extension.keystoneNoFingerprint") };
   }
   const { xfp } = wallet.device;
   try {
@@ -62,13 +62,14 @@ function prepare({ payloads, wallet }: Pick<DeviceSignPanelProps, "payloads" | "
 
 export interface KeystonePanelOptions {
   /** Where this shell lets the user turn the camera back on. */
-  cameraDeniedHelp: string;
+  cameraDeniedHelp: CameraDeniedHelp;
   /** Swapped in tests, which have no camera. */
   Scanner?: ComponentType<QrScannerProps>;
 }
 
 export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: KeystonePanelOptions): DeviceSignPanel {
   return function KeystonePanel({ payloads, wallet, onSignatures, onActivity, onError }: DeviceSignPanelProps) {
+    const t = useT();
     const [prepared] = useState(() => prepare({ payloads, wallet }));
     const [index, setIndex] = useState(0);
     const [step, setStep] = useState<Step>({ kind: "show" });
@@ -120,21 +121,21 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
       <div className="flex flex-col gap-4">
         {total > 1 ? (
           <p className="text-center text-caption font-semibold text-foreground">
-            Item {index + 1} of {total}
+            {t("extension.itemOfTotal", { index: index + 1, total })}
           </p>
         ) : null}
 
         {step.kind === "show" ? (
           <>
-            <p className="text-center text-label leading-snug text-muted">Scan this with your Keystone</p>
+            <p className="text-center text-label leading-snug text-muted">{t("extension.scanWithKeystone")}</p>
             <AnimatedQr
               key={index}
               encoder={request.encoder}
               onFrame={activity}
-              label={total > 1 ? `Signing request ${index + 1} for Keystone` : "Signing request for Keystone"}
+              label={total > 1 ? t("extension.signingRequestOf", { index: index + 1 }) : t("extension.signingRequest")}
             />
             <Button type="button" onClick={scanAgain}>
-              Scan Keystone&apos;s signature
+              {t("extension.scanKeystoneSignature")}
             </Button>
           </>
         ) : null}
@@ -142,7 +143,7 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
         {step.kind === "scan" ? (
           <>
             <p className="text-center text-label leading-snug text-muted">
-              Confirm on your Keystone, then scan the signature it shows.
+              {t("extension.confirmOnKeystone")}
             </p>
             <Scanner
               key={step.attempt}
@@ -156,7 +157,7 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
             />
             <div
               role="progressbar"
-              aria-label="Scan progress"
+              aria-label={t("extension.scanProgress")}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={step.percent}
@@ -165,7 +166,7 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
               <div className="h-full bg-foreground transition-[width]" style={{ width: `${step.percent}%` }} />
             </div>
             <Button type="button" variant="secondary" onClick={() => setStep({ kind: "show" })}>
-              Show the QR again
+              {t("extension.showQrAgain")}
             </Button>
           </>
         ) : null}
@@ -176,14 +177,14 @@ export function createKeystonePanel({ cameraDeniedHelp, Scanner = QrScanner }: K
               <CameraDeniedNotice help={cameraDeniedHelp} />
             ) : (
               <p role="alert" className="text-caption leading-snug text-warning">
-                {SCAN_ERROR[step.error]}
+                {t(SCAN_ERROR[step.error])}
               </p>
             )}
             <Button type="button" onClick={scanAgain}>
-              Scan again
+              {t("extension.scanAgain")}
             </Button>
             <Button type="button" variant="secondary" onClick={() => setStep({ kind: "show" })}>
-              Show the QR again
+              {t("extension.showQrAgain")}
             </Button>
           </>
         ) : null}

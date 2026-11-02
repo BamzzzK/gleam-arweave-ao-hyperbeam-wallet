@@ -6,6 +6,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
 
 export interface SecurityPhraseStepProps {
   runtime: RuntimePort;
@@ -14,6 +15,7 @@ export interface SecurityPhraseStepProps {
 
 /** Onboarding's anti-phishing step. It starts on a suggestion, so Continue alone is enough. */
 export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps) {
+  const t = useT();
   const { refresh: refreshAddressIdentity } = useAddressIdentity();
   const [phrase, setPhrase] = useState<SecurityPhrase>(() => suggestSecurityPhrase());
   const [saving, setSaving] = useState(false);
@@ -25,7 +27,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Anti-phishing phrase" />
+      <ScreenHeader title={t("onboarding.antiPhishingTitle")} />
       <form
         className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
@@ -45,10 +47,9 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Pick your anti-phishing phrase</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.antiPhishingHeading")}</h1>
           <p className="text-body leading-relaxed text-muted">
-            Your anti-phishing phrase and icon appear before important actions. If a window asks for your
-            password or signature without them, it isn&apos;t Gleam.
+            {t("onboarding.antiPhishingBody")}
           </p>
         </div>
 
@@ -57,12 +58,12 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
           iconSvg={icon}
           onChange={setPhrase}
           disabled={saving}
-          errorMessage={error ?? (valid ? undefined : "Use up to 24 letters or numbers.")}
+          errorMessage={error ?? (valid ? undefined : t("onboarding.antiPhishingInvalid"))}
         />
 
         <ScreenFooter>
           <Button type="submit" disabled={!valid || saving}>
-            {saving ? "Saving…" : "Continue"}
+            {saving ? t("onboarding.saving") : t("onboarding.continue")}
           </Button>
         </ScreenFooter>
       </form>

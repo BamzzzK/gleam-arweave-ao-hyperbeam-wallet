@@ -4,6 +4,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
+import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 
 /**
@@ -28,24 +29,24 @@ export interface SigningApprovalScreenProps {
   onSign: () => Promise<void>;
 }
 
-const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], string> = {
-  sign: "Sign and send",
-  dispatch: "Sign and send",
-  signDataItem: "Sign message",
-  batchSignDataItem: "Sign messages",
-  encrypt: "Encrypt data",
-  decrypt: "Decrypt data",
-  transferAoTokens: "Send",
-  signMessage: "Sign message",
-  transfer: "Send",
-  pointsProof: "Prove ownership",
+const REQUEST_KIND_COPY: Record<SigningApprovalPreview["kind"], MessageKey> = {
+  sign: "approval.actionSignAndSend",
+  dispatch: "approval.actionSignAndSend",
+  signDataItem: "approval.actionSignMessage",
+  batchSignDataItem: "approval.actionSignMessages",
+  encrypt: "approval.actionEncryptData",
+  decrypt: "approval.actionDecryptData",
+  transferAoTokens: "approval.actionSend",
+  signMessage: "approval.actionSignMessage",
+  transfer: "approval.actionSend",
+  pointsProof: "approval.actionProveOwnership",
 };
 
-function actionCopy(preview: SigningApprovalPreview): string {
+function actionCopy(preview: SigningApprovalPreview, t: TFunction): string {
   if (preview.kind === "batchSignDataItem" && preview.items) {
-    return `${REQUEST_KIND_COPY[preview.kind]} (${preview.items.length})`;
+    return t("approval.actionSignMessagesCount", { count: preview.items.length });
   }
-  return REQUEST_KIND_COPY[preview.kind];
+  return t(REQUEST_KIND_COPY[preview.kind]);
 }
 
 /**
@@ -90,9 +91,14 @@ function formatAmount(atomic: string | null, token: string | null, tokenDenomina
  * is unknown, since a ticker with no confirmed scale is misleading on its
  * own (is this 1000 units, or 0.000001?).
  */
-function formatAmountUnit(token: string | null, tokenDenomination: number | null, tokenTicker: string | null): string | null {
+function formatAmountUnit(
+  token: string | null,
+  tokenDenomination: number | null,
+  tokenTicker: string | null,
+  t: TFunction,
+): string | null {
   if (token === null) return null;
-  if (tokenDenomination === null) return "smallest units";
+  if (tokenDenomination === null) return t("approval.smallestUnits");
   if (tokenTicker !== null && tokenTicker !== token) return tokenTicker;
   return shortenProcessId(token);
 }
@@ -146,6 +152,7 @@ export function SigningApprovalScreen({
   onReject,
   onSign,
 }: SigningApprovalScreenProps) {
+  const t = useT();
   const lookalikeOf = assessment?.lookalikeOf ?? null;
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
@@ -178,12 +185,11 @@ export function SigningApprovalScreen({
       </div>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">{actionCopy(preview)}</div>
+        <div className="text-center text-body font-bold text-foreground">{actionCopy(preview, t)}</div>
 
         {preview.kind === "pointsProof" ? (
           <p className="text-center text-label leading-relaxed text-muted">
-            To use Gleam Points, your device signs a 0 AR transaction that proves you own this wallet. It is never
-            posted and moves no AR.
+            {t("approval.pointsProofIntro")}
           </p>
         ) : null}
 
@@ -191,7 +197,7 @@ export function SigningApprovalScreen({
           <>
             <div className="flex flex-col items-center gap-2 py-1 text-center">
               <CollectibleThumbnail
-                name={preview.collectible.name ?? "Collectible"}
+                name={preview.collectible.name ?? t("approval.collectible")}
                 imageUrl={preview.collectible.imageUrl}
                 className="w-24"
               />
@@ -210,7 +216,7 @@ export function SigningApprovalScreen({
             <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
-              <ReviewRow label="Network fee" value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
+              <ReviewRow label={t("approval.networkFee")} value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
             </div>
           </>
         ) : isTransfer ? (
@@ -221,7 +227,7 @@ export function SigningApprovalScreen({
               </span>
               {preview.token != null ? (
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">
-                  {formatAmountUnit(preview.token, preview.tokenDenomination, preview.tokenTicker)}
+                  {formatAmountUnit(preview.token, preview.tokenDenomination, preview.tokenTicker, t)}
                 </span>
               ) : null}
             </div>
@@ -236,9 +242,9 @@ export function SigningApprovalScreen({
             <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
-              <ReviewRow label="Fee" value={formatFee(preview.fee)} />
+              <ReviewRow label={t("approval.fee")} value={formatFee(preview.fee)} />
               <ReviewRow
-                label="Total"
+                label={t("approval.total")}
                 value={formatTotal(preview.amount, preview.fee, preview.token, preview.tokenDenomination)}
                 strong
               />
@@ -249,7 +255,9 @@ export function SigningApprovalScreen({
         {preview.items ? (
           <div className="flex flex-col gap-3">
             <span className="text-caption font-semibold uppercase tracking-wide text-muted">
-              {preview.items.length} item{preview.items.length === 1 ? "" : "s"} to sign
+              {preview.items.length === 1
+                ? t("approval.oneItemToSign")
+                : t("approval.manyItemsToSign", { count: preview.items.length })}
             </span>
             {preview.items.map((item, index) => (
               <DataItemPreview key={index} index={index} item={item} />
@@ -259,7 +267,7 @@ export function SigningApprovalScreen({
           <>
             {preview.decodedData !== null && preview.decodedData !== "" ? (
               <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
+                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
                 <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
                   {preview.decodedData}
                 </div>
@@ -268,7 +276,7 @@ export function SigningApprovalScreen({
 
             {preview.tags.length > 0 ? (
               <div className="flex flex-col gap-1.5">
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">Tags</span>
+                <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {preview.tags.map((tag, index) => (
                     <span key={index} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
@@ -281,7 +289,11 @@ export function SigningApprovalScreen({
 
             {/* A wallet send has no payload of its own; its device step shows what is signed. */}
             {preview.kind !== "transfer" ? (
-              <AddrBlock label="Signing payload (SHA-256)" value={preview.payloadHash} />
+              <AddrBlock
+                label={t("approval.signingPayloadHash")}
+                copyLabel={t("approval.copySigningPayloadHash")}
+                value={preview.payloadHash}
+              />
             ) : null}
           </>
         )}
@@ -294,7 +306,7 @@ export function SigningApprovalScreen({
 
         <div className="mt-auto flex gap-2.5 pt-1">
           <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            Reject
+            {t("approval.reject")}
           </Button>
           <Button
             type="button"
@@ -304,7 +316,7 @@ export function SigningApprovalScreen({
             onClick={() => void handleSign()}
             className="flex-1"
           >
-            {submitting ? "Signing…" : actionCopy(preview)}
+            {submitting ? t("approval.signing") : actionCopy(preview, t)}
           </Button>
         </div>
       </div>
@@ -319,23 +331,24 @@ function DataItemPreview({
   index: number;
   item: NonNullable<SigningApprovalPreview["items"]>[number];
 }) {
+  const t = useT();
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
   const targetAvatarSvg = item.target ? identity.avatarSvg(item.target) : undefined;
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
-      <span className="text-caption font-semibold text-foreground">Item {index + 1}</span>
+      <span className="text-caption font-semibold text-foreground">{t("approval.itemNumber", { number: index + 1 })}</span>
 
       {item.target !== null ? (
         <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Target</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.target")}</span>
           <MemorableAddress address={item.target} emphasisPick={emphasisPick} avatarSvg={targetAvatarSvg} />
         </div>
       ) : null}
 
       {item.decodedData !== null && item.decodedData !== "" ? (
         <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Decoded data</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
           <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-[11px] leading-relaxed text-foreground">
             {item.decodedData}
           </div>
@@ -344,7 +357,7 @@ function DataItemPreview({
 
       {item.tags.length > 0 ? (
         <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Tags</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
           <div className="flex flex-wrap gap-1.5">
             {item.tags.map((tag, tagIndex) => (
               <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
@@ -356,7 +369,7 @@ function DataItemPreview({
       ) : null}
 
       <div className="flex flex-col gap-0.5">
-        <span className="text-caption font-semibold uppercase tracking-wide text-muted">Payload (SHA-256)</span>
+        <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.payloadHash")}</span>
         <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
       </div>
     </div>
@@ -364,16 +377,17 @@ function DataItemPreview({
 }
 
 function RecipientBlock({ address }: { address: string }) {
+  const t = useT();
   const identity = useAddressIdentity();
   const { emphasisPick } = identity;
   const avatarSvg = identity.avatarSvg(address);
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-caption font-semibold uppercase tracking-wide text-muted">Recipient</span>
+        <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.recipient")}</span>
         <button
           type="button"
-          aria-label="Copy recipient"
+          aria-label={t("approval.copyRecipient")}
           onClick={() => void copyToClipboard(address)}
           className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
         >
@@ -385,7 +399,7 @@ function RecipientBlock({ address }: { address: string }) {
   );
 }
 
-function AddrBlock({ label, value }: { label: string; value: string }) {
+function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: string; value: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-caption font-semibold uppercase tracking-wide text-muted">{label}</span>
@@ -393,7 +407,7 @@ function AddrBlock({ label, value }: { label: string; value: string }) {
         <span className="flex-1 break-all font-mono text-caption leading-relaxed text-foreground">{value}</span>
         <button
           type="button"
-          aria-label={`Copy ${label.toLowerCase()}`}
+          aria-label={copyLabel}
           onClick={() => void copyToClipboard(value)}
           className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
         >

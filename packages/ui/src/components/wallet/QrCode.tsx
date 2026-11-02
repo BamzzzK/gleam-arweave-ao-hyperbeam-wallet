@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
 import QRCodeStyling from "qr-code-styling";
 import { cn } from "../../primitives/cn";
+import { useUiLabels } from "../../labels";
 
 export interface QrCodeProps {
   value: string;
   size?: number;
+  /** Accessible name for the code; English unless the caller passes its own. */
+  label?: (value: string) => string;
   className?: string;
 }
 
@@ -16,7 +19,8 @@ const QR_ACCENT = "#8b12ff";
 const LOGO_SRC = "/icon/128.png";
 const LOGO_TIMEOUT_MS = 1500;
 
-export function QrCode({ value, size = 176, className }: QrCodeProps) {
+export function QrCode({ value, size = 176, label, className }: QrCodeProps) {
+  const labels = useUiLabels();
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<QRCodeStyling | null>(null);
 
@@ -104,7 +108,7 @@ export function QrCode({ value, size = 176, className }: QrCodeProps) {
       <div
         ref={containerRef}
         role="img"
-        aria-label={`QR code for wallet address ${value}`}
+        aria-label={(label ?? labels.qrCode)(value)}
         style={{ width: size, height: size }}
       />
     </div>

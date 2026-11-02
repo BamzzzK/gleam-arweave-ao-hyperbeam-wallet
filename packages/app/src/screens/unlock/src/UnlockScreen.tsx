@@ -5,6 +5,7 @@ import { SecurityPhraseMark } from "@gleam/ui/src/components/security-phrase/ind
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
+import { useT, type TFunction } from "../../../i18n";
 
 /**
  * A pure brand moment, global unlock: no per-wallet identity (avatar/name/
@@ -45,23 +46,27 @@ interface QuickUnlock extends PasskeyUnlockProps {
   switchBack: string;
 }
 
-function quickUnlockFor(passkey?: PasskeyUnlockProps, biometrics?: BiometricUnlockProps): QuickUnlock | undefined {
+function quickUnlockFor(
+  t: TFunction,
+  passkey?: PasskeyUnlockProps,
+  biometrics?: BiometricUnlockProps,
+): QuickUnlock | undefined {
   if (biometrics) {
     return {
       ...biometrics,
       icon: <BiometricIcon />,
-      action: `Unlock with ${biometrics.label}`,
-      waiting: `Waiting for ${biometrics.label}…`,
-      switchBack: `Use ${biometrics.label}`,
+      action: t("unlock.unlockWithBiometric", { label: biometrics.label }),
+      waiting: t("unlock.waitingForBiometric", { label: biometrics.label }),
+      switchBack: t("unlock.useBiometric", { label: biometrics.label }),
     };
   }
   if (passkey) {
     return {
       ...passkey,
       icon: <PasskeyIcon />,
-      action: "Unlock with passkey",
-      waiting: "Waiting for passkey…",
-      switchBack: "Use passkey",
+      action: t("unlock.unlockWithPasskey"),
+      waiting: t("unlock.waitingForPasskey"),
+      switchBack: t("unlock.usePasskey"),
     };
   }
   return undefined;
@@ -72,12 +77,13 @@ export function UnlockScreen({
   unlocking = false,
   errorMessage,
   onForgotPassword,
-  tagline = "Simple. Fast. Easy.",
+  tagline,
   passkey,
   biometrics,
   securityPhrase,
 }: UnlockScreenProps) {
-  const quick = quickUnlockFor(passkey, biometrics);
+  const t = useT();
+  const quick = quickUnlockFor(t, passkey, biometrics);
   // The form and the links stay disabled while the other way in is running.
   const locked = unlocking || (quick?.busy ?? false);
   const [usePassword, setUsePassword] = useState(false);
@@ -114,7 +120,7 @@ export function UnlockScreen({
         onClick={onForgotPassword}
         className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-3"
       >
-        Forgot password?
+        {t("unlock.forgotPassword")}
       </button>
     </div>
   );
@@ -124,7 +130,7 @@ export function UnlockScreen({
       <div className="h-2 w-full" aria-hidden="true" />
       {/* With the keyboard up there is no room for the wordmark; the security phrase below it stays. */}
       <div className="mt-16 mb-2 phone:mt-6 phone:[@media(max-height:560px)]:hidden">
-        <BeamMark tagline={tagline} />
+        <BeamMark tagline={tagline ?? t("unlock.tagline")} />
       </div>
       {securityPhrase && phraseIcon ? (
         <SecurityPhraseMark phrase={securityPhrase} iconSvg={phraseIcon} layout="stacked" className="mt-6 phone:mt-4" />
@@ -146,8 +152,8 @@ export function UnlockScreen({
           }}
         >
           <PasswordField
-            label="Password"
-            placeholder="Enter your password"
+            label={t("unlock.passwordLabel")}
+            placeholder={t("unlock.passwordPlaceholder")}
             autoFocus
             autoComplete="current-password"
             value={password}
@@ -163,10 +169,10 @@ export function UnlockScreen({
               {unlocking ? (
                 <>
                   <Spinner />
-                  <span>Unlocking&hellip;</span>
+                  <span>{t("unlock.unlocking")}</span>
                 </>
               ) : (
-                "Unlock"
+                t("unlock.unlock")
               )}
             </Button>
             {links}
@@ -189,6 +195,7 @@ function QuickUnlockButtons({
   onUsePassword,
   links,
 }: QuickUnlock & { disabled: boolean; onUsePassword: () => void; links: ReactNode }) {
+  const t = useT();
   return (
     <ScreenFooter className="mt-12 gap-0">
       <Button type="button" autoFocus disabled={busy || disabled} aria-busy={busy} onClick={onUnlock}>
@@ -213,7 +220,7 @@ function QuickUnlockButtons({
         </p>
       ) : null}
       <Button type="button" variant="secondary" disabled={busy || disabled} onClick={onUsePassword} className="mt-2.5">
-        Use password instead
+        {t("unlock.usePasswordInstead")}
       </Button>
       {links}
     </ScreenFooter>

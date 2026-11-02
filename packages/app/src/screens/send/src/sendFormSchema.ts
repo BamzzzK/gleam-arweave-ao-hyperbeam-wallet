@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { t } from "../../../i18n";
 
 /**
  * Compose-step field validation (recipient shape + amount shape/precision).
@@ -15,7 +16,7 @@ import { z } from "zod";
 export const recipientSchema = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9_-]{43}$/, "That doesn't look like a full Arweave address: check for a missing character.");
+  .regex(/^[A-Za-z0-9_-]{43}$/, { error: () => t("send.addressIncomplete") });
 
 const AMOUNT_SHAPE = /^\d+(\.\d+)?$/;
 
@@ -24,12 +25,12 @@ export function amountSchema(denomination: number) {
   return z
     .string()
     .trim()
-    .regex(AMOUNT_SHAPE, "Enter a valid amount.")
-    .refine((value) => !/^0+(\.0+)?$/.test(value), "Enter an amount greater than 0.")
+    .regex(AMOUNT_SHAPE, { error: () => t("send.invalidAmount") })
+    .refine((value) => !/^0+(\.0+)?$/.test(value), { error: () => t("send.amountPositive") })
     .refine((value) => {
       const fraction = value.split(".")[1];
       return fraction === undefined || fraction.length <= denomination;
-    }, `This token supports up to ${denomination} decimal place${denomination === 1 ? "" : "s"}.`);
+    }, { error: () => (denomination === 1 ? t("send.oneDecimal") : t("send.manyDecimals", { count: denomination })) });
 }
 
 export type RecipientValidation = z.infer<typeof recipientSchema>;

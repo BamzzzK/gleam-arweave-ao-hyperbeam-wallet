@@ -1,14 +1,21 @@
 import { isFiatCurrency, type DisplayCurrency } from "@gleam/core";
 
-const PERCENT_FORMAT = new Intl.NumberFormat("en-US", {
-  style: "percent",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  signDisplay: "exceptZero",
-});
+const PERCENT_FORMATS = new Map<string, Intl.NumberFormat>();
 
-export function formatPercent(fraction: number): string {
-  return PERCENT_FORMAT.format(fraction);
+/** Without a locale this stays `en-US`, so a signed percent reads the same everywhere until the app picks a language. */
+export function formatPercent(fraction: number, locale?: string): string {
+  const tag = locale ?? "en-US";
+  let format = PERCENT_FORMATS.get(tag);
+  if (!format) {
+    format = new Intl.NumberFormat(tag, {
+      style: "percent",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      signDisplay: "exceptZero",
+    });
+    PERCENT_FORMATS.set(tag, format);
+  }
+  return format.format(fraction);
 }
 
 /** A formatted value with its token ticker kept apart, so a large figure can set the ticker smaller. */
@@ -31,9 +38,9 @@ const LATIN_ABBREVIATION = /^[A-Za-z.]+$/;
  * code as the unit. AR and AO get more decimals below 1, where two would
  * round most balances to zero.
  */
-export function formatCurrencyParts(value: number, currency: DisplayCurrency): CurrencyValueParts {
+export function formatCurrencyParts(value: number, currency: DisplayCurrency, locale?: string): CurrencyValueParts {
   if (isFiatCurrency(currency)) {
-    const parts = new Intl.NumberFormat(undefined, { style: "currency", currency, currencyDisplay: "narrowSymbol" }).formatToParts(value);
+    const parts = new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "narrowSymbol" }).formatToParts(value);
     const symbol = parts.find((part) => part.type === "currency")?.value ?? "";
     if (!LATIN_ABBREVIATION.test(symbol)) return { amount: parts.map((part) => part.value).join("") };
     // Drops the code with the space that separated it, so `-AED 1,200.00` becomes `-1,200.00`.
@@ -48,20 +55,20 @@ export function formatCurrencyParts(value: number, currency: DisplayCurrency): C
     return { amount, unit: currency };
   }
   const maximumFractionDigits = Math.abs(value) >= 1 || value === 0 ? 2 : 6;
-  return { amount: new Intl.NumberFormat(undefined, { maximumFractionDigits }).format(value), unit: currency };
+  return { amount: new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value), unit: currency };
 }
 
 /** One step of the last digit `formatCurrencyParts` shows for `value`, such as 0.01 for cents. */
-export function currencyStep(value: number, currency: DisplayCurrency): number {
+export function currencyStep(value: number, currency: DisplayCurrency, locale?: string): number {
   if (isFiatCurrency(currency)) {
-    const { maximumFractionDigits = 2 } = new Intl.NumberFormat(undefined, { style: "currency", currency }).resolvedOptions();
+    const { maximumFractionDigits = 2 } = new Intl.NumberFormat(locale, { style: "currency", currency }).resolvedOptions();
     return 10 ** -maximumFractionDigits;
   }
   return Math.abs(value) >= 1 || value === 0 ? 0.01 : 0.000001;
 }
 
-export function formatCurrencyValue(value: number, currency: DisplayCurrency): string {
-  const { amount, unit } = formatCurrencyParts(value, currency);
+export function formatCurrencyValue(value: number, currency: DisplayCurrency, locale?: string): string {
+  const { amount, unit } = formatCurrencyParts(value, currency, locale);
   return unit ? `${amount} ${unit}` : amount;
 }
 

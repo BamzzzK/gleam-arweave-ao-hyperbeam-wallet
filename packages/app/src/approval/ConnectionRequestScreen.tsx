@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { useT, type MessageKey } from "../i18n";
 
 /**
  * Ports `connection-request.html` (6.1): origin identity, "wants to:"
@@ -17,17 +18,17 @@ export interface ConnectionRequestScreenProps {
   onGrant: () => void;
 }
 
-const SCOPE_COPY: Record<PermissionType, { title: string; detail: string }> = {
-  ACCESS_ADDRESS: { title: "See your address", detail: "Your public wallet address" },
-  ACCESS_PUBLIC_KEY: { title: "See your public key", detail: "Used to verify signatures" },
-  ACCESS_ALL_ADDRESSES: { title: "See all your wallets", detail: "Every address you've added" },
-  ACCESS_ARWEAVE_CONFIG: { title: "See your network settings", detail: "Gateway and peer configuration" },
-  ACCESS_TOKENS: { title: "See your token balances", detail: "AR and AO token balances" },
-  SIGN_TRANSACTION: { title: "Request payments", detail: "You'll confirm each one" },
-  SIGNATURE: { title: "Ask you to sign data", detail: "Reviewed individually, every time" },
-  ENCRYPT: { title: "Encrypt data for you", detail: "Using your key" },
-  DECRYPT: { title: "Decrypt data for you", detail: "Using your key" },
-  DISPATCH: { title: "Request payments", detail: "You'll confirm each one" },
+const SCOPE_COPY: Record<PermissionType, { title: MessageKey; detail: MessageKey }> = {
+  ACCESS_ADDRESS: { title: "approval.scopeAddressTitle", detail: "approval.scopeAddressDetail" },
+  ACCESS_PUBLIC_KEY: { title: "approval.scopePublicKeyTitle", detail: "approval.scopePublicKeyDetail" },
+  ACCESS_ALL_ADDRESSES: { title: "approval.scopeAllAddressesTitle", detail: "approval.scopeAllAddressesDetail" },
+  ACCESS_ARWEAVE_CONFIG: { title: "approval.scopeNetworkTitle", detail: "approval.scopeNetworkDetail" },
+  ACCESS_TOKENS: { title: "approval.scopeTokensTitle", detail: "approval.scopeTokensDetail" },
+  SIGN_TRANSACTION: { title: "approval.scopePaymentsTitle", detail: "approval.scopePaymentsDetail" },
+  SIGNATURE: { title: "approval.scopeSignDataTitle", detail: "approval.scopeSignDataDetail" },
+  ENCRYPT: { title: "approval.scopeEncryptTitle", detail: "approval.scopeKeyDetail" },
+  DECRYPT: { title: "approval.scopeDecryptTitle", detail: "approval.scopeKeyDetail" },
+  DISPATCH: { title: "approval.scopePaymentsTitle", detail: "approval.scopePaymentsDetail" },
 };
 
 function faviconLetter(origin: string): string {
@@ -47,6 +48,7 @@ function hostnameOf(origin: string): string {
 }
 
 export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: ConnectionRequestScreenProps) {
+  const t = useT();
   const { requestedPermissions, appInfo } = preview;
   const fallbackName = hostnameOf(origin).split(".")[0] ?? origin;
   const displayName = appInfo?.name?.trim() || fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
@@ -75,7 +77,7 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
           <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>
 
-        <div className="text-center text-caption font-semibold text-muted">{displayName} wants to:</div>
+        <div className="text-center text-caption font-semibold text-muted">{t("approval.wantsTo", { name: displayName })}</div>
 
         <div className="flex flex-col">
           {requestedPermissions.map((permission) => {
@@ -86,8 +88,8 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
                   <ScopeIcon />
                 </div>
                 <div className="flex flex-col gap-px">
-                  <span className="text-label font-semibold text-foreground">{copy.title}</span>
-                  <span className="text-caption text-muted">{copy.detail}</span>
+                  <span className="text-label font-semibold text-foreground">{t(copy.title)}</span>
+                  <span className="text-caption text-muted">{t(copy.detail)}</span>
                 </div>
               </div>
             );
@@ -96,10 +98,10 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
 
         <div className="mt-auto flex gap-2.5">
           <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            Reject
+            {t("approval.reject")}
           </Button>
           <Button type="button" variant="primary" onClick={onGrant} className="flex-1">
-            Grant
+            {t("approval.grant")}
           </Button>
         </div>
       </div>

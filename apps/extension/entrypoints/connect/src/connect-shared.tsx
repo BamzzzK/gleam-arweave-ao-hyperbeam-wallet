@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { t, useT } from "@gleam/app/src/i18n/index.tsx";
 
 /** Rewrites the background's refusals into copy for the connect page. */
 export function backgroundErrorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/unlock/i.test(message)) {
-    return "Gleam is locked. Click the Gleam icon in the toolbar, unlock it, then press Connect again.";
+    return t("extension.lockedHelp");
   }
   return message;
 }
@@ -26,13 +27,14 @@ export function ConnectShell({ title, children }: { title: string; children: Rea
 }
 
 export function ConnectedNotice({ device, onClose }: { device: string; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-4">
       <p role="status" className="text-body leading-relaxed">
-        {device} connected. You can close this tab.
+        {t("extension.deviceConnected", { device })}
       </p>
       <Button type="button" variant="secondary" onClick={onClose}>
-        Close tab
+        {t("extension.closeTab")}
       </Button>
     </div>
   );

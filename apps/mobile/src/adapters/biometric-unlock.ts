@@ -10,6 +10,7 @@ import type {
   BiometricUnlockPort,
   BiometryKind,
 } from "@gleam/app/src/app-platform/types.ts";
+import { t } from "@gleam/app/src/i18n/index.tsx";
 
 /**
  * Every call into the biometric plugin. The vault password is stored only
@@ -22,7 +23,6 @@ import type {
  */
 const SERVER = "app.gleamwallet.vault-password";
 const USERNAME = "gleam";
-const PROMPT_TITLE = "Unlock Gleam";
 // The plugin's Android default of one try ends the prompt on a single
 // misread finger; five is the most BiometricPrompt allows.
 const MAX_ATTEMPTS = 5;
@@ -93,7 +93,7 @@ export function createBiometricUnlock(): BiometricUnlockPort {
           password,
           accessControl: AccessControl.BIOMETRY_CURRENT_SET,
           authValidityDuration: 0,
-          title: "Turn on biometric unlock",
+          title: t("extension.biometricEnableTitle"),
           maxAttempts: MAX_ATTEMPTS,
         });
       } catch (error) {
@@ -105,8 +105,8 @@ export function createBiometricUnlock(): BiometricUnlockPort {
       try {
         const { password } = await NativeBiometric.getSecureCredentials({
           server: SERVER,
-          reason: PROMPT_TITLE,
-          title: PROMPT_TITLE,
+          reason: t("extension.biometricUnlockTitle"),
+          title: t("extension.biometricUnlockTitle"),
           maxAttempts: MAX_ATTEMPTS,
         });
         return password;

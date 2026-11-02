@@ -1,22 +1,23 @@
 import { lazy, Suspense } from "react";
 import type { HardwareConnectView, HardwareConnectViewProps } from "@gleam/app/src/app-platform/types.ts";
+import { t } from "@gleam/app/src/i18n/index.tsx";
 import type { DeviceSignPanel } from "@gleam/app/src/approval/device-panels.tsx";
 
-const CAMERA_DENIED_HELP = "Turn on camera access for Gleam in your phone's Settings, then try again.";
+const cameraDeniedHelp = () => t("extension.cameraDeniedHelpMobile");
 
 // The Keystone libraries load when a Keystone screen first opens, so they
 // stay out of the bundle every launch parses.
 const keystone = () => import("@gleam/keystone");
 
 const LazyPanel = lazy(async () => ({
-  default: (await keystone()).createKeystonePanel({ cameraDeniedHelp: CAMERA_DENIED_HELP }),
+  default: (await keystone()).createKeystonePanel({ cameraDeniedHelp }),
 }));
 
 const LazyConnectView = lazy(async () => {
   const { KeystoneConnectView } = await keystone();
   return {
     default: (props: HardwareConnectViewProps) => (
-      <KeystoneConnectView {...props} cameraDeniedHelp={CAMERA_DENIED_HELP} />
+      <KeystoneConnectView {...props} cameraDeniedHelp={cameraDeniedHelp} />
     ),
   };
 });

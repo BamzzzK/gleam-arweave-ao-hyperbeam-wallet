@@ -1,6 +1,7 @@
 import * as React from "react";
 import { TextField, type TextFieldProps } from "../../primitives/text-field";
 import { cn } from "../../primitives/cn";
+import { useUiLabels } from "../../labels";
 
 /**
  * Password input with a reveal toggle and (optionally) a caps-lock
@@ -14,10 +15,15 @@ import { cn } from "../../primitives/cn";
 export interface PasswordFieldProps extends Omit<TextFieldProps, "type" | "label"> {
   label?: string;
   capsLockOn?: boolean;
+  /** Accessible names and hint text; English unless the caller passes its own. */
+  showLabel?: string;
+  hideLabel?: string;
+  capsLockLabel?: string;
 }
 
 export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldProps>(
-  ({ label, capsLockOn, id, className, ...props }, ref) => {
+  ({ label, capsLockOn, showLabel, hideLabel, capsLockLabel, id, className, ...props }, ref) => {
+    const labels = useUiLabels();
     const [revealed, setRevealed] = React.useState(false);
     const generatedId = React.useId();
     const inputId = id ?? generatedId;
@@ -39,7 +45,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
           />
           <button
             type="button"
-            aria-label={revealed ? "Hide password" : "Show password"}
+            aria-label={revealed ? (hideLabel ?? labels.hidePassword) : (showLabel ?? labels.showPassword)}
             aria-pressed={revealed}
             onClick={() => setRevealed((value) => !value)}
             className="absolute right-2 top-0 flex h-11 w-7 flex-shrink-0 phone:right-0 phone:w-11 items-center justify-center text-faint hover:text-muted"
@@ -52,7 +58,7 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
         {capsLockOn ? (
           <div className="flex items-center gap-1.5 text-caption text-muted">
             <CapsLockIcon />
-            <span>Caps Lock is on</span>
+            <span>{capsLockLabel ?? labels.capsLockOn}</span>
           </div>
         ) : null}
       </div>

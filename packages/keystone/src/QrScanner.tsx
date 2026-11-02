@@ -3,6 +3,7 @@ import jsQR from "jsqr";
 import type { UR } from "@ngraveio/bc-ur";
 import { WrongKeystoneQrError } from "./decode-account";
 import { UrAssembler } from "./ur-assembler";
+import { t } from "@gleam/app/src/i18n/index.tsx";
 
 export type ScannerError = "camera-denied" | "camera-unavailable" | "wrong-type" | "invalid";
 
@@ -101,7 +102,7 @@ export function QrScanner({ expectedType, onProgress, onComplete, onError }: QrS
       ref={videoRef}
       muted
       playsInline
-      aria-label="Camera preview"
+      aria-label={t("extension.cameraPreview")}
       className="mx-auto aspect-square w-full max-w-[min(100%,45dvh)] rounded-lg border border-line bg-mist object-cover"
     />
   );

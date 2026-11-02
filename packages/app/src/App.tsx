@@ -26,6 +26,9 @@ import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
 import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
+import { LanguageView } from "./screens/language/index.tsx";
+import { useDocumentLanguage, useT } from "./i18n";
+import { UiLabels } from "./i18n/UiLabels";
 import { PointsView } from "./screens/points/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
@@ -98,6 +101,7 @@ type MainSubView =
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "display-currency" }
+  | { kind: "language" }
   | { kind: "collectible"; collectible: Collectible }
   | { kind: "send-collectible"; collectible: Collectible }
   | { kind: "points" }
@@ -115,8 +119,18 @@ function resolveActiveWallet(state: WalletState): WalletSummary | null {
   return state.wallets.find((wallet) => wallet.id === preferredId) ?? state.wallets[0] ?? null;
 }
 
-export function App({ layout, runtime: runtimeProp }: AppProps) {
+export function App(props: AppProps) {
+  return (
+    <UiLabels>
+      <AppContent {...props} />
+    </UiLabels>
+  );
+}
+
+function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   const platform = usePlatform();
+  useDocumentLanguage();
+  const t = useT();
   const runtime = runtimeProp ?? platform.runtime;
   const [view, setView] = useState<TopView>("loading");
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
@@ -263,9 +277,9 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
   let content: ReactNode;
 
   if (initError) {
-    content = <div className="p-4 text-body text-muted">Couldn&apos;t reach the extension background. {initError}</div>;
+    content = <div className="p-4 text-body text-muted">{t("app.initError", { error: initError })}</div>;
   } else if (view === "loading") {
-    content = <div className="p-4 text-body text-muted">Loading&hellip;</div>;
+    content = <div className="p-4 text-body text-muted">{t("app.loading")}</div>;
   } else if (view === "onboarding") {
     content = <GatedOnboarding
         runtime={runtime}
@@ -289,7 +303,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     // response the current models can't actually produce (wallets.length
     // > 0 is what got us into this branch), kept as a named fallback
     // rather than crashing.
-    content = <div className="p-4 text-body text-muted">No active wallet found.</div>;
+    content = <div className="p-4 text-body text-muted">{t("app.noActiveWallet")}</div>;
   } else if (subView.kind === "send") {
     content = (
       <SendView
@@ -353,7 +367,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         }}
       />
     ) : (
-      <div className="p-4 text-body text-muted">Wallet not found.</div>
+      <div className="p-4 text-body text-muted">{t("app.walletNotFound")}</div>
     );
   } else if (subView.kind === "add-wallet") {
     content = (
@@ -380,6 +394,7 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
         onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
+        onOpenLanguage={() => setSubView({ kind: "language" })}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
@@ -429,6 +444,8 @@ export function App({ layout, runtime: runtimeProp }: AppProps) {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "display-currency") {
     content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+  } else if (subView.kind === "language") {
+    content = <LanguageView onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "use-gleam-on-site") {
     content = (
       <UseGleamOnSiteView

@@ -1,0 +1,43 @@
+import { defineMessages } from "../define";
+
+export const walletSwitcher = defineMessages({
+  en: {
+    switchWallet: "Switch wallet",
+    wallets: "Wallets",
+    addWallet: "Add wallet",
+    avatarOf: "{name} avatar",
+    active: "Active",
+    makeActive: "Make active",
+    addressCopied: "{name} address copied",
+    copyAddressOf: "Copy {name} address",
+    copied: "Copied",
+    copyAddress: "Copy address",
+    manage: "Manage {name}",
+  },
+  "zh-CN": {
+    switchWallet: "切换钱包",
+    wallets: "钱包",
+    addWallet: "添加钱包",
+    avatarOf: "{name}的头像",
+    active: "当前使用",
+    makeActive: "设为当前",
+    addressCopied: "已复制{name}的地址",
+    copyAddressOf: "复制{name}的地址",
+    copied: "已复制",
+    copyAddress: "复制地址",
+    manage: "管理{name}",
+  },
+  "zh-TW": {
+    switchWallet: "切換錢包",
+    wallets: "錢包",
+    addWallet: "新增錢包",
+    avatarOf: "{name}的頭像",
+    active: "目前使用",
+    makeActive: "設為目前",
+    addressCopied: "已複製{name}的地址",
+    copyAddressOf: "複製{name}的地址",
+    copied: "已複製",
+    copyAddress: "複製地址",
+    manage: "管理{name}",
+  },
+});

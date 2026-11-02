@@ -4,6 +4,7 @@ import {
   type LedgerArweaveClient,
 } from "@gleam/core";
 import { LedgerTransportError } from "./webhid-transport";
+import { t } from "@gleam/app/src/i18n/index.tsx";
 
 /** Thrown when the caller's signal aborts a Ledger flow. */
 export class LedgerCancelled extends Error {
@@ -32,7 +33,7 @@ export function ledgerErrorText(error: unknown): string {
   if (error instanceof LedgerError || error instanceof LedgerTransportError)
     return error.message;
   const message = error instanceof Error ? error.message : String(error);
-  return message || "Something went wrong talking to the Ledger.";
+  return message || t("extension.ledgerError");
 }
 
 export type LedgerWaitReason = "app" | "key";

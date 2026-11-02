@@ -3,6 +3,7 @@ import { explorerUrlFor, type TokenBalance } from "@gleam/core";
 import { TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker } from "../../main-screen/src/formatWinston";
+import { useT } from "../../../i18n";
 import { useCopy } from "../../points/src/useCopy";
 
 /** AR is native and has no process page, so it links to the network's transactions. */
@@ -24,6 +25,7 @@ export function TokenInfoPanel({
   balanceValue: string | undefined;
   priceDisplay: string | undefined;
 }) {
+  const t = useT();
   const ticker = token === null ? "AR" : displayTicker(token.ticker);
   const name = token === null ? "Arweave" : (token.name ?? ticker);
   const denomination = token === null ? 12 : token.denomination;
@@ -45,15 +47,15 @@ export function TokenInfoPanel({
 
       <dl className="flex flex-col gap-3">
         {balanceDisplay !== undefined ? (
-          <InfoRow label="Your balance">
+          <InfoRow label={t("send.yourBalance")}>
             {balanceDisplay} {ticker}
             {balanceValue !== undefined ? <span className="ml-1.5 font-normal text-muted">≈ {balanceValue}</span> : null}
           </InfoRow>
         ) : null}
-        {priceDisplay !== undefined ? <InfoRow label="Price">{priceDisplay}</InfoRow> : null}
-        <InfoRow label="Decimals">{denomination}</InfoRow>
+        {priceDisplay !== undefined ? <InfoRow label={t("send.price")}>{priceDisplay}</InfoRow> : null}
+        <InfoRow label={t("send.decimals")}>{denomination}</InfoRow>
         {token !== null ? (
-          <InfoRow label="Process">
+          <InfoRow label={t("send.process")}>
             <ProcessId processId={token.processId} />
           </InfoRow>
         ) : null}
@@ -65,7 +67,7 @@ export function TokenInfoPanel({
         rel="noopener noreferrer"
         className="self-start text-label font-semibold text-foreground hover:underline"
       >
-        View on explorer ↗
+        {t("send.viewOnExplorer")}
       </a>
     </div>
   );
@@ -81,16 +83,17 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function ProcessId({ processId }: { processId: string }) {
+  const t = useT();
   const { copied, copy } = useCopy(processId);
   return (
     <button
       type="button"
       onClick={copy}
       title={processId}
-      aria-label={copied ? "Process id copied" : "Copy process id"}
+      aria-label={copied ? t("send.processIdCopied") : t("send.copyProcessId")}
       className="rounded px-1 font-mono text-caption font-medium text-foreground hover:bg-mist"
     >
-      {copied ? "Copied" : truncateAddress(processId, 6)}
+      {copied ? t("send.copied") : truncateAddress(processId, 6)}
     </button>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { PasskeyIcon } from "@gleam/app/src/screens/unlock/src/UnlockScreen.tsx";
 import { createUnlockPasskey, PasskeyError, type CreatedPasskey } from "@gleam/app/src/passkey/webauthn.ts";
+import { useT } from "@gleam/app/src/i18n/index.tsx";
 
 export interface PasskeySetupProps {
   runtime: RuntimePort;
@@ -23,6 +24,7 @@ type Phase = "idle" | "checking" | "creating" | "saving" | "done";
  * passkey in the user's password manager.
  */
 export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPasskey }: PasskeySetupProps) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [passwordError, setPasswordError] = useState<string>();
@@ -49,7 +51,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
     } catch (error) {
       setNotice(
         error instanceof PasskeyError && error.reason === "cancelled"
-          ? { text: "Passkey cancelled. Try again when you're ready.", tone: "muted" }
+          ? { text: t("extension.passkeyCancelledNotice"), tone: "muted" }
           : { text: error instanceof Error ? error.message : String(error), tone: "error" },
       );
       setPhase("idle");
@@ -70,19 +72,19 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
   if (phase === "done") {
     return (
       <div className="flex min-h-screen flex-col">
-        <ScreenHeader title="Passkey" />
+        <ScreenHeader title={t("extension.passkeyTitle")} />
         <div className="flex flex-1 flex-col px-6 pb-6 pt-16">
           <div className="flex flex-col items-center gap-5 text-center">
             <Beam className="w-10 gleam-beam-sweep" />
             <div className="flex flex-col gap-1.5">
-              <h1 className="text-h3 font-semibold tracking-tight">Passkey ready</h1>
+              <h1 className="text-h3 font-semibold tracking-tight">{t("extension.passkeyReady")}</h1>
               <p className="text-body leading-relaxed text-muted">
-                Next time, choose Unlock with passkey. Your password still works too.
+                {t("extension.passkeyReadyHint")}
               </p>
             </div>
           </div>
           <Button type="button" autoFocus className="mt-auto" onClick={onDone}>
-            Done
+            {t("extension.done")}
           </Button>
         </div>
       </div>
@@ -91,7 +93,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
 
   return (
     <div className="flex min-h-screen flex-col">
-      <ScreenHeader title="Passkey" />
+      <ScreenHeader title={t("extension.passkeyTitle")} />
       <form
         className="flex flex-1 flex-col gap-6 px-6 pb-6 pt-8"
         onSubmit={(event) => {
@@ -104,16 +106,16 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
             <PasskeyIcon size={20} />
           </span>
           <div className="flex flex-col gap-1.5">
-            <h1 className="text-h3 font-semibold tracking-tight">Unlock with a passkey</h1>
+            <h1 className="text-h3 font-semibold tracking-tight">{t("extension.passkeyHeading")}</h1>
             <p className="text-body leading-relaxed text-muted">
-              Use your fingerprint, face, screen lock or a security key instead of typing your password.
+              {t("extension.passkeyIntro")}
             </p>
           </div>
         </div>
 
         <PasswordField
-          label="Password"
-          placeholder="Enter your Gleam password"
+          label={t("extension.password")}
+          placeholder={t("extension.passwordPlaceholder")}
           autoFocus
           autoComplete="current-password"
           value={password}
@@ -123,7 +125,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
         />
 
         <p className="border-t border-line pt-4 text-caption leading-relaxed text-faint">
-          Your password still unlocks Gleam. Keep it: you&apos;ll need it if you lose this passkey.
+          {t("extension.passkeyKeepPassword")}
         </p>
 
         <div className="mt-auto flex flex-col gap-2.5">
@@ -139,7 +141,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
           ) : null}
           {phase === "creating" ? (
             <p role="status" className="text-center text-caption text-muted">
-              Follow your browser&apos;s prompt.
+              {t("extension.followBrowserPrompt")}
             </p>
           ) : null}
           <Button type="submit" disabled={busy || password.length === 0} aria-busy={busy}>
@@ -149,10 +151,10 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
                   aria-hidden="true"
                   className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-background/35 border-t-background motion-reduce:animate-none"
                 />
-                <span>{phase === "creating" ? "Waiting for passkey…" : "Checking…"}</span>
+                <span>{phase === "creating" ? t("extension.waitingForPasskey") : t("extension.checking")}</span>
               </>
             ) : (
-              "Create passkey"
+              t("extension.createPasskey")
             )}
           </Button>
         </div>

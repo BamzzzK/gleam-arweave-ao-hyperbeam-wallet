@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { RuntimePort } from "@gleam/core";
 import { KeystoneConnectView, type KeystoneConnectViewProps } from "@gleam/keystone";
-import { CAMERA_DENIED_HELP } from "@/src/hardware/keystone/camera-help";
+import { cameraDeniedHelp } from "@/src/hardware/keystone/camera-help";
 import { backgroundErrorText, ConnectedNotice, ConnectShell } from "./connect-shared";
+import { useT } from "@gleam/app/src/i18n/index.tsx";
 
 export interface ConnectViewProps {
   runtime: RuntimePort;
@@ -14,6 +15,7 @@ export interface ConnectViewProps {
 
 /** The Keystone connect page, in its own tab. */
 export function ConnectView({ runtime, Scanner, onClose = () => window.close(), autoCloseMs = 3000 }: ConnectViewProps) {
+  const t = useT();
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -23,14 +25,14 @@ export function ConnectView({ runtime, Scanner, onClose = () => window.close(), 
   }, [done, onClose, autoCloseMs]);
 
   return (
-    <ConnectShell title="Connect Keystone">
+    <ConnectShell title={t("extension.connectKeystoneTitle")}>
       {done ? (
         <ConnectedNotice device="Keystone" onClose={onClose} />
       ) : (
         <KeystoneConnectView
           runtime={runtime}
           onConnected={() => setDone(true)}
-          cameraDeniedHelp={CAMERA_DENIED_HELP}
+          cameraDeniedHelp={cameraDeniedHelp}
           errorText={backgroundErrorText}
           {...(Scanner ? { Scanner } : {})}
         />

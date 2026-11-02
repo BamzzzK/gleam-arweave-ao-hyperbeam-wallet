@@ -8,6 +8,7 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { usePlatform } from "../../../app-platform/context";
 import { sitePageUrl } from "@gleam/core";
+import { useT, type MessageKey } from "../../../i18n";
 
 const X_PROFILE_URL = "https://x.com/gleam_wallet";
 // Only the mention and the tag, so every ask is in the asker's own words and
@@ -16,10 +17,10 @@ const X_PROFILE_URL = "https://x.com/gleam_wallet";
 // nothing. No sentence: identical posts from many accounts read as spam.
 const X_ASK_URL = "https://x.com/intent/post?text=%40gleam_wallet%20%23GleamInvite%20";
 
-const MESSAGES: Record<Exclude<InviteRedeemResult, "ok">, string> = {
-  full: "That code is full. Its seats have all been taken.",
-  unknown: "We couldn't find that code. Check it and try again.",
-  offline: "Gleam can't reach the invite server. Try again in a moment.",
+const MESSAGES: Record<Exclude<InviteRedeemResult, "ok">, MessageKey> = {
+  full: "onboarding.gateFull",
+  unknown: "onboarding.gateUnknown",
+  offline: "onboarding.gateOffline",
 };
 
 /**
@@ -54,6 +55,7 @@ export interface FoundingGateProps {
 }
 
 export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGateProps) {
+  const t = useT();
   const { version } = usePlatform().buildInfo;
   const [code, setCode] = useState(initialUnlock?.code ?? "");
   const [verdict, setVerdict] = useState<Exclude<InviteRedeemResult, "ok"> | null>(
@@ -111,7 +113,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
     if (askOpen) askRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [askOpen]);
 
-  const errorMessage = verdict ? MESSAGES[verdict] : emptyPrompt ? "Enter your invite code." : undefined;
+  const errorMessage = verdict ? t(MESSAGES[verdict]) : emptyPrompt ? t("onboarding.enterInviteCode") : undefined;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -129,9 +131,9 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
       <BeamMark animated />
 
       <div className="mt-7 flex flex-col items-center gap-1.5 text-center">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">You&apos;re early.</h1>
+        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">{t("onboarding.gateEarlyTitle")}</h1>
         <p className="text-body text-muted">
-          Members are earning{" "}
+          {t("onboarding.gateMembersEarning")}{" "}
           <EarningWord href={sitePageUrl("gleam", version)} />
         </p>
       </div>
@@ -139,8 +141,8 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
       <form className="mt-8 flex w-full flex-col gap-3" onSubmit={onSubmit} noValidate>
         <TextField
           ref={inputRef}
-          aria-label="Invite code"
-          placeholder="Paste your invite code or link"
+          aria-label={t("onboarding.inviteCodeLabel")}
+          placeholder={t("onboarding.invitePlaceholder")}
           value={code}
           onChange={(event) => {
             setCode(codeFromInput(event.target.value));
@@ -161,7 +163,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
         {unlocked ? (
           <p role="status" className="flex items-center justify-center gap-1.5 text-caption font-semibold text-positive">
             <CheckIcon />
-            You&apos;re in.
+            {t("onboarding.gateYoureIn")}
           </p>
         ) : null}
         <Button
@@ -170,10 +172,10 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
           aria-disabled={checking || unlocked}
           className={cn((checking || unlocked) && "pointer-events-none")}
         >
-          {unlocked ? "Unlocked" : checking ? "Checking…" : "Unlock Gleam"}
+          {unlocked ? t("onboarding.gateUnlocked") : checking ? t("onboarding.gateChecking") : t("onboarding.gateUnlock")}
         </Button>
         <span role="status" aria-live="polite" className="sr-only">
-          {checking ? "Checking your code" : ""}
+          {checking ? t("onboarding.gateCheckingCode") : ""}
         </span>
       </form>
 
@@ -185,25 +187,25 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
           onClick={() => setAskOpen((open) => !open)}
           className="flex items-center gap-1 text-label font-semibold text-foreground hover:opacity-70"
         >
-          Get an invitation
+          {t("onboarding.getInvitation")}
           <ChevronIcon open={showAsk} />
         </button>
         {showAsk ? (
           <div id="founding-gate-ask" ref={askRef} className="flex w-full flex-col items-center gap-3">
             <Button asChild variant={full ? "primary" : "secondary"}>
               <a href={X_ASK_URL} target="_blank" rel="noreferrer">
-                Ask for an invite on X
+                {t("onboarding.askForInvite")}
               </a>
             </Button>
             <p className="text-center text-caption text-muted">
-              or{" "}
+              {t("onboarding.or")}{" "}
               <a
                 href={X_PROFILE_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline underline-offset-2"
               >
-                follow @gleam_wallet for drops
+                {t("onboarding.followForDrops")}
               </a>
             </p>
           </div>

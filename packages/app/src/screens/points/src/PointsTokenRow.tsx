@@ -1,6 +1,7 @@
 import { capabilitiesFor, type RuntimePort, type WalletSummary } from "@gleam/core";
 import { TokenRow } from "@gleam/ui/src/components/wallet/TokenRow.tsx";
 import { GLEAM_POINTS_ICON_URL } from "@gleam/ui/src/tokens/default-token-icons.ts";
+import { useT } from "../../../i18n";
 import { formatPoints, formatPointsCompact } from "./formatPoints";
 import { usePointsStanding } from "./usePoints";
 
@@ -18,16 +19,17 @@ export interface PointsTokenRowProps {
  * Gleam's own. Clicking opens the Points screen.
  */
 export function PointsTokenRow({ runtime, wallet, onOpen, className }: PointsTokenRowProps) {
+  const t = useT();
   const standing = usePointsStanding(runtime, wallet);
   const amount =
     standing.status === "joined"
-      ? `${formatPointsCompact(standing.estimateAtomic)} points`
+      ? t("points.pointsAmount", { amount: formatPointsCompact(standing.estimateAtomic) })
       : standing.status === "not-joined"
         ? capabilitiesFor(wallet.method).points
-          ? "Sign up"
-          : "Unavailable"
+          ? t("points.signUp")
+          : t("points.unavailable")
         : "—";
-  const amountFull = standing.status === "joined" ? `${formatPoints(standing.estimateAtomic)} points` : undefined;
+  const amountFull = standing.status === "joined" ? t("points.pointsAmount", { amount: formatPoints(standing.estimateAtomic) }) : undefined;
 
   return (
     <TokenRow

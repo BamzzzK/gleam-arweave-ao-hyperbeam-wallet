@@ -1,5 +1,6 @@
 import type { RuntimePort } from "@gleam/core";
 import type { BiometricUnlockPort, BiometryKind } from "../app-platform/types";
+import { t, type MessageKey } from "../i18n";
 
 /**
  * - `invalidated`: the device's biometrics changed, so the OS discarded the
@@ -25,23 +26,23 @@ export class BiometricError extends Error {
   }
 }
 
-const LABELS: Record<BiometryKind, string> = {
-  faceId: "Face ID",
-  touchId: "Touch ID",
-  fingerprint: "fingerprint",
-  face: "face recognition",
-  iris: "iris scan",
-  biometrics: "biometrics",
+const LABEL_KEYS: Record<BiometryKind, MessageKey> = {
+  faceId: "app.biometryFaceId",
+  touchId: "app.biometryTouchId",
+  fingerprint: "app.biometryFingerprint",
+  face: "app.biometryFace",
+  iris: "app.biometryIris",
+  biometrics: "app.biometryGeneric",
 };
 
 /** The name to use mid-sentence: "Unlock with Face ID", "Unlock with fingerprint". */
 export function biometryLabel(kind: BiometryKind): string {
-  return LABELS[kind];
+  return t(LABEL_KEYS[kind]);
 }
 
 /** The name to start a heading or sentence with. */
 export function biometryTitle(kind: BiometryKind): string {
-  const label = LABELS[kind];
+  const label = biometryLabel(kind);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -72,7 +73,7 @@ export async function unlockWithBiometrics(
     await biometrics.remove().catch(() => {});
     throw new BiometricError(
       "mismatch",
-      `${biometryTitle(kind)} no longer matches your password. Unlock with your password, then turn ${biometryLabel(kind)} on again.`,
+      t("app.biometricMismatch", { title: biometryTitle(kind), label: biometryLabel(kind) }),
     );
   }
 }
@@ -90,18 +91,18 @@ export function biometricNotice(error: unknown, kind: BiometryKind): { text: str
   }
   switch (error.reason) {
     case "cancelled":
-      return { text: `${title} cancelled. Try again, or use your password.`, tone: "muted" };
+      return { text: t("app.biometricCancelled", { title }), tone: "muted" };
     case "failed":
-      return { text: `${title} didn't work. Try again, or use your password.`, tone: "error" };
+      return { text: t("app.biometricFailed", { title }), tone: "error" };
     case "lockout":
-      return { text: `Too many tries. Unlock with your password.`, tone: "error" };
+      return { text: t("app.biometricLockout"), tone: "error" };
     case "invalidated":
       return {
-        text: `Your device's ${label} settings changed, so Gleam turned ${label} unlock off. Unlock with your password, then turn it on again.`,
+        text: t("app.biometricInvalidated", { label }),
         tone: "error",
       };
     case "unavailable":
-      return { text: `${title} isn't available right now. Use your password.`, tone: "error" };
+      return { text: t("app.biometricUnavailable", { title }), tone: "error" };
     default:
       return { text: error.message, tone: "error" };
   }

@@ -103,6 +103,13 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `@permaweb/aoconnect`: its browser build's signature check breaks raw-JWK
   signing in Chrome. Outcomes are read from `cu.ao-testnet.xyz/result/…`
   (`core/ao/result.ts`).
+- **Translations** live in `packages/app/src/i18n/messages/<screen>.ts`,
+  one `defineMessages({ en, "zh-CN", "zh-TW" })` per screen folder, keyed
+  `namespace.name` and read with `useT()` (`t()` outside React). A key
+  missing from any language fails `tsc`, and `catalog.i18n.test.ts` checks
+  placeholders match. Without a stored choice the language follows the
+  device and falls back to English. Never translate decoded transaction
+  data, addresses, tag values or errors thrown by `core`/`runtime`.
 - **Amounts** are atomic-integer strings (Winston, or the token's smallest
   unit). Never floats.
 - **Activity** merges the local optimistic log with gateway GraphQL. A

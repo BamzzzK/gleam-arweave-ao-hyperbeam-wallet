@@ -4,7 +4,8 @@ import type { RuntimePort } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
-import { inviteLinkFor, invitesLine } from "../../../points-share";
+import { inviteLinkFor } from "../../../points-share";
+import { useT } from "../../../i18n";
 import { useCopy } from "../../points/src/useCopy";
 import { usePointsScores } from "../../points/src/usePoints";
 
@@ -17,26 +18,29 @@ export interface FoundingRevealProps {
 }
 
 export function FoundingReveal({ seatsLeft, inviteCode, onDone }: FoundingRevealProps) {
+  const t = useT();
   const { copied, copy } = useCopy(inviteCode ? inviteLinkFor(inviteCode) : "");
 
   return (
     <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-6 pt-7 phone:pt-4">
       <div className="mt-12 flex flex-col items-center gap-1 text-center">
-        <h1 className="text-h2 font-semibold tracking-tight text-foreground">You&apos;re in</h1>
-        <p className="text-body text-muted">You&apos;re now earning Gleam Points.</p>
+        <h1 className="text-h2 font-semibold tracking-tight text-foreground">{t("onboarding.revealTitle")}</h1>
+        <p className="text-body text-muted">{t("onboarding.revealBody")}</p>
       </div>
       <Beam className="gleam-beam-sweep mt-4 w-24" />
 
       <div className="mt-8 flex min-h-[48px] flex-col items-center gap-1 text-center">
-        {seatsLeft !== null ? <p className="text-h3 font-semibold text-foreground">{invitesLine(seatsLeft)}</p> : null}
+        {seatsLeft !== null ? <p className="text-h3 font-semibold text-foreground">{seatsLeft <= 0
+            ? t("onboarding.invitesNone")
+            : t(seatsLeft === 1 ? "onboarding.invitesOne" : "onboarding.invitesMany", { count: seatsLeft })}</p> : null}
       </div>
 
       <div className="mt-auto flex w-full flex-col gap-3 pt-6">
         <Button disabled={!inviteCode} className={cn(copied && "text-positive")} onClick={copy}>
-          {copied ? "Copied" : "Copy invite link"}
+          {copied ? t("onboarding.copied") : t("onboarding.copyInvite")}
         </Button>
         <Button variant="secondary" onClick={onDone}>
-          Done
+          {t("onboarding.done")}
         </Button>
       </div>
     </div>

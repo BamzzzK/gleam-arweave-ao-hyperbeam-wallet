@@ -1,5 +1,6 @@
 import { usePlatform } from "../../../app-platform/context";
 import { sitePageUrl } from "@gleam/core";
+import { useT } from "../../../i18n";
 
 /** points.html, which drops its install CTAs for a visitor the extension sent (?v=). */
 export function howItWorksUrl(version: string): string {
@@ -21,15 +22,16 @@ export function scanUrl(version: string): string {
  * Points screen drops the link because its About section carries it.
  */
 export function JoinNote({ withLink = true }: { withLink?: boolean }) {
+  const t = useT();
   const { version } = usePlatform().buildInfo;
   return (
     <p className="text-center text-caption text-faint">
-      Joining links this wallet's address to this browser on the Gleam Points server.
+      {t("points.joinNote")}
       {withLink ? (
         <>
           {" "}
           <a href={howItWorksUrl(version)} target="_blank" rel="noreferrer" className="underline hover:text-muted">
-            How to earn points
+            {t("points.howToEarn")}
           </a>
         </>
       ) : null}

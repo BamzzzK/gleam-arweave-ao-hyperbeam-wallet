@@ -1,5 +1,6 @@
 import { cn } from "../../primitives/cn";
 import { Button } from "../../primitives/button";
+import { useUiLabels } from "../../labels";
 
 /**
  * The "your wallet is ready" keyfile card. Backup is explicit and
@@ -16,7 +17,19 @@ export interface AddressRevealProps {
   downloadError?: string | null;
   onSkip: () => void;
   onContinue: () => void;
+  /** Visible and accessible text; English unless the caller passes its own. */
+  labels?: AddressRevealLabels;
   className?: string;
+}
+
+export interface AddressRevealLabels {
+  title: string;
+  savedAs: (name: string) => string;
+  saving: string;
+  format: string;
+  save: string;
+  continue: string;
+  skip: string;
 }
 
 export function AddressReveal({
@@ -27,8 +40,11 @@ export function AddressReveal({
   downloadError = null,
   onSkip,
   onContinue,
+  labels: labelsProp,
   className,
 }: AddressRevealProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.addressReveal;
   return (
     <div className={cn("flex flex-col gap-5", className)}>
       <div className="flex flex-col gap-2">
@@ -37,14 +53,14 @@ export function AddressReveal({
             <FileIcon />
           </span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="text-label font-semibold text-foreground">Wallet keyfile</div>
+            <div className="text-label font-semibold text-foreground">{labels.title}</div>
             <div className="truncate text-caption text-muted">
-              {savedAs ? `Saved as ${savedAs}` : downloading ? "Saving…" : <>JSON &middot; standard Arweave keyfile</>}
+              {savedAs ? labels.savedAs(savedAs) : downloading ? labels.saving : labels.format}
             </div>
           </div>
           <button
             type="button"
-            aria-label="Save keyfile"
+            aria-label={labels.save}
             onClick={onDownload}
             disabled={downloading || !canDownload}
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground disabled:opacity-50 phone:hit-target"
@@ -60,7 +76,7 @@ export function AddressReveal({
       </div>
 
       <Button type="button" onClick={onContinue}>
-        Continue to wallet
+        {labels.continue}
       </Button>
       {!savedAs ? (
         <div className="flex justify-center">
@@ -69,7 +85,7 @@ export function AddressReveal({
             onClick={onSkip}
             className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-4"
           >
-            I&apos;ll back this up later
+            {labels.skip}
           </button>
         </div>
       ) : null}

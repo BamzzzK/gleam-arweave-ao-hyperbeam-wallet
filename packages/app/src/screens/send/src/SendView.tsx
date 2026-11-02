@@ -6,6 +6,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "../../../address-identity";
+import { t, useT } from "../../../i18n";
 import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { useDisplaySettings } from "../../../display-settings";
@@ -157,7 +158,7 @@ function isFullAddress(value: string): boolean {
  * `denomination` can't be trusted for display or for a max-send check, so
  * the row is shown but not selectable (`onClick` omitted).
  */
-const UNAVAILABLE_TOKEN_BALANCE_LABEL = "Unavailable";
+const unavailableTokenBalanceLabel = () => t("send.unavailable");
 
 /** `token.ticker` for an AO token, `"AR"` for the native token (`token === null`). */
 function tickerFor(token: TokenBalance | null): string {
@@ -175,6 +176,7 @@ function priceFor(prices: TokenPrice[] | undefined, token: TokenBalance | null):
 }
 
 export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewProps) {
+  const t = useT();
   const [step, setStep] = useState<Step>(INITIAL_STEP);
   // Store the compose step state when opening the token picker so we can restore it
   const [savedComposeStep, setSavedComposeStep] = useState<Extract<Step, { kind: "compose" }> | null>(null);
@@ -238,7 +240,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
       if (!recipientResult.success) {
         setStep({
           ...step,
-          recipientError: firstIssueMessage(recipientResult.error, "That doesn't look like a valid address."),
+          recipientError: firstIssueMessage(recipientResult.error, t("send.invalidAddress")),
           amountError: undefined,
         });
         return;
@@ -251,7 +253,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         setStep({
           ...step,
           recipientError: undefined,
-          amountError: firstIssueMessage(amountResult.error, "Enter a valid amount."),
+          amountError: firstIssueMessage(amountResult.error, t("send.invalidAmount")),
         });
         return;
       }
@@ -260,7 +262,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           ? parseArToWinston(amountResult.data)
           : parseDisplayToAtomic(amountResult.data, selectedToken.denomination);
       if (amountAtomic === null) {
-        setStep({ ...step, recipientError: undefined, amountError: "Enter a valid amount." });
+        setStep({ ...step, recipientError: undefined, amountError: t("send.invalidAmount") });
         return;
       }
 
@@ -353,7 +355,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
             ...step,
             recipientError: result.success
               ? undefined
-              : firstIssueMessage(result.error, "That doesn't look like a valid address."),
+              : firstIssueMessage(result.error, t("send.invalidAddress")),
           });
         }}
         hideSaveOption={
@@ -379,7 +381,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
           const result = amountSchema(denomination).safeParse(step.amountDisplay);
           setStep({
             ...step,
-            amountError: result.success ? undefined : firstIssueMessage(result.error, "Enter a valid amount."),
+            amountError: result.success ? undefined : firstIssueMessage(result.error, t("send.invalidAmount")),
           });
         }}
         onContinue={() => void handleContinue()}
@@ -467,7 +469,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 
   return (
     <SuccessStep
-      summary={`${formatAmount(step.amountAtomic, selectedToken)} ${tickerFor(selectedToken)} to ${step.recipient}`}
+      summary={t("send.summary", { amount: `${formatAmount(step.amountAtomic, selectedToken)} ${tickerFor(selectedToken)}`, recipient: step.recipient })}
       txId={step.txId}
       onDone={onDone}
       isSaved={contactFor(step.recipient) !== undefined || ownWalletFor(step.recipient) !== undefined}
@@ -478,7 +480,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
 }
 
 /** What you can do with the token, shown as tabs in the compose header. */
-const TOKEN_ACTIONS = [{ id: "send", label: "Send" }] as const;
+const TOKEN_ACTIONS = [{ id: "send", labelKey: "send.sendTab" }] as const;
 
 function ComposeStep({
   wallet,
@@ -538,6 +540,7 @@ function ComposeStep({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const t = useT();
   const denomination = token === null ? 12 : token.denomination;
   const ticker = tickerFor(token);
   // Every non-AR send is an AO data item, which not every wallet kind can sign.
@@ -547,12 +550,12 @@ function ComposeStep({
   const canContinue = !step.submitting && unsupported === null && recipientValid && amountValid;
   // A disabled button names what's missing rather than leaving it to guesswork.
   const continueLabel = step.submitting
-    ? "Estimating fee…"
+    ? t("send.estimatingFee")
     : !recipientValid
-      ? "Enter an address"
+      ? t("send.enterAddress")
       : !amountValid
-        ? "Enter an amount"
-        : "Review and Send";
+        ? t("send.enterAmount")
+        : t("send.reviewAndSend");
   // For AR, Max is balance minus the rough fee estimate (clamped to 0),
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
@@ -591,7 +594,7 @@ function ComposeStep({
   if (showInfo) {
     return (
       <div className="flex min-h-full flex-col">
-        <ScreenHeader title="Token details" onBack={() => onShowInfo(false)} />
+        <ScreenHeader title={t("send.tokenDetails")} onBack={() => onShowInfo(false)} />
         <div className="px-5 py-5">
           <TokenInfoPanel
             token={token && { ...token, logoUrl: shownTokenLogo(token, readRowVisibility(wallet.address), showTokenLogos) }}
@@ -609,7 +612,7 @@ function ComposeStep({
       <ScreenHeader
         onBack={onBack}
         center={
-          <div role="tablist" aria-label={`${ticker} actions`} className="flex items-center gap-1">
+          <div role="tablist" aria-label={t("send.tokenActions", { ticker })} className="flex items-center gap-1">
             {TOKEN_ACTIONS.map((action) => (
               <button
                 key={action.id}
@@ -618,7 +621,7 @@ function ComposeStep({
                 aria-selected={action.id === "send"}
                 className={`rounded-md px-2.5 py-1 text-body phone:hit-target ${action.id === "send" ? "font-semibold text-foreground" : "text-muted hover:text-foreground"}`}
               >
-                {action.label}
+                {t(action.labelKey)}
               </button>
             ))}
           </div>
@@ -626,7 +629,7 @@ function ComposeStep({
         end={
           <button
             type="button"
-            aria-label="Token details"
+            aria-label={t("send.tokenDetails")}
             onClick={() => onShowInfo(true)}
             className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground phone:hit-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
           >
@@ -638,9 +641,9 @@ function ComposeStep({
       />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
         <div className="flex items-center justify-between gap-3 text-label">
-          <span className="font-semibold text-muted">From</span>
+          <span className="font-semibold text-muted">{t("send.from")}</span>
           <span className="flex min-w-0 items-center gap-2">
-            <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label={`${wallet.name} avatar`} size={20} />
+            <AccountAvatar svgMarkup={identity.avatarSvg(wallet.address)} label={t("send.avatarLabel", { name: wallet.name })} size={20} />
             <span className="truncate font-semibold text-foreground">{wallet.name}</span>
             <span className="flex-shrink-0 font-mono text-caption text-faint">{truncateAddress(wallet.address, 6)}</span>
           </span>
@@ -667,7 +670,7 @@ function ComposeStep({
 
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-label font-semibold text-muted">Amount</span>
+            <span className="text-label font-semibold text-muted">{t("send.amount")}</span>
             <span className="flex items-center gap-1 text-label">
               {balanceDisplay !== undefined ? (
                 <span className="tabular-nums text-muted">
@@ -677,11 +680,11 @@ function ComposeStep({
               {maxDisplay !== undefined ? (
                 <button
                   type="button"
-                  aria-label={`Max: ${maxDisplay}`}
+                  aria-label={t("send.maxAria", { amount: maxDisplay })}
                   onClick={() => onChange({ amountDisplay: maxDisplay })}
                   className="rounded-full px-2 py-1 text-caption font-semibold uppercase tracking-wide text-foreground hover:bg-mist phone:hit-target"
                 >
-                  Max
+                  {t("send.max")}
                 </button>
               ) : null}
             </span>
@@ -691,7 +694,7 @@ function ComposeStep({
               <input
                 type="text"
                 inputMode="decimal"
-                aria-label="Amount"
+                aria-label={t("send.amount")}
                 placeholder="0"
                 value={step.amountDisplay}
                 onChange={(event) => {
@@ -791,6 +794,7 @@ export function RecipientField({
   onConfirmSaveAddress: () => void;
   savingAddress: boolean;
 }) {
+  const t = useT();
   const { capabilities, qrScanner } = usePlatform();
   const [editing, setEditing] = useState<"no" | "focused" | "refocus">("no");
   const [scanning, setScanning] = useState(false);
@@ -832,8 +836,8 @@ export function RecipientField({
     } catch (error) {
       setScanError(
         error instanceof QrScanError && error.reason === "permission-denied"
-          ? "Camera access is off for Gleam. Turn it on in Settings to scan."
-          : "Couldn't scan. Try again or paste the address.",
+          ? t("send.scanCameraOff")
+          : t("send.scanFailed"),
       );
     } finally {
       setScanning(false);
@@ -843,11 +847,11 @@ export function RecipientField({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-label font-semibold text-muted">To</span>
+        <span className="text-label font-semibold text-muted">{t("send.to")}</span>
         {capabilities.qrScanner ? (
           <button
             type="button"
-            aria-label="Scan QR code"
+            aria-label={t("send.scanQr")}
             disabled={scanning}
             onClick={() => void scan()}
             // 44px target without growing the label row.
@@ -870,7 +874,7 @@ export function RecipientField({
           <input
             type="text"
             spellCheck={false}
-            aria-label="Recipient address"
+            aria-label={t("send.recipientAddress")}
             autoFocus={editing === "refocus"}
             value={recipient}
             onChange={(event) => onChangeRecipient(event.target.value)}
@@ -882,13 +886,13 @@ export function RecipientField({
               setEditing("no");
               if (!pickedRef.current) onBlurRecipient();
             }}
-            placeholder="Paste an address"
+            placeholder={t("send.pasteAddress")}
             className="w-full rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
           />
           {showDropdown ? (
             <div
               role="listbox"
-              aria-label="Saved contacts"
+              aria-label={t("send.savedContacts")}
               // Keeps focus in the input, so a click lands before the blur closes the list.
               onMouseDown={(event) => event.preventDefault()}
               className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-line bg-background shadow-lg"
@@ -915,7 +919,7 @@ export function RecipientField({
                 onClick={onOpenSavedAddresses}
                 className="w-full px-3.5 py-3 text-left text-label font-medium text-muted hover:bg-mist hover:text-foreground"
               >
-                Saved contacts
+                {t("send.savedContacts")}
               </button>
             </div>
           ) : null}
@@ -994,12 +998,13 @@ function SaveAddressInline({
   onChangeName: (name: string) => void;
   onConfirm: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-2">
       {/* Keeps focus in the recipient input: its blur swaps in the shorter card, which moves this checkbox out from under the click. */}
       <label onMouseDown={(event) => event.preventDefault()} className="flex w-fit items-center gap-2 text-label text-muted phone:min-h-11 phone:gap-2.5">
         <input type="checkbox" checked={expanded} onChange={onToggle} className="h-3.5 w-3.5 accent-foreground phone:h-5 phone:w-5" />
-        Save this address
+        {t("send.saveThisAddress")}
       </label>
       {expanded ? (
         <div className="flex items-center gap-2">
@@ -1011,7 +1016,7 @@ function SaveAddressInline({
             onKeyDown={(event) => {
               if (event.key === "Enter") onConfirm();
             }}
-            placeholder="Enter address name"
+            placeholder={t("send.enterAddressName")}
             className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
           />
           <button
@@ -1020,7 +1025,7 @@ function SaveAddressInline({
             onClick={onConfirm}
             className="flex-shrink-0 text-label font-semibold text-foreground underline-offset-2 hover:underline disabled:opacity-40"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("send.saving") : t("send.save")}
           </button>
         </div>
       ) : null}
@@ -1050,6 +1055,7 @@ function ReviewStep({
   onBack: () => void;
   onSign: () => void;
 }) {
+  const t = useT();
   const ticker = tickerFor(token);
   // A legacy AO transfer has no sender-side fee (`estimate.fee` is `null`),
   // so the Fee row says so rather than showing a fabricated "0 <TICKER>".
@@ -1073,7 +1079,7 @@ function ReviewStep({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Review send" onBack={onBack} busy={step.submitting} />
+      <ScreenHeader title={t("send.reviewSend")} onBack={onBack} busy={step.submitting} />
       <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
         <div className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
           <span className="text-[30px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
@@ -1091,7 +1097,7 @@ function ReviewStep({
         ) : null}
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-label font-semibold text-muted">To</span>
+          <span className="text-label font-semibold text-muted">{t("send.to")}</span>
           <RecipientCard
             address={step.recipient}
             name={knownName ?? null}
@@ -1103,10 +1109,10 @@ function ReviewStep({
 
         <div className="flex flex-col">
           <ReviewRow
-            label="Fee"
-            value={step.estimate.fee === null ? "No network fee" : `${formatWinstonAsAr(step.estimate.fee, 12)} AR`}
+            label={t("send.fee")}
+            value={step.estimate.fee === null ? t("send.noNetworkFee") : `${formatWinstonAsAr(step.estimate.fee, 12)} AR`}
           />
-          <ReviewRow label="Total" value={`${formatAmount(total, token)} ${ticker}`} strong />
+          <ReviewRow label={t("send.total")} value={`${formatAmount(total, token)} ${ticker}`} strong />
         </div>
 
         {step.error ? (
@@ -1117,12 +1123,12 @@ function ReviewStep({
 
         {step.submitting && signsOnDevice ? (
           <p role="status" className="text-label leading-snug text-muted">
-            Approve on your device in the window that opened.
+            {t("send.approveOnDevice")}
           </p>
         ) : null}
 
         <ScreenFooter pinned={false}>
-          {irreversible ? null : <p className="text-center text-label text-muted">This cannot be undone.</p>}
+          {irreversible ? null : <p className="text-center text-label text-muted">{t("send.cannotBeUndone")}</p>}
           <Button
             type="button"
             variant={irreversible ? "destructive" : "primary"}
@@ -1132,9 +1138,9 @@ function ReviewStep({
           >
             {step.submitting
               ? signsOnDevice
-                ? "Waiting for approval…"
-                : "Sending…"
-              : `Send ${formatAmount(step.amountAtomic, token)} ${ticker}`}
+                ? t("send.waitingForApproval")
+                : t("send.sending")
+              : t("send.sendAmount", { amount: formatAmount(step.amountAtomic, token), ticker })}
           </Button>
         </ScreenFooter>
       </div>
@@ -1202,6 +1208,7 @@ function TokenPickerStep({
   onSelect: (token: TokenBalance | null) => void;
   onBack: () => void;
 }) {
+  const t = useT();
   const loading = balancesQuery.isLoading;
   const errorMessage = balancesQuery.error
     ? balancesQuery.error instanceof Error
@@ -1219,8 +1226,8 @@ function TokenPickerStep({
   );
 
   return (
-    <div className="flex min-h-full flex-col" role="dialog" aria-label="Select token">
-      <ScreenHeader title="Select token" onBack={onBack} />
+    <div className="flex min-h-full flex-col" role="dialog" aria-label={t("send.selectToken")}>
+      <ScreenHeader title={t("send.selectToken")} onBack={onBack} />
       <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {errorMessage ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
@@ -1247,7 +1254,7 @@ function TokenPickerStep({
           amount={
             aoBalance
               ? aoBalance.available === false
-                ? UNAVAILABLE_TOKEN_BALANCE_LABEL
+                ? unavailableTokenBalanceLabel()
                 : formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
               : DEFAULT_AO_TOKEN.defaultDisplayAmount
           }
@@ -1269,7 +1276,7 @@ function TokenPickerStep({
               name={displayTicker(candidate.ticker)}
               amount={
                 candidate.available === false
-                  ? UNAVAILABLE_TOKEN_BALANCE_LABEL
+                  ? unavailableTokenBalanceLabel()
                   : formatAtomicCompact(candidate.quantity, candidate.denomination)
               }
               onClick={candidate.available === false ? undefined : () => onSelect(candidate)}
@@ -1322,6 +1329,7 @@ export function SavedAddressesStep({
   onSelect: (recipient: string) => void;
   onBack: () => void;
 }) {
+  const t = useT();
   const [filter, setFilter] = useState("");
   const activityQuery = useActivity(runtime, wallet.address);
 
@@ -1345,14 +1353,14 @@ export function SavedAddressesStep({
     !loading && filteredContacts.length === 0 && filteredWallets.length === 0 && filteredRecent.length === 0;
 
   return (
-    <div className="flex min-h-full flex-col" role="dialog" aria-label="Saved contacts">
-      <ScreenHeader title="Saved contacts" onBack={onBack} />
+    <div className="flex min-h-full flex-col" role="dialog" aria-label={t("send.savedContacts")}>
+      <ScreenHeader title={t("send.savedContacts")} onBack={onBack} />
       <div className="px-3.5 pb-2 pt-3 phone:px-5">
         <input
           type="text"
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
-          placeholder="Search by name or address"
+          placeholder={t("send.searchPlaceholder")}
           className="w-full rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
         />
       </div>
@@ -1370,28 +1378,28 @@ export function SavedAddressesStep({
           <EmptyState
             message={
               query.length > 0
-                ? "No matching addresses."
-                : "No saved contacts yet. Addresses you save or send to will show up here."
+                ? t("send.noMatching")
+                : t("send.noSavedYet")
             }
           />
         ) : (
           <>
             {filteredContacts.length > 0 ? (
-              <PickerSection label="Contacts">
+              <PickerSection label={t("send.contacts")}>
                 {filteredContacts.map((contact) => (
                   <AddressRow key={contact.address} address={contact.address} name={contact.name} onSelect={() => onSelect(contact.address)} />
                 ))}
               </PickerSection>
             ) : null}
             {filteredWallets.length > 0 ? (
-              <PickerSection label="Your wallets">
+              <PickerSection label={t("send.yourWallets")}>
                 {filteredWallets.map((candidate) => (
                   <AddressRow key={candidate.address} address={candidate.address} name={candidate.name} onSelect={() => onSelect(candidate.address)} />
                 ))}
               </PickerSection>
             ) : null}
             {filteredRecent.length > 0 ? (
-              <PickerSection label="Recent">
+              <PickerSection label={t("send.recent")}>
                 {filteredRecent.map((address) => (
                   <AddressRow key={address} address={address} name={null} onSelect={() => onSelect(address)} />
                 ))}
@@ -1489,6 +1497,7 @@ export function SuccessStep({
   onSaveAddress: (name: string) => void;
   saving: boolean;
 }) {
+  const t = useT();
   const [showSave, setShowSave] = useState(false);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
@@ -1500,11 +1509,11 @@ export function SuccessStep({
           <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <h2 className="text-body text-foreground">Signed and sent.</h2>
+      <h2 className="text-body text-foreground">{t("send.signedAndSent")}</h2>
       <p className="-mt-2 break-words text-label text-muted">{summary}</p>
       <div className="mt-2 flex w-full items-center gap-2 border-b border-line py-3 text-label text-muted phone:border-b-0">
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-beam-yellow" />
-        <span>Pending confirmation</span>
+        <span>{t("send.pendingConfirmation")}</span>
       </div>
       <a
         href={explorerUrlFor(txId)}
@@ -1512,7 +1521,7 @@ export function SuccessStep({
         rel="noopener noreferrer"
         className="-mt-1 text-label font-semibold text-muted underline-offset-2 hover:text-foreground hover:underline"
       >
-        View in explorer
+        {t("send.viewInExplorer")}
       </a>
 
       {!isSaved && !saved ? (
@@ -1529,7 +1538,7 @@ export function SuccessStep({
                   onSaveAddress(name.trim());
                   setSaved(true);
                 }}
-                placeholder="Enter address name"
+                placeholder={t("send.enterAddressName")}
                 className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
               />
               <button
@@ -1541,7 +1550,7 @@ export function SuccessStep({
                 }}
                 className="flex-shrink-0 text-label font-semibold text-foreground underline-offset-2 hover:underline disabled:opacity-40"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? t("send.saving") : t("send.save")}
               </button>
             </div>
           ) : (
@@ -1550,7 +1559,7 @@ export function SuccessStep({
               onClick={() => setShowSave(true)}
               className="text-label font-medium text-muted hover:text-foreground hover:underline"
             >
-              Save as contact
+              {t("send.saveAsContact")}
             </button>
           )}
         </div>
@@ -1558,7 +1567,7 @@ export function SuccessStep({
 
       <ScreenFooter>
         <Button type="button" onClick={onDone}>
-          Done
+          {t("send.done")}
         </Button>
       </ScreenFooter>
     </div>

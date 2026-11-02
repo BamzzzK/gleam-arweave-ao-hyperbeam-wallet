@@ -1,4 +1,5 @@
 import { cn } from "../../primitives/cn";
+import { useUiLabels } from "../../labels";
 import { CollectibleThumbnail } from "./CollectibleThumbnail";
 
 /**
@@ -26,6 +27,8 @@ export interface ActivityRowProps {
   collectible?: { name: string; imageUrl?: string };
   pending?: boolean;
   onClick?: () => void;
+  /** Accessible name of the pending bar; English unless the caller passes its own. */
+  pendingLabel?: string;
   className?: string;
 }
 
@@ -44,8 +47,10 @@ export function ActivityRow({
   collectible,
   pending = false,
   onClick,
+  pendingLabel,
   className,
 }: ActivityRowProps) {
+  const labels = useUiLabels();
   const Component = onClick ? "button" : "div";
   return (
     <Component
@@ -84,7 +89,7 @@ export function ActivityRow({
       {pending ? (
         <div
           role="progressbar"
-          aria-label="Pending confirmation"
+          aria-label={pendingLabel ?? labels.pendingConfirmation}
           className="relative h-[3px] overflow-hidden rounded-sm bg-line"
         >
           <div className="gleam-beam-divider absolute inset-0 w-2/5 animate-[gleam-pending-sweep_1.4s_ease-in-out_infinite] motion-reduce:w-full motion-reduce:animate-none motion-reduce:opacity-50" />

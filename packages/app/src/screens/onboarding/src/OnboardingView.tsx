@@ -18,6 +18,7 @@ import { VaultPassword } from "./VaultPassword";
 import { ClaimStep, type ClaimPhase } from "./ClaimStep";
 import { FoundingRevealScreen } from "./FoundingReveal";
 import { SecurityPhraseStep } from "./SecurityPhraseStep";
+import { t as translate, useT } from "../../../i18n";
 
 /**
  * Onboarding view module (`screens/onboarding/`) — a folder, not
@@ -117,6 +118,7 @@ function randomDefaultWalletName(): string {
 }
 
 export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultHasPassword = true, onCancel, claim, onConnectKeystone, onConnectLedger, requestDownloadPermission }: OnboardingViewProps) {
+  const t = useT();
   const { hardwareWallets, downloads } = usePlatform();
   const [step, setStep] = useState<Step>({ kind: "welcome" });
   const connectDevice = (device: HardwareWalletMethod) => {
@@ -202,7 +204,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     setBackup({
       downloading: false,
       savedAs: null,
-      error: `${reason ?? "The keyfile couldn't be saved."} Try again, or back it up later from this wallet's settings.`,
+      error: translate("onboarding.backupFailed", { reason: reason ?? translate("onboarding.keyfileNotSaved") }),
     });
   };
 
@@ -269,7 +271,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       if (askVaultPassword) {
         return (
           <VaultPassword
-            title="Create a wallet"
+            title={t("onboarding.createWallet")}
             onBack={() => setStep({ kind: "welcome" })}
             onSubmit={(password) => void handleCreatePassword(password)}
             submitting={submitting}
@@ -330,7 +332,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       if (askVaultPassword) {
         return (
           <VaultPassword
-            title="Import a wallet"
+            title={t("onboarding.importWallet")}
             onBack={() => setStep({ kind: "import" })}
             onSubmit={(password) => void handleImportPassword(step.jwk, password)}
             submitting={submitting}
@@ -340,7 +342,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       }
       return (
         <CreatePassword
-          title="Import a wallet"
+          title={t("onboarding.importWallet")}
           onBack={() => setStep({ kind: "import" })}
           onSubmit={(password) => handleImportPassword(step.jwk, password)}
           submitting={submitting}

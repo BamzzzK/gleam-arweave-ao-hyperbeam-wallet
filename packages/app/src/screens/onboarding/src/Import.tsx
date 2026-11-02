@@ -4,6 +4,7 @@ import { FileDropzone } from "@gleam/ui/src/primitives/file-dropzone.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validateJWKShape } from "@gleam/core/src/keys/jwk.ts";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
 
 /**
  * Import wallet — file drop + paste-JSON fallback, validates JWK shape
@@ -19,6 +20,7 @@ export interface ImportProps {
 }
 
 export function Import({ onBack, onValidJWK }: ImportProps) {
+  const t = useT();
   const [fileName, setFileName] = useState<string>();
   const [pasteValue, setPasteValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -29,7 +31,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      setErrorMessage("That file isn't a valid Arweave keyfile.");
+      setErrorMessage(t("onboarding.invalidKeyfile"));
       setPendingJWK(null);
       if (sourceName) setFileName(sourceName);
       return;
@@ -58,7 +60,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Import a wallet" onBack={onBack} />
+      <ScreenHeader title={t("onboarding.importWallet")} onBack={onBack} />
       <form
         className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
@@ -68,16 +70,16 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
       >
         <div className="flex flex-col gap-1.5">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">
-            Add your keyfile
+            {t("onboarding.importKeyfileTitle")}
           </h1>
           <p className="text-body leading-relaxed text-muted">
-            Import an existing Arweave wallet using its JWK keyfile.
+            {t("onboarding.importKeyfileBody")}
           </p>
         </div>
 
         <FileDropzone
-          label="Drop your keyfile here"
-          hint=".json · or click to browse"
+          label={t("onboarding.dropKeyfile")}
+          hint={t("onboarding.dropKeyfileHint")}
           fileName={fileName}
           errorMessage={errorMessage}
           accept="application/json"
@@ -86,7 +88,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
 
         <div className="flex items-center gap-2.5">
           <span className="h-px flex-1 bg-line" />
-          <span className="text-caption text-faint">or paste JSON</span>
+          <span className="text-caption text-faint">{t("onboarding.orPasteJson")}</span>
           <span className="h-px flex-1 bg-line" />
         </div>
 
@@ -102,7 +104,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
 
         <ScreenFooter className="mt-8">
           <Button type="submit" disabled={!pendingJWK}>
-            Continue
+            {t("onboarding.continue")}
           </Button>
         </ScreenFooter>
       </form>

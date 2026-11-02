@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDocumentLanguage, useT, type MessageKey } from "../i18n";
+import { UiLabels } from "../i18n/UiLabels";
 import type {
   ApprovalRequest,
   DeviceSigningRequest,
@@ -120,8 +122,18 @@ function hostnameOf(origin: string): string {
   }
 }
 
-export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => window.close() }: ApprovalRootProps) {
+export function ApprovalRoot(props: ApprovalRootProps) {
+  return (
+    <UiLabels>
+      <ApprovalRootContent {...props} />
+    </UiLabels>
+  );
+}
+
+function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => window.close() }: ApprovalRootProps) {
   const platform = usePlatform();
+  useDocumentLanguage();
+  const t = useT();
   const devicePanels = platform.hardwareWallets.signPanels;
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
@@ -183,7 +195,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
 
     async function init() {
       if (!requestId) {
-        setState({ kind: "error", message: "This approval window has no request to show." });
+        setState({ kind: "error", message: t("approval.noRequest") });
         return;
       }
       try {
@@ -216,14 +228,14 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
         payload: { requestId: request.requestId, approved: false },
       });
     } finally {
-      setState({ kind: "done", message: "Request rejected." });
+      setState({ kind: "done", message: t("approval.requestRejected") });
     }
   };
 
   let content: ReactNode;
 
   if (state.kind === "loading") {
-    content = <CenteredMessage text="Loading…" />;
+    content = <CenteredMessage text={t("approval.loading")} />;
   } else if (state.kind === "error") {
     content = <CenteredMessage text={state.message} />;
   } else if (state.kind === "done") {
@@ -243,12 +255,12 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
     content = (
       <UnlockView
         runtime={state.runtime}
-        tagline={`Unlock to review ${hostnameOf(state.request.origin)}'s request`}
+        tagline={t("approval.unlockToReview", { host: hostnameOf(state.request.origin) })}
         onUnlocked={() => void load(state.runtime, state.request.requestId)}
         // A reset rejects every pending request, this one included.
         onResetComplete={() => {
           void forgetQueryCache(platform.queryCache.clear());
-          setState({ kind: "done", message: "Gleam was reset. The request was rejected." });
+          setState({ kind: "done", message: t("approval.resetDone") });
         }}
       />
     );
@@ -277,7 +289,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
             type: "submitDeviceSignature",
             payload: { requestId: request.requestId, signatures },
           });
-          setState(isShown(shown) ? { kind: "attested", result: shown.result } : { kind: "done", message: "Signed." });
+          setState(isShown(shown) ? { kind: "attested", result: shown.result } : { kind: "done", message: t("approval.signed") });
         }}
         onCancel={() => void rejectRequest(runtime, request)}
         onActivity={() =>
@@ -288,7 +300,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
         }
       />
     ) : (
-      <CenteredMessage text={`Gleam can't reach a ${DEVICE_NAMES[device.method]} from here.`} tone="warning" />
+      <CenteredMessage text={t("approval.cantReachDevice", { device: DEVICE_NAMES[device.method] })} tone="warning" />
     );
   } else {
     const { runtime, request, assessment } = state;
@@ -297,7 +309,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
 
     // A failed approval has already rejected the dApp and dropped the
     // request, so there's nothing to retry: show the error and stop.
-    const handleApprove = async (doneMessage: string, failurePrefix: string) => {
+    const handleApprove = async (doneKey: MessageKey, failureKey: MessageKey) => {
       try {
         const next = await runtime.send<{ requestId: string; approved: boolean }, ApprovalRequest | ApprovalShown | undefined>({
           type: "resolveApproval",
@@ -311,10 +323,10 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
           setState({ kind: "awaiting-device", runtime, request: next, device: next.device });
           return;
         }
-        setState({ kind: "done", message: doneMessage });
+        setState({ kind: "done", message: t(doneKey) });
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        setState({ kind: "failed", message: `${failurePrefix}: ${reason}` });
+        setState({ kind: "failed", message: t(failureKey, { reason }) });
       }
     };
 
@@ -325,7 +337,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
           origin={request.origin}
           preview={preview}
           onReject={() => void handleReject()}
-          onGrant={() => void handleApprove("Grant approved.", "Couldn't connect")}
+          onGrant={() => void handleApprove("approval.grantApproved", "approval.couldntConnect")}
         />
       );
     } else if (request.preview.kind === "addToken") {
@@ -334,7 +346,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
           origin={request.origin}
           preview={request.preview}
           onReject={() => void handleReject()}
-          onAdd={() => handleApprove("Token added.", "Couldn't add the token")}
+          onAdd={() => handleApprove("approval.tokenAdded", "approval.couldntAddToken")}
         />
       );
     } else if (request.preview.kind === "scanAttestation") {
@@ -350,7 +362,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
               payload: { requestId: request.requestId },
             })
           }
-          onSign={() => handleApprove("Signed.", "Couldn't sign the attestation")}
+          onSign={() => handleApprove("approval.signed", "approval.couldntSignAttestation")}
         />
       );
     } else {
@@ -361,7 +373,7 @@ export function ApprovalRoot({ requestId, runtime: runtimeProp, onClose = () => 
           preview={signingPreview}
           assessment={assessment}
           onReject={() => void handleReject()}
-          onSign={() => handleApprove("Signed.", "Signing failed")}
+          onSign={() => handleApprove("approval.signed", "approval.signingFailed")}
         />
       );
     }

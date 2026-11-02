@@ -1,4 +1,5 @@
 import type { TokenBalance } from "@gleam/core";
+import { t } from "../../../i18n";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import type { WalletBalances } from "./useBalances";
 
@@ -53,13 +54,13 @@ export function validateSendAmount(
 
   try {
     if (BigInt(amountAtomic) > BigInt(available)) {
-      return "That's more than your current balance.";
+      return t("activity.overBalance");
     }
     if (token === null && arFeeAtomic !== undefined && BigInt(amountAtomic) + BigInt(arFeeAtomic) > BigInt(available)) {
       const fee = `${formatWinstonAsAr(arFeeAtomic, 12)} AR`;
       return feeIsNewAddress
-        ? `This address is new to Arweave, so the network fee is ${fee}. That plus this amount is more than your balance.`
-        : `The network fee is ${fee}. That plus this amount is more than your balance.`;
+        ? t("activity.overBalanceWithFeeNewAddress", { fee })
+        : t("activity.overBalanceWithFee", { fee });
     }
   } catch {
     return null;

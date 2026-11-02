@@ -4,6 +4,7 @@ import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow, Watch
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
+import { useT } from "../../../i18n";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -47,6 +48,7 @@ interface LoadState {
 }
 
 export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
+  const t = useT();
   const [state, setState] = useState<LoadState>({
     wallets: [],
     activeWalletId: null,
@@ -95,10 +97,10 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
   };
 
   return (
-    <div className="flex min-h-full flex-col" role="dialog" aria-label="Switch wallet">
+    <div className="flex min-h-full flex-col" role="dialog" aria-label={t("walletSwitcher.switchWallet")}>
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
-      <ScreenHeader title="Wallets" onBack={onBack} />
+      <ScreenHeader title={t("walletSwitcher.wallets")} onBack={onBack} />
 
       <div className="px-6 phone:px-5 pb-3 pt-9 phone:pt-4">
         <div>
@@ -133,7 +135,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
           >
             <PlusIcon />
           </span>
-          <span className="text-label font-semibold text-foreground">Add wallet</span>
+          <span className="text-label font-semibold text-foreground">{t("walletSwitcher.addWallet")}</span>
         </button>
       </div>
     </div>
@@ -149,6 +151,7 @@ interface WalletSwitcherRowProps {
 }
 
 function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: WalletSwitcherRowProps) {
+  const t = useT();
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
   const methodLabel = WALLET_METHOD_LABEL[wallet.method];
@@ -170,7 +173,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         aria-current={active ? "true" : undefined}
         className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left disabled:opacity-60"
       >
-        <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={36} />
+        <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-label font-semibold text-foreground">
@@ -181,11 +184,11 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
             {active ? (
               <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
                 <CheckIcon size={12} />
-                Active
+                {t("walletSwitcher.active")}
               </span>
             ) : (
               <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
-                Make active
+                {t("walletSwitcher.makeActive")}
               </span>
             )}
           </span>
@@ -195,15 +198,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
       <button
         type="button"
         onClick={copy}
-        aria-label={copied ? `${wallet.name} address copied` : `Copy ${wallet.name} address`}
-        title={copied ? "Copied" : "Copy address"}
+        aria-label={copied ? t("walletSwitcher.addressCopied", { name: wallet.name }) : t("walletSwitcher.copyAddressOf", { name: wallet.name })}
+        title={copied ? t("walletSwitcher.copied") : t("walletSwitcher.copyAddress")}
         className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
         {copied ? <CheckIcon /> : <CopyIcon />}
       </button>
       <button
         type="button"
-        aria-label={`Manage ${wallet.name}`}
+        aria-label={t("walletSwitcher.manage", { name: wallet.name })}
         onClick={onManage}
         className="flex h-7 w-5 shrink-0 items-center justify-center rounded-lg text-faint hover:bg-background hover:text-foreground phone:h-11 phone:w-11"
       >

@@ -1,6 +1,7 @@
 import { cn } from "../../primitives/cn";
 import { AccountAvatar } from "./AccountAvatar";
 import { MemorableAddress } from "./MemorableAddress";
+import { useUiLabels } from "../../labels";
 
 export interface RecipientCardProps {
   address: string;
@@ -15,7 +16,16 @@ export interface RecipientCardProps {
   tone?: "default" | "confirm";
   /** Makes the whole card a button, for a card standing in for an address field. */
   onEdit?: () => void;
+  /** Visible and accessible text; English unless the caller passes its own. */
+  labels?: RecipientCardLabels;
   className?: string;
+}
+
+export interface RecipientCardLabels {
+  newAddress: string;
+  avatar: (name: string) => string;
+  addressAvatar: string;
+  change: (name: string | null) => string;
 }
 
 /**
@@ -24,14 +34,16 @@ export interface RecipientCardProps {
  * the address field back, so it's built from spans (a button holds only
  * phrasing content).
  */
-export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "default", onEdit, className }: RecipientCardProps) {
+export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "default", onEdit, labels: labelsProp, className }: RecipientCardProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.recipientCard;
   const body = (
     <>
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? `${name} avatar` : "Address avatar"} size={40} />
+      <AccountAvatar svgMarkup={avatarSvg} label={name ? labels.avatar(name) : labels.addressAvatar} size={40} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         {name !== undefined ? (
           <span className={cn("truncate text-label font-semibold", name ? "text-foreground" : "text-muted")}>
-            {name ?? "New address"}
+            {name ?? labels.newAddress}
           </span>
         ) : null}
         {/* Pulls the padded chunks back so the address lines up with the name. */}
@@ -46,7 +58,7 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
       <button
         type="button"
         onClick={onEdit}
-        aria-label={`Change recipient${name ? `, ${name}` : ""}`}
+        aria-label={labels.change(name ?? null)}
         className={cn(frame, "transition-colors hover:border-faint focus-visible:border-foreground focus-visible:outline-none", className)}
       >
         {body}
