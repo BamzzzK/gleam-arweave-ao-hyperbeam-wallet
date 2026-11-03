@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useDocumentLanguage, useT, type MessageKey } from "../i18n";
-import { UiLabels } from "../i18n/UiLabels";
+import { useT, type MessageKey } from "../i18n";
+import { LocalizedRoot } from "../i18n/LocalizedRoot";
 import type {
   ApprovalRequest,
   DeviceSigningRequest,
@@ -124,15 +124,14 @@ function hostnameOf(origin: string): string {
 
 export function ApprovalRoot(props: ApprovalRootProps) {
   return (
-    <UiLabels>
+    <LocalizedRoot>
       <ApprovalRootContent {...props} />
-    </UiLabels>
+    </LocalizedRoot>
   );
 }
 
 function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => window.close() }: ApprovalRootProps) {
   const platform = usePlatform();
-  useDocumentLanguage();
   const t = useT();
   const devicePanels = platform.hardwareWallets.signPanels;
   const [state, setState] = useState<LoadState>({ kind: "loading" });

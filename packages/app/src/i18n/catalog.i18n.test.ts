@@ -37,7 +37,15 @@ describe("matchLanguage", () => {
 });
 
 describe("translate", () => {
-  it("fills placeholders and leaves unknown ones", () => {
+  it("returns the language's text", () => {
     expect(translate("zh-CN", "language.title")).toBe("语言");
+  });
+
+  it("fills placeholders, including replacement patterns in a value", () => {
+    expect(translate("en", "common.securityPhrase", { word: "$&" })).toBe("Your anti-phishing phrase: $&");
+  });
+
+  it("leaves a placeholder with no value in place", () => {
+    expect(translate("en", "common.securityPhrase", {})).toBe("Your anti-phishing phrase: {word}");
   });
 });

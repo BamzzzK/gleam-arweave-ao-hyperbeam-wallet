@@ -1,11 +1,19 @@
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { UiLabelsProvider, type UiLabels as UiLabelSet } from "@gleam/ui/src/labels";
-import { useLocale, useT } from "./index";
+import { LANGUAGES } from "./define";
+import { useLanguage, useT } from "./index";
 
-/** Gives the shared `@gleam/ui` components their text and number formats in the language in use. */
-export function UiLabels({ children }: { children: ReactNode }) {
+/**
+ * Wraps every page root. It gives `@gleam/ui` its text and number formats in
+ * the language in use, and keeps `<html lang>` in step so screen readers and
+ * CJK font selection follow it. Without it, shared components stay in English.
+ */
+export function LocalizedRoot({ children }: { children: ReactNode }) {
   const t = useT();
-  const locale = useLocale();
+  const locale = useLanguage();
+  useEffect(() => {
+    document.documentElement.lang = LANGUAGES.find((entry) => entry.code === locale)?.htmlLang ?? "en";
+  }, [locale]);
   const labels = useMemo<UiLabelSet>(
     () => ({
       back: t("common.back"),
@@ -51,6 +59,7 @@ export function UiLabels({ children }: { children: ReactNode }) {
       dropFile: t("common.dropFile"),
       browseHint: t("common.browseHint"),
       tryAnotherFile: t("common.tryAnotherFile"),
+      watchOnly: t("common.watchOnly"),
       chart: {
         showAllWallets: t("common.chartShowAll"),
         showThisWallet: t("common.chartShowThis"),

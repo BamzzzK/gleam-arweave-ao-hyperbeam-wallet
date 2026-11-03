@@ -27,8 +27,8 @@ import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
 import { LanguageView } from "./screens/language/index.tsx";
-import { useDocumentLanguage, useT } from "./i18n";
-import { UiLabels } from "./i18n/UiLabels";
+import { useT } from "./i18n";
+import { LocalizedRoot } from "./i18n/LocalizedRoot";
 import { PointsView } from "./screens/points/index.tsx";
 import { UseGleamOnSiteView } from "./screens/site-wallet/index.tsx";
 import { usePlatform } from "./app-platform/context";
@@ -121,15 +121,14 @@ function resolveActiveWallet(state: WalletState): WalletSummary | null {
 
 export function App(props: AppProps) {
   return (
-    <UiLabels>
+    <LocalizedRoot>
       <AppContent {...props} />
-    </UiLabels>
+    </LocalizedRoot>
   );
 }
 
 function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   const platform = usePlatform();
-  useDocumentLanguage();
   const t = useT();
   const runtime = runtimeProp ?? platform.runtime;
   const [view, setView] = useState<TopView>("loading");

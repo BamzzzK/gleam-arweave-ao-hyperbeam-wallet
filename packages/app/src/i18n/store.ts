@@ -66,20 +66,30 @@ export function setLanguagePreference(next: LanguagePreference): void {
   } catch {
     // Not persisting only means the next open follows the device language.
   }
+  notify();
+}
+
+function notify(): void {
   for (const listener of listeners) listener();
 }
 
+function onStorage(event: StorageEvent): void {
+  if (event.key !== STORAGE_KEY) return;
+  preference = readPreference();
+  notify();
+}
+
 function subscribe(listener: () => void): () => void {
+  if (listeners.size === 0) {
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("languagechange", notify);
+  }
   listeners.add(listener);
-  const onStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY) return;
-    preference = readPreference();
-    listener();
-  };
-  window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(listener);
+    if (listeners.size > 0) return;
     window.removeEventListener("storage", onStorage);
+    window.removeEventListener("languagechange", notify);
   };
 }
 
@@ -89,6 +99,5 @@ export function useLanguagePreference(): LanguagePreference {
 
 /** The language in use now; components re-render when it changes. */
 export function useLanguage(): Language {
-  const pref = useLanguagePreference();
-  return resolveLanguage(pref);
+  return useSyncExternalStore(subscribe, getLanguage, () => "en");
 }

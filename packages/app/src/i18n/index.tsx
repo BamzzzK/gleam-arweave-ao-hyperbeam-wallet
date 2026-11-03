@@ -1,6 +1,6 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { CATALOGS, type MessageKey } from "./catalog";
-import { LANGUAGES, type Language } from "./define";
+import type { Language } from "./define";
 import { getLanguage, useLanguage } from "./store";
 
 export { LANGUAGES, type Language } from "./define";
@@ -38,12 +38,4 @@ export function useT(): TFunction {
 /** The BCP 47 tag for `Intl` calls, so dates and numbers match the text. */
 export function useLocale(): string {
   return useLanguage();
-}
-
-/** Keeps `<html lang>` in step with the language so screen readers and CJK font selection follow it. */
-export function useDocumentLanguage(): void {
-  const language = useLanguage();
-  useEffect(() => {
-    document.documentElement.lang = LANGUAGES.find((entry) => entry.code === language)?.htmlLang ?? "en";
-  }, [language]);
 }
