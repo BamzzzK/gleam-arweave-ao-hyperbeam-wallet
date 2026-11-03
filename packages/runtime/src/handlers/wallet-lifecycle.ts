@@ -254,7 +254,6 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
   return (
     isDisplayCurrency(record.currency) &&
     typeof record.compactHeader === "boolean" &&
-    typeof record.showTokenLogos === "boolean" &&
     isHeadlineBalance(record.headline) &&
     typeof record.balancesHidden === "boolean"
   );
@@ -262,17 +261,14 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
   const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  // Older records lack `showTokenLogos`, or carry `showChart` in place of `compactHeader`. Someone who
-  // had turned the chart off gets the compact header, the closest thing to it; the rest is kept.
+  // Older records carry `showChart` in place of `compactHeader`, or a `showTokenLogos` flag that no
+  // longer exists. Someone who had turned the chart off gets the compact header, the closest thing to it.
   const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
-  const upgraded = record
-    ? { showTokenLogos: false, compactHeader: record.showChart === false, ...record }
-    : raw;
+  const upgraded = record ? { compactHeader: record.showChart === false, ...record } : raw;
   if (isDisplaySettings(upgraded)) {
     return {
       currency: upgraded.currency,
       compactHeader: upgraded.compactHeader,
-      showTokenLogos: upgraded.showTokenLogos,
       headline: upgraded.headline,
       balancesHidden: upgraded.balancesHidden,
     };
@@ -1202,7 +1198,6 @@ export class WalletLifecycleHandler {
     await this.storage.set(DISPLAY_SETTINGS_KEY, {
       currency: req.currency,
       compactHeader: req.compactHeader,
-      showTokenLogos: req.showTokenLogos,
       headline: req.headline,
       balancesHidden: req.balancesHidden,
     });
