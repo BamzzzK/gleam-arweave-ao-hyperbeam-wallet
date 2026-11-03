@@ -33,7 +33,7 @@ function runtimeFor(getState: () => WalletState, handlers: Record<string, () => 
       if (type in handlers) return handlers[type]!();
       if (type === "getState") return getState();
       if (type === "getThemePreference") return { theme: "light" };
-      if (type === "getDisplaySettings") return { currency: "USD", headline: "total", compactHeader: false, balancesHidden: false };
+      if (type === "getDisplaySettings") return { currency: "USD", headline: "total", header: "full", tokenLogos: true, tokenRows: "detailed", balancesHidden: false };
       if (type === "getBalance") return "0";
       if (type === "getTokenBalances") return [];
       if (type === "getActivity") return { entries: [] };

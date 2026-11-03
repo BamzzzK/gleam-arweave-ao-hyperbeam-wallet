@@ -361,6 +361,26 @@ function writePortfolioScope(scope: PortfolioScope): void {
   }
 }
 
+const PORTFOLIO_RANGE_STORAGE_KEY = "gleam:portfolioRange";
+const PORTFOLIO_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
+
+function readPortfolioRange(): PortfolioHistoryRange {
+  try {
+    const stored = window.localStorage.getItem(PORTFOLIO_RANGE_STORAGE_KEY);
+    return PORTFOLIO_RANGES.find((range) => range === stored) ?? "7D";
+  } catch {
+    return "7D";
+  }
+}
+
+function writePortfolioRange(range: PortfolioHistoryRange): void {
+  try {
+    window.localStorage.setItem(PORTFOLIO_RANGE_STORAGE_KEY, range);
+  } catch {
+    // Not persisting only means the next open starts on 7D.
+  }
+}
+
 interface ListedTokenRow {
   key: string;
   label: string;
@@ -460,7 +480,9 @@ export function MainScreenView({
   const activityQuery = useActivity(runtime, wallet.address);
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
-  const compactHeader = displaySettings?.compactHeader ?? false;
+  const headerStyle = displaySettings?.header ?? "full";
+  const simpleRows = displaySettings?.tokenRows === "simple";
+  const tokenLogos = displaySettings?.tokenLogos ?? true;
   const masked = displaySettings?.balancesHidden ?? false;
   const watchOnly = isWatchWalletMethod(wallet.method);
   const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
@@ -470,7 +492,11 @@ export function MainScreenView({
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
-  const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>("7D");
+  const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>(readPortfolioRange);
+  const selectRange = (range: PortfolioHistoryRange) => {
+    setSelectedRange(range);
+    writePortfolioRange(range);
+  };
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
@@ -769,7 +795,7 @@ export function MainScreenView({
               change={chartChange}
               periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
               activeRange={selectedRange}
-              onRangeChange={setSelectedRange}
+              onRangeChange={selectRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
               headline={
@@ -781,7 +807,7 @@ export function MainScreenView({
               }
               masked={masked}
               onToggleMasked={displaySettings ? toggleMasked : undefined}
-              compact={compactHeader}
+              layout={headerStyle}
               loading={portfolioHistoryQuery.isPending || (portfolioHistoryQuery.isFetching && !portfolioHasSeries)}
               cached={chartCached}
               cachedFetching={chartFetching}
@@ -819,7 +845,7 @@ export function MainScreenView({
               onSend={onSend}
               onReceive={onReceive}
               sendDisabled={watchOnly}
-              compact={compactHeader}
+              compact={headerStyle !== "full"}
             />
           </div>
         </div>
@@ -910,15 +936,15 @@ export function MainScreenView({
                     defaultHidden: false,
                     node: (
                       <TokenRow
-                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: row.logoUrl }}
+                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: tokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
                         amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
                         value={
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
                         // `amount @ price` would give the hidden holding away.
-                        unitPrice={masked ? undefined : row.unitPrice}
-                        change={row.change}
+                        unitPrice={masked || simpleRows ? undefined : row.unitPrice}
+                        change={simpleRows ? undefined : row.change}
                         loading={loading}
                         cached={tokensCached}
                         cachedFetching={tokensFetching}
@@ -931,7 +957,7 @@ export function MainScreenView({
                     key: "gleam-points",
                     label: "Gleam Points",
                     defaultHidden: false,
-                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} className="border-b-0" />,
+                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} showLogo={tokenLogos} className="border-b-0" />,
                   },
                   ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
                     const discovered = token.source === "discovered";
@@ -949,7 +975,7 @@ export function MainScreenView({
                           glyph={{
                             label: token.ticker.slice(0, 2).toUpperCase(),
                             tone: 2,
-                            logoUrl: shownTokenLogo(token, rowVisibility),
+                            logoUrl: shownTokenLogo(token, rowVisibility, tokenLogos),
                           }}
                           name={displayTicker(token.ticker)}
                           amount={
@@ -961,8 +987,8 @@ export function MainScreenView({
                                 )
                           }
                           value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
-                          unitPrice={masked || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
-                          change={value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
+                          unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
+                          change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
                           loading={loading}
                           cached={tokensCached}
                           cachedFetching={tokensFetching}

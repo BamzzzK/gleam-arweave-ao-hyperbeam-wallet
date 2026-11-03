@@ -9,6 +9,8 @@ export interface PointsTokenRowProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   onOpen: () => void;
+  /** Draws the Gleam mark; without it the row shows GLM letters, like any token with logos off. */
+  showLogo?: boolean;
   className?: string;
 }
 
@@ -18,7 +20,7 @@ export interface PointsTokenRowProps {
  * its icon is the Gleam mark rather than a ticker glyph, marking it as
  * Gleam's own. Clicking opens the Points screen.
  */
-export function PointsTokenRow({ runtime, wallet, onOpen, className }: PointsTokenRowProps) {
+export function PointsTokenRow({ runtime, wallet, onOpen, showLogo = true, className }: PointsTokenRowProps) {
   const t = useT();
   const standing = usePointsStanding(runtime, wallet);
   const amount =
@@ -33,8 +35,8 @@ export function PointsTokenRow({ runtime, wallet, onOpen, className }: PointsTok
 
   return (
     <TokenRow
-      glyph={{ label: "GP" }}
-      icon={<PointsIcon />}
+      glyph={{ label: "GLM" }}
+      icon={showLogo ? <PointsIcon /> : undefined}
       name="Gleam Points"
       amount={amount}
       amountFull={amountFull !== amount ? amountFull : undefined}

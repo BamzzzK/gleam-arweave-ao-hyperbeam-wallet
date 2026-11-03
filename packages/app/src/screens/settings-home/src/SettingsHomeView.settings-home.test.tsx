@@ -20,7 +20,7 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
-const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", compactHeader: false, headline: "total", balancesHidden: false };
+const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false };
 
 function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
@@ -211,7 +211,7 @@ describe("SettingsHomeView", () => {
     expect(onOpenDisplayCurrency).toHaveBeenCalled();
   });
 
-  it("saves the main balance choice and the chart toggle", async () => {
+  it("saves the main balance, header and token row choices", async () => {
     const send = successfulSend();
     renderSettingsHome({ runtime: fakeRuntime({ send }) });
 
@@ -222,13 +222,37 @@ describe("SettingsHomeView", () => {
       expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, headline: "AO" } }),
     );
 
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Compact header/i }));
+    const header = screen.getByLabelText("Header") as HTMLSelectElement;
+    expect(header.value).toBe("full");
+    fireEvent.change(header, { target: { value: "minimal" } });
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
         type: "setDisplaySettings",
-        payload: { ...DISPLAY_SETTINGS, headline: "AO", compactHeader: true },
+        payload: { ...DISPLAY_SETTINGS, headline: "AO", header: "minimal" },
       }),
     );
-    expect(screen.getByRole("menuitemcheckbox", { name: /Compact header/i }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByLabelText("Header") as HTMLSelectElement).value).toBe("minimal");
+
+    fireEvent.change(screen.getByLabelText("Token rows"), { target: { value: "simple" } });
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "setDisplaySettings",
+        payload: { ...DISPLAY_SETTINGS, headline: "AO", header: "minimal", tokenRows: "simple" },
+      }),
+    );
+  });
+
+  it("starts with token logos on and saves turning them off", async () => {
+    const send = successfulSend();
+    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+
+    const toggle = await screen.findByRole("menuitemcheckbox", { name: /Token logos/i });
+    await waitFor(() => expect(toggle.getAttribute("aria-disabled")).not.toBe("true"));
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, tokenLogos: false } }),
+    );
   });
 });

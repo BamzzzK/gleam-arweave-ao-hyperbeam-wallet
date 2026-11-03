@@ -90,10 +90,18 @@ describe("PointsTokenRow", () => {
 
     renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={onOpen} />);
     expect(await screen.findByText("Sign up")).toBeTruthy();
-    expect(screen.queryByText("GP")).toBeNull();
+    expect(screen.queryByText("GLM")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Gleam Points/ }));
 
     expect(onOpen).toHaveBeenCalled();
+  });
+
+  it("shows GLM letters in place of the Gleam mark while token logos are off", async () => {
+    const runtime = fakeRuntime({ ...BALANCES, getPointsMemberships: () => ({}) });
+
+    renderWithQuery(<PointsTokenRow runtime={runtime} wallet={WALLET} onOpen={vi.fn()} showLogo={false} />);
+    expect(await screen.findByText("GLM")).toBeTruthy();
+    expect(document.querySelector("img")).toBeNull();
   });
 
   it("offers a hardware wallet Sign up too", async () => {

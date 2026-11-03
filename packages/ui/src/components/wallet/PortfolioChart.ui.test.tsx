@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { PortfolioChart, type PortfolioChartProps } from "./PortfolioChart";
 
 afterEach(() => {
@@ -77,5 +77,29 @@ describe("PortfolioChart total", () => {
     rerender(<PortfolioChart {...BASE} currentValue={200} activeRange="1Y" />);
     expect(container.textContent).toContain("200");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("PortfolioChart minimal", () => {
+  it("steps to the next range when the range is tapped, wrapping after ALL", () => {
+    const onRangeChange = vi.fn();
+    const { rerender } = render(<PortfolioChart {...BASE} layout="minimal" onRangeChange={onRangeChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "7D" }));
+    expect(onRangeChange).toHaveBeenLastCalledWith("1M");
+
+    rerender(<PortfolioChart {...BASE} layout="minimal" activeRange="ALL" onRangeChange={onRangeChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "ALL" }));
+    expect(onRangeChange).toHaveBeenLastCalledWith("24H");
+  });
+
+  it("toggles the wallet scope from the space beside the figures, only with more than one wallet", () => {
+    const onToggleScope = vi.fn();
+    const { rerender } = render(<PortfolioChart {...BASE} layout="minimal" />);
+    expect(screen.queryByRole("button", { name: "Show all wallets" })).toBeNull();
+
+    rerender(<PortfolioChart {...BASE} layout="minimal" onToggleScope={onToggleScope} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show all wallets" }));
+    expect(onToggleScope).toHaveBeenCalledOnce();
+    expect(screen.getByText("All wallets")).toBeTruthy();
   });
 });

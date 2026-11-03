@@ -2,12 +2,14 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type {
   AutoLockTimeout,
+  HeaderStyle,
   HeadlineBalance,
   LockSettings,
   NetworkSettings,
   RuntimePort,
   ThemePreference,
   ThemeSettings,
+  TokenRowDetail,
 } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
@@ -29,6 +31,17 @@ const HEADLINE_KEYS = [
   { value: "AR", key: "settingsHome.headlineAr" },
   { value: "AO", key: "settingsHome.headlineAo" },
 ] as const satisfies readonly { value: HeadlineBalance; key: MessageKey }[];
+
+const HEADER_KEYS = [
+  { value: "full", key: "settingsHome.headerFull" },
+  { value: "compact", key: "settingsHome.headerCompact" },
+  { value: "minimal", key: "settingsHome.headerMinimal" },
+] as const satisfies readonly { value: HeaderStyle; key: MessageKey }[];
+
+const TOKEN_ROW_KEYS = [
+  { value: "detailed", key: "settingsHome.tokenRowsDetailed" },
+  { value: "simple", key: "settingsHome.tokenRowsSimple" },
+] as const satisfies readonly { value: TokenRowDetail; key: MessageKey }[];
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -85,6 +98,8 @@ export function SettingsHomeView({
   const [savingTheme, setSavingTheme] = useState(false);
   const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
   const headlineOptions = HEADLINE_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
+  const headerOptions = HEADER_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
+  const tokenRowOptions = TOKEN_ROW_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -185,11 +200,25 @@ export function SettingsHomeView({
             disabled={!display}
             onChange={(headline) => void updateDisplay({ headline })}
           />
-          <ToggleRow
-            title={t("settingsHome.compactHeader")}
-            checked={display?.compactHeader ?? false}
+          <SelectRow
+            title={t("settingsHome.header")}
+            value={display?.header ?? "full"}
+            options={headerOptions}
             disabled={!display}
-            onToggle={() => void updateDisplay({ compactHeader: !(display?.compactHeader ?? false) })}
+            onChange={(header) => void updateDisplay({ header })}
+          />
+          <SelectRow
+            title={t("settingsHome.tokenRows")}
+            value={display?.tokenRows ?? "detailed"}
+            options={tokenRowOptions}
+            disabled={!display}
+            onChange={(tokenRows) => void updateDisplay({ tokenRows })}
+          />
+          <ToggleRow
+            title={t("settingsHome.tokenLogos")}
+            checked={display?.tokenLogos ?? true}
+            disabled={!display}
+            onToggle={() => void updateDisplay({ tokenLogos: !(display?.tokenLogos ?? true) })}
           />
           <ToggleRow
             title={t("settingsHome.darkMode")}

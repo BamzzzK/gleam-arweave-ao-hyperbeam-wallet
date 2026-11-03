@@ -80,7 +80,7 @@ export { REPO_URL, STORE_REVIEWS_URL, releaseUrl, sitePageUrl } from "./site-lin
 export type { SitePage } from "./site-links";
 export { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, explorerUrlFor } from "./network";
 export type { ThemePreference, ThemeSettings } from "./theme";
-export type { DisplayCurrency, DisplaySettings, FiatCurrency, HeadlineBalance, TokenCurrency } from "./display";
+export type { DisplayCurrency, DisplaySettings, FiatCurrency, HeaderStyle, HeadlineBalance, TokenCurrency, TokenRowDetail } from "./display";
 export {
   FIAT_CURRENCIES,
   TOKEN_CURRENCIES,
@@ -88,7 +88,9 @@ export {
   defaultDisplaySettings,
   isDisplayCurrency,
   isFiatCurrency,
+  isHeaderStyle,
   isHeadlineBalance,
+  isTokenRowDetail,
 } from "./display";
 export type { SecurityPhrase } from "./security-phrase";
 export {
