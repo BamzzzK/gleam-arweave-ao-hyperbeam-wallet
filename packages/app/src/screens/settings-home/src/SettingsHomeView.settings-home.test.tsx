@@ -20,7 +20,7 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
-const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false };
+const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", compactHeader: false, headline: "total", balancesHidden: false };
 
 function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
@@ -230,19 +230,5 @@ describe("SettingsHomeView", () => {
       }),
     );
     expect(screen.getByRole("menuitemcheckbox", { name: /Compact header/i }).getAttribute("aria-checked")).toBe("true");
-  });
-
-  it("starts with token logos off and saves turning them on", async () => {
-    const send = successfulSend();
-    renderSettingsHome({ runtime: fakeRuntime({ send }) });
-
-    const toggle = await screen.findByRole("menuitemcheckbox", { name: /Token logos/i });
-    await waitFor(() => expect(toggle.getAttribute("aria-disabled")).not.toBe("true"));
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
-
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, showTokenLogos: true } }),
-    );
   });
 });
