@@ -201,6 +201,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const arFeeQuery = useArFee(runtime);
   const displaySettings = useDisplaySettings(runtime).settings;
   const currency = displaySettings?.currency;
+  const showTokenLogos = displaySettings?.showTokenLogos ?? false;
   const tokenPricesQuery = useTokenPrices(runtime, currency);
   // Invalidates the shared balances/activity cache for `wallet.address` on
   // success so both Send and Main Screen reflect the updated balance
@@ -329,6 +330,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         arFeeAtomic={arFeeQuery.data}
         price={priceFor(tokenPricesQuery.data, selectedToken)}
         currency={currency}
+        showTokenLogos={showTokenLogos}
         step={step}
         showInfo={showInfo}
         onShowInfo={setShowInfo}
@@ -398,6 +400,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
       <TokenPickerStep
         walletAddress={wallet.address}
         balancesQuery={balancesQuery}
+        showTokenLogos={showTokenLogos}
         selectedToken={selectedToken}
         onSelect={(nextToken) => {
           setSelectedToken(nextToken);
@@ -487,6 +490,7 @@ function ComposeStep({
   arFeeAtomic,
   price,
   currency,
+  showTokenLogos,
   step,
   showInfo,
   onShowInfo,
@@ -514,6 +518,7 @@ function ComposeStep({
   /** The selected token's spot price in `currency`; `undefined` when unpriced or still loading. */
   price: number | undefined;
   currency: DisplayCurrency | undefined;
+  showTokenLogos: boolean;
   step: Extract<Step, { kind: "compose" }>;
   /** The Token details view, opened from the ticker in the header's corner. */
   showInfo: boolean;
@@ -593,7 +598,7 @@ function ComposeStep({
         <ScreenHeader title={t("send.tokenDetails")} onBack={() => onShowInfo(false)} />
         <div className="px-5 py-5">
           <TokenInfoPanel
-            token={token && { ...token, logoUrl: shownTokenLogo(token, readRowVisibility(wallet.address)) }}
+            token={token && { ...token, logoUrl: shownTokenLogo(token, readRowVisibility(wallet.address), showTokenLogos) }}
             balanceDisplay={balanceDisplay}
             balanceValue={balanceValue}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
@@ -1192,12 +1197,14 @@ function defaultAoTokenBalance(walletAddress: string): TokenBalance {
 function TokenPickerStep({
   walletAddress,
   balancesQuery,
+  showTokenLogos,
   selectedToken,
   onSelect,
   onBack,
 }: {
   walletAddress: string;
   balancesQuery: UseQueryResult<WalletBalances>;
+  showTokenLogos: boolean;
   selectedToken: TokenBalance | null;
   onSelect: (token: TokenBalance | null) => void;
   onBack: () => void;
@@ -1262,7 +1269,7 @@ function TokenPickerStep({
           otherTokenBalances.map((candidate) => (
             <TokenRow
               key={candidate.processId}
-              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: shownTokenLogo(candidate, visibility) }}
+              glyph={{ label: displayTicker(candidate.ticker).slice(0, 2).toUpperCase(), tone: 2, logoUrl: shownTokenLogo(candidate, visibility, showTokenLogos) }}
               name={displayTicker(candidate.ticker)}
               amount={
                 candidate.available === false

@@ -52,6 +52,8 @@ export interface DisplaySettings {
   currency: DisplayCurrency;
   /** Puts a small sparkline beside the figures in place of the full-width chart; off by default. */
   compactHeader: boolean;
+  /** Draws token logos in place of ticker letters; off by default. */
+  showTokenLogos: boolean;
   headline: HeadlineBalance;
   /** Masks balances on the main screen, toggled by tapping the headline. */
   balancesHidden: boolean;
@@ -88,5 +90,5 @@ export function defaultDisplayCurrency(locale: string | undefined): FiatCurrency
 }
 
 export function defaultDisplaySettings(locale: string | undefined): DisplaySettings {
-  return { currency: defaultDisplayCurrency(locale), compactHeader: false, headline: "total", balancesHidden: false };
+  return { currency: defaultDisplayCurrency(locale), compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false };
 }

@@ -192,6 +192,12 @@ export function SettingsHomeView({
             onToggle={() => void updateDisplay({ compactHeader: !(display?.compactHeader ?? false) })}
           />
           <ToggleRow
+            title={t("settingsHome.tokenLogos")}
+            checked={display?.showTokenLogos ?? false}
+            disabled={!display}
+            onToggle={() => void updateDisplay({ showTokenLogos: !(display?.showTokenLogos ?? false) })}
+          />
+          <ToggleRow
             title={t("settingsHome.darkMode")}
             checked={theme === "dark"}
             disabled={savingTheme}

@@ -6,7 +6,7 @@ import { DisplayCurrencyView } from "./DisplayCurrencyView";
 
 afterEach(cleanup);
 
-const SETTINGS: DisplaySettings = { currency: "USD", compactHeader: false, headline: "total", balancesHidden: false };
+const SETTINGS: DisplaySettings = { currency: "USD", compactHeader: false, showTokenLogos: false, headline: "total", balancesHidden: false };
 
 function renderPicker() {
   const send = vi.fn(async ({ type }: { type: string }) => {

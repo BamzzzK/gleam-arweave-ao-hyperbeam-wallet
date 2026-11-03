@@ -461,6 +461,7 @@ export function MainScreenView({
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
   const compactHeader = displaySettings?.compactHeader ?? false;
+  const showTokenLogos = displaySettings?.showTokenLogos ?? false;
   const masked = displaySettings?.balancesHidden ?? false;
   const watchOnly = isWatchWalletMethod(wallet.method);
   const toggleMasked = () => void updateDisplaySettings({ balancesHidden: !masked });
@@ -910,7 +911,7 @@ export function MainScreenView({
                     defaultHidden: false,
                     node: (
                       <TokenRow
-                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: row.logoUrl }}
+                        glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: showTokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
                         amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
                         value={
@@ -949,7 +950,7 @@ export function MainScreenView({
                           glyph={{
                             label: token.ticker.slice(0, 2).toUpperCase(),
                             tone: 2,
-                            logoUrl: shownTokenLogo(token, rowVisibility),
+                            logoUrl: shownTokenLogo(token, rowVisibility, showTokenLogos),
                           }}
                           name={displayTicker(token.ticker)}
                           amount={
