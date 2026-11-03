@@ -932,7 +932,7 @@ export function MainScreenView({
                     key: "gleam-points",
                     label: "Gleam Points",
                     defaultHidden: false,
-                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} className="border-b-0" />,
+                    node: <PointsTokenRow runtime={runtime} wallet={wallet} onOpen={onOpenPoints} showLogo={tokenLogos} className="border-b-0" />,
                   },
                   ...nonDefaultTokenBalances(balancesQuery.data).map((token) => {
                     const discovered = token.source === "discovered";
