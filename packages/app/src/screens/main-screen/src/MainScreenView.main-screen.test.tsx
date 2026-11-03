@@ -242,6 +242,32 @@ describe("MainScreenView display settings", () => {
     expect(screen.getByRole("tab", { name: "7D" })).toBeTruthy();
   });
 
+  it("puts the total, change and range in the top bar once scrolled, and taps back to the top", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({}) }) });
+    await waitFor(() => expect(screen.getByText("$12.00")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "$12.00 +20.00% 7D" })).toBeNull();
+
+    Object.defineProperty(window, "scrollY", { value: 200, configurable: true });
+    fireEvent.scroll(window);
+    fireEvent.click(await screen.findByRole("button", { name: "$12.00 +20.00% 7D" }));
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+    scrollTo.mockRestore();
+  });
+
+  it("masks the top-bar total with the balances", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ balancesHidden: true }) }) });
+    await screen.findByRole("button", { name: "Show balances" });
+
+    Object.defineProperty(window, "scrollY", { value: 200, configurable: true });
+    fireEvent.scroll(window);
+
+    expect(await screen.findByRole("button", { name: "•••••• +20.00% 7D" })).toBeTruthy();
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+  });
+
   it("shows the unit price and 24h change on a token row, and hides the price with the balances", async () => {
     const send = sendWithDisplay({}, [{ processId: null, price: 3, change24h: -0.024 }]);
     renderMainScreen({ runtime: fakeRuntime({ send }) });

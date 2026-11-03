@@ -18,7 +18,7 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
-import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
+import { formatCurrencyValue, formatPercent, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
@@ -707,6 +707,23 @@ export function MainScreenView({
             </button>
           </div>
         )}
+
+        {headerCollapsed && history && !portfolioFailed ? (
+          // The range tabs fade out with the chart, so the range rides along to say what the change covers.
+          <button
+            type="button"
+            onClick={returnHome}
+            className="flex min-w-0 flex-1 items-baseline justify-center gap-1.5 text-label tabular-nums text-muted phone:min-h-11 phone:items-center"
+          >
+            <span className="truncate font-semibold text-foreground">
+              {masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale)}
+            </span>{" "}
+            <span className="font-semibold" style={{ color: chartChange >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
+              {formatPercent(chartChange, locale)}
+            </span>{" "}
+            <span>{selectedRange}</span>
+          </button>
+        ) : null}
 
         <div className="flex flex-shrink-0 items-center phone:-mr-3">
           {onOpenBrowser ? (
