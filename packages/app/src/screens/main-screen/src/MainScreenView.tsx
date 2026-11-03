@@ -824,8 +824,8 @@ export function MainScreenView({
         runs to the popup's bottom edge and scrolls internally — a fixed
         box can't be moved by window scroll, so without that a list longer
         than the popup would be cut off. The undocked min-height keeps the
-        page tall enough for a tab click to scroll the section all the way
-        up to its docked position even when the list is short.
+        page tall enough for a swipe or a tab click to scroll the section all
+        the way up to its docked position even when the list is short.
       */}
       {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
       <div
@@ -833,7 +833,7 @@ export function MainScreenView({
         className={`px-6 pb-6 phone:px-5 phone:pb-4 phone:[@media(max-height:700px)]:pb-2 ${
           listDocked
             ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
-            : "min-h-[calc(100dvh-4rem)] phone:min-h-0"
+            : "min-h-[calc(100dvh-4rem)]"
         }`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >
