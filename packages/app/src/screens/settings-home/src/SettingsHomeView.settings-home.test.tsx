@@ -47,6 +47,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenManageTokens={vi.fn()}
       onOpenContacts={vi.fn()}
       onOpenDisplayCurrency={vi.fn()}
+      onOpenLanguage={vi.fn()}
       onOpenFeedback={vi.fn()}
       {...overrides}
     />

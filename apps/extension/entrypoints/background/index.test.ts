@@ -901,9 +901,9 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       });
       resultPromise.catch(() => {});
 
-      // Advance past the lookup's own race timeout without waiting on real
-      // wall-clock time, then let the window-open path proceed.
-      await vi.advanceTimersByTimeAsync(3_000);
+      // Advance past the fee quote's race timeout, the longer of the two lookups,
+      // without waiting on real wall-clock time, then let the window-open path proceed.
+      await vi.advanceTimersByTimeAsync(10_000);
       await vi.waitFor(() => expect(windowsCreate).toHaveBeenCalled(), { timeout: 1000 });
 
       const pendingRaw = (await getItem("session:pendingApprovals")) as Array<{

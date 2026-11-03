@@ -14,20 +14,21 @@ import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.t
 import { useDisplaySettings } from "../../../display-settings";
 import { REPO_URL } from "@gleam/core";
 import { AboutBuild } from "./AboutBuild";
+import { LANGUAGES, useLanguage, useT, type MessageKey } from "../../../i18n";
 
-const TIMEOUT_LABELS: Record<AutoLockTimeout, string> = {
-  never: "Never",
-  immediate: "After 1 minute",
-  "5min": "5 minutes",
-  "1hr": "1 hour",
-  "4hr": "4 hours",
-};
+const TIMEOUT_KEYS = {
+  never: "settingsHome.timeoutNever",
+  immediate: "settingsHome.timeoutImmediate",
+  "5min": "settingsHome.timeout5min",
+  "1hr": "settingsHome.timeout1hr",
+  "4hr": "settingsHome.timeout4hr",
+} as const satisfies Record<AutoLockTimeout, MessageKey>;
 
-const HEADLINE_OPTIONS: { value: HeadlineBalance; label: string }[] = [
-  { value: "total", label: "Total wallet value" },
-  { value: "AR", label: "AR balance" },
-  { value: "AO", label: "AO balance" },
-];
+const HEADLINE_KEYS = [
+  { value: "total", key: "settingsHome.headlineTotal" },
+  { value: "AR", key: "settingsHome.headlineAr" },
+  { value: "AO", key: "settingsHome.headlineAo" },
+] as const satisfies readonly { value: HeadlineBalance; key: MessageKey }[];
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -53,6 +54,7 @@ export interface SettingsHomeViewProps {
   onOpenManageTokens: () => void;
   onOpenContacts: () => void;
   onOpenDisplayCurrency: () => void;
+  onOpenLanguage: () => void;
   onOpenFeedback: () => void;
 }
 
@@ -71,14 +73,18 @@ export function SettingsHomeView({
   onOpenManageTokens,
   onOpenContacts,
   onOpenDisplayCurrency,
+  onOpenLanguage,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
   const platform = usePlatform();
+  const t = useT();
+  const language = useLanguage();
   const { version } = platform.buildInfo;
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
   const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
+  const headlineOptions = HEADLINE_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -124,79 +130,86 @@ export function SettingsHomeView({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Settings" onBack={onBack} />
+      <ScreenHeader title={t("settingsHome.title")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-8 phone:gap-6 px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
-        <OptionSection title="Wallet">
+        <OptionSection title={t("settingsHome.sectionWallet")}>
           {onOpenLockSettings ? (
             <OptionRow
               divided={false}
-              title="Lock & unlock"
-              description="Auto-lock and passkey"
-              value={state.loading ? undefined : state.lockSettings ? TIMEOUT_LABELS[state.lockSettings.autoLockTimeout] : "—"}
+              title={t("settingsHome.lockTitle")}
+              description={t("settingsHome.lockDescription")}
+              value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
           <OptionRow
             divided={false}
-            title="Connected apps"
-            description="Manage sites with an active grant"
+            title={t("settingsHome.connectedAppsTitle")}
+            description={t("settingsHome.connectedAppsDescription")}
             onClick={onOpenConnectedApps}
           />
           <OptionRow
             divided={false}
-            title="Manage tokens"
-            description="Add or remove watched AO tokens"
+            title={t("settingsHome.manageTokensTitle")}
+            description={t("settingsHome.manageTokensDescription")}
             onClick={onOpenManageTokens}
           />
           <OptionRow
             divided={false}
-            title="Contacts"
-            description="Saved addresses for sending"
+            title={t("settingsHome.contactsTitle")}
+            description={t("settingsHome.contactsDescription")}
             onClick={onOpenContacts}
           />
         </OptionSection>
 
-        <OptionSection title="Display">
+        <OptionSection title={t("settingsHome.sectionDisplay")}>
           <OptionRow
             divided={false}
-            title="Currency"
-            description="Balances and prices are shown in"
+            title={t("settingsHome.currencyTitle")}
+            description={t("settingsHome.currencyDescription")}
             value={display?.currency}
             onClick={onOpenDisplayCurrency}
           />
+          <OptionRow
+            divided={false}
+            title={t("language.title")}
+            description={t("language.description")}
+            value={LANGUAGES.find((entry) => entry.code === language)?.name}
+            onClick={onOpenLanguage}
+          />
           <SelectRow
-            title="Main balance"
+            title={t("settingsHome.mainBalance")}
             value={display?.headline ?? "total"}
-            options={HEADLINE_OPTIONS}
+            options={headlineOptions}
             disabled={!display}
             onChange={(headline) => void updateDisplay({ headline })}
           />
           <ToggleRow
-            title="Compact header"
+            title={t("settingsHome.compactHeader")}
             checked={display?.compactHeader ?? false}
             disabled={!display}
             onToggle={() => void updateDisplay({ compactHeader: !(display?.compactHeader ?? false) })}
           />
           <ToggleRow
-            title="Token logos"
+            title={t("settingsHome.tokenLogos")}
             checked={display?.showTokenLogos ?? false}
             disabled={!display}
             onToggle={() => void updateDisplay({ showTokenLogos: !(display?.showTokenLogos ?? false) })}
           />
           <ToggleRow
-            title="Dark mode"
+            title={t("settingsHome.darkMode")}
             checked={theme === "dark"}
             disabled={savingTheme}
             onToggle={() => void handleToggleTheme()}
           />
         </OptionSection>
 
-        <OptionSection title="Network">
+        <OptionSection title={t("settingsHome.sectionNetwork")}>
           <OptionRow
             divided={false}
-            title="Network & peers"
-            description="Gateway and AO node endpoints"
+            title={t("settingsHome.networkTitle")}
+            description={t("settingsHome.networkDescription")}
             value={
               state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
             }
@@ -205,7 +218,7 @@ export function SettingsHomeView({
         </OptionSection>
 
         <div className="mt-auto">
-          <OptionSection title="Help & About">
+          <OptionSection title={t("settingsHome.sectionHelp")}>
             <FeedbackCard onClick={onOpenFeedback} />
             <SourceLink />
             <AboutBuild runtime={runtime} version={version} />
@@ -316,14 +329,15 @@ function LeadingIcon({ children, className }: { children: React.ReactNode; class
 
 /** It leaves the wallet for the website's feedback form, so the trailing icon marks it as a link out. */
 function FeedbackCard({ onClick }: { onClick: () => void }) {
+  const t = useT();
   return (
     <button type="button" onClick={onClick} className={HELP_ROW}>
       <LeadingIcon>
         <FeedbackIcon />
       </LeadingIcon>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-label font-semibold text-foreground">Got an issue or suggestion?</span>
-        <span className="text-caption text-muted">Send us a message</span>
+        <span className="text-label font-semibold text-foreground">{t("settingsHome.feedbackTitle")}</span>
+        <span className="text-caption text-muted">{t("settingsHome.feedbackDescription")}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-faint">
         <ExternalIcon />
@@ -334,14 +348,15 @@ function FeedbackCard({ onClick }: { onClick: () => void }) {
 
 /** A wallet asks for trust, so the source sits one click away. */
 function SourceLink() {
+  const t = useT();
   return (
     <a href={REPO_URL} target="_blank" rel="noreferrer" className={HELP_ROW}>
       <LeadingIcon>
         <GitHubIcon />
       </LeadingIcon>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-label font-semibold text-foreground">Gleam is open source</span>
-        <span className="text-caption text-muted">MIT licensed. Read the code on GitHub</span>
+        <span className="text-label font-semibold text-foreground">{t("settingsHome.sourceTitle")}</span>
+        <span className="text-caption text-muted">{t("settingsHome.sourceDescription")}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-faint">
         <ExternalIcon />

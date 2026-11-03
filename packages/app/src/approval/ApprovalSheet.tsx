@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { Sheet } from "@gleam/ui/src/primitives/sheet.tsx";
 import type { ApprovalSheetPort } from "../app-platform/types";
+import { useT } from "../i18n";
 import { ApprovalRoot } from "./ApprovalRoot";
 
 export interface ApprovalSheetProps {
@@ -22,6 +23,7 @@ function DismissOnBack({ onBack }: { onBack: () => void }) {
  * rejects the request.
  */
 export function ApprovalSheet({ port, container }: ApprovalSheetProps) {
+  const t = useT();
   // The id is kept after the sheet closes so its content stays until it has slid away.
   const [shown, setShown] = useState<{ requestId: string; open: boolean } | null>(null);
 
@@ -40,7 +42,7 @@ export function ApprovalSheet({ port, container }: ApprovalSheetProps) {
   const dismiss = () => port.dismissed(requestId);
 
   return (
-    <Sheet open={open} onOpenChange={(next) => !next && dismiss()} label="Approval request" container={container}>
+    <Sheet open={open} onOpenChange={(next) => !next && dismiss()} label={t("approval.approvalRequest")} container={container}>
       {open ? <DismissOnBack onBack={dismiss} /> : null}
       <ApprovalRoot key={requestId} requestId={requestId} onClose={dismiss} />
     </Sheet>

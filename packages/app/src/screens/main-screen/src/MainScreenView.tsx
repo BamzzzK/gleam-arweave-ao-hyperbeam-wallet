@@ -24,6 +24,7 @@ import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "./formatWinston";
 import { useAddressIdentity } from "../../../address-identity";
+import { useLocale, useT, type TFunction } from "../../../i18n";
 import { useDisplaySettings } from "../../../display-settings";
 import { useActivity } from "../../activity/src/useActivity";
 import { useCollectibles } from "../../activity/src/useCollectibles";
@@ -143,15 +144,16 @@ interface DefaultTokenRow {
  * guessed quantity, which for a wrong denomination could be off by orders
  * of magnitude.
  */
-const UNAVAILABLE_BALANCE_LABEL = "Unavailable";
+// Compared by value below, so it is resolved at render time in the language in use.
+const unavailableBalanceLabel = (t: TFunction): string => t("mainScreen.unavailable");
 
 /** `0.2 sending`, `+0.5 arriving`, or both. With balances hidden the amounts go, and the words stay. */
-function pendingNote(pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
+function pendingNote(t: TFunction, pending: PendingAmounts | undefined, denomination: number, masked: boolean): string | null {
   if (!pending) return null;
   const notes: string[] = [];
-  if (pending.outgoing !== "0") notes.push(masked ? "sending" : `${formatAtomicCompact(pending.outgoing, denomination)} sending`);
-  if (pending.incoming !== "0") notes.push(masked ? "arriving" : `+${formatAtomicCompact(pending.incoming, denomination)} arriving`);
-  return notes.length > 0 ? notes.join(", ") : null;
+  if (pending.outgoing !== "0") notes.push(masked ? t("mainScreen.sending") : t("mainScreen.sendingAmount", { amount: formatAtomicCompact(pending.outgoing, denomination) }));
+  if (pending.incoming !== "0") notes.push(masked ? t("mainScreen.arriving") : t("mainScreen.arrivingAmount", { amount: formatAtomicCompact(pending.incoming, denomination) }));
+  return notes.length > 0 ? notes.join(t("mainScreen.noteSeparator")) : null;
 }
 
 function withPendingNote(amount: string, note: string | null): ReactNode {
@@ -217,6 +219,7 @@ function restoredCache(query: { data: unknown; dataUpdatedAt: number }, openedAt
  * back to `DEFAULT_TOKENS`' own `"0"` constant, never `null`/`undefined`.
  */
 function buildDefaultTokenRows(
+  t: TFunction,
   data: WalletBalances | undefined,
   prices: TokenPrice[] | undefined,
   currency: DisplayCurrency | undefined,
@@ -248,7 +251,7 @@ function buildDefaultTokenRows(
       amount: aoAvailable
         ? formatAtomicCompact(aoBalance.quantity, aoBalance.denomination)
         : aoBalance
-          ? UNAVAILABLE_BALANCE_LABEL
+          ? unavailableBalanceLabel(t)
           : DEFAULT_AO_TOKEN.defaultDisplayAmount,
       pending: aoAvailable ? aoBalance.pending : undefined,
       amountNumber: aoAvailable ? aoAmount : undefined,
@@ -335,8 +338,8 @@ function swapAssetLabel(processId: string, tokenBalances: TokenBalance[] | undef
 }
 
 /** A gateway-only entry knows just the asset's process id. */
-function collectibleLabel(collectible: CollectibleRef): string {
-  return collectible.name ?? "Collectible";
+function collectibleLabel(t: TFunction, collectible: CollectibleRef): string {
+  return collectible.name ?? t("mainScreen.collectible");
 }
 
 // A per-device view preference, so plain localStorage; it can throw or be empty in some contexts.
@@ -402,6 +405,8 @@ export function MainScreenView({
   initialTab = "tokens",
   onTabChange,
 }: MainScreenViewProps) {
+  const t = useT();
+  const locale = useLocale();
   const [activeTab, setActiveTab] = useState<MainScreenTab>(initialTab);
   const [openedAt] = useState(Date.now);
   // Discovery is slow, so it starts on first open rather than with the main screen.
@@ -506,7 +511,7 @@ export function MainScreenView({
       ]),
   });
 
-  const defaultTokenRows = buildDefaultTokenRows(balancesQuery.data, tokenPrices, currency);
+  const defaultTokenRows = buildDefaultTokenRows(t, balancesQuery.data, tokenPrices, currency);
   const tokensCached = restoredCache(balancesQuery, openedAt) || restoredCache(tokenPricesQuery, openedAt);
   const collectiblesCached = restoredCache(collectiblesQuery, openedAt);
   const activityCached = restoredCache(activityQuery, openedAt);
@@ -670,7 +675,7 @@ export function MainScreenView({
           // h-9 matches the account pill's height so the row, and the list docked under it, don't shift.
           <button
             type="button"
-            aria-label="Back"
+            aria-label={t("mainScreen.back")}
             onClick={returnHome}
             className="-ml-2 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:-ml-3 phone:h-11 phone:w-11"
           >
@@ -683,10 +688,10 @@ export function MainScreenView({
               type="button"
               onClick={onOpenWalletSwitcher}
               aria-haspopup="dialog"
-              aria-label={`${wallet.name}, address ${wallet.address}, view account details`}
+              aria-label={t("mainScreen.accountDetails", { name: wallet.name, address: wallet.address })}
               className="flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-0 pr-1 phone:min-h-11 phone:gap-2.5"
             >
-              <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={24} />
+              <AccountAvatar svgMarkup={avatarSvg} label={t("mainScreen.avatarOf", { name: wallet.name })} size={24} />
               <span className="truncate text-label">{wallet.name}</span>
               <span className="truncate font-mono text-label text-faint">
                 {truncateAddress(wallet.address, 6)}
@@ -695,8 +700,8 @@ export function MainScreenView({
             <button
               type="button"
               onClick={copyAddress}
-              aria-label={addressCopied ? "Address copied" : "Copy address"}
-              title={addressCopied ? "Copied" : "Copy address"}
+              aria-label={addressCopied ? t("mainScreen.addressCopied") : t("mainScreen.copyAddress")}
+              title={addressCopied ? t("mainScreen.copied") : t("mainScreen.copyAddress")}
               className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-muted opacity-0 hover:text-foreground"}`}
             >
               {addressCopied ? <CheckIcon /> : <CopyIcon />}
@@ -708,7 +713,7 @@ export function MainScreenView({
           {onOpenBrowser ? (
             <button
               type="button"
-              aria-label="Browser"
+              aria-label={t("mainScreen.browser")}
               onClick={onOpenBrowser}
               className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
             >
@@ -717,7 +722,7 @@ export function MainScreenView({
           ) : null}
           <button
             type="button"
-            aria-label="Settings"
+            aria-label={t("mainScreen.settings")}
             onClick={onOpenSettings}
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11"
           >
@@ -753,8 +758,8 @@ export function MainScreenView({
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
               headline={
                 headlineRow
-                  ? headlineRow.amount === UNAVAILABLE_BALANCE_LABEL
-                    ? { amount: `${headlineRow.ticker} unavailable` }
+                  ? headlineRow.amount === unavailableBalanceLabel(t)
+                    ? { amount: t("mainScreen.unavailableTicker", { ticker: headlineRow.ticker }) }
                     : { amount: headlineRow.amount, unit: headlineRow.ticker, value: headlineRow.amountNumber }
                   : undefined
               }
@@ -835,7 +840,7 @@ export function MainScreenView({
       >
         <div
           role="tablist"
-          aria-label="Tokens, collectibles and activity"
+          aria-label={t("mainScreen.tabsLabel")}
           className="sticky top-0 z-10 flex items-center gap-1 bg-background pb-2.5 pt-1 phone:-mx-2.5 phone:pb-1 phone:pt-1"
         >
           <button
@@ -847,7 +852,7 @@ export function MainScreenView({
               activeTab === "tokens" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
-            Tokens
+            {t("mainScreen.tabTokens")}
           </button>
           <button
             type="button"
@@ -858,7 +863,7 @@ export function MainScreenView({
               activeTab === "collectibles" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
-            Collectibles
+            {t("mainScreen.tabCollectibles")}
           </button>
           <button
             type="button"
@@ -869,7 +874,7 @@ export function MainScreenView({
               activeTab === "activity" ? "text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
-            Activity
+            {t("mainScreen.tabActivity")}
           </button>
         </div>
 
@@ -891,7 +896,7 @@ export function MainScreenView({
                       <TokenRow
                         glyph={{ label: row.ticker.slice(0, 2).toUpperCase(), tone: 2, logoUrl: showTokenLogos ? row.logoUrl : undefined }}
                         name={row.name}
-                        amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(row.pending, 12, masked))}
+                        amount={withPendingNote(masked ? HIDDEN_AMOUNT : row.amount, pendingNote(t, row.pending, 12, masked))}
                         value={
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
@@ -933,10 +938,10 @@ export function MainScreenView({
                           name={displayTicker(token.ticker)}
                           amount={
                             token.available === false
-                              ? UNAVAILABLE_BALANCE_LABEL
+                              ? unavailableBalanceLabel(t)
                               : withPendingNote(
                                   masked ? HIDDEN_AMOUNT : formatAtomicCompact(token.quantity, token.denomination),
-                                  pendingNote(token.pending, token.denomination, masked),
+                                  pendingNote(t, token.pending, token.denomination, masked),
                                 )
                           }
                           value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
@@ -951,7 +956,7 @@ export function MainScreenView({
                       ),
                     };
                   }),
-                ].sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+                ].sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
                 const hiddenRows = rows.filter(isRowHidden);
                 const renderRow = (row: ListedTokenRow) => {
                   const hidden = isRowHidden(row);
@@ -960,12 +965,11 @@ export function MainScreenView({
                     return (
                       <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
                         <p className="text-caption leading-relaxed text-muted">
-                          Ignore {row.label}? It won&apos;t show anywhere in Gleam. To bring it back, add
-                          its process id in Manage tokens.
+                          {t("mainScreen.ignoreConfirm", { label: row.label })}
                         </p>
                         {ignoreFailed ? (
                           <p role="alert" className="text-caption text-warning">
-                            Couldn&apos;t ignore it. Try again.
+                            {t("mainScreen.ignoreFailed")}
                           </p>
                         ) : null}
                         <div className="flex justify-end gap-3 text-caption font-semibold">
@@ -974,7 +978,7 @@ export function MainScreenView({
                             onClick={() => setConfirmingIgnore(null)}
                             className="text-muted hover:text-foreground"
                           >
-                            Cancel
+                            {t("mainScreen.cancel")}
                           </button>
                           <button
                             type="button"
@@ -982,7 +986,7 @@ export function MainScreenView({
                             onClick={() => void ignoreToken(processId)}
                             className="text-warning disabled:opacity-60"
                           >
-                            {ignoring ? "Ignoring…" : "Ignore"}
+                            {ignoring ? t("mainScreen.ignoring") : t("mainScreen.ignore")}
                           </button>
                         </div>
                       </div>
@@ -998,23 +1002,23 @@ export function MainScreenView({
                           {hidden && processId !== undefined ? (
                             <button
                               type="button"
-                              aria-label={`Ignore ${row.label}`}
+                              aria-label={t("mainScreen.ignoreLabel", { label: row.label })}
                               onClick={() => {
                                 setIgnoreFailed(false);
                                 setConfirmingIgnore(processId);
                               }}
                               className={actionClassName}
                             >
-                              Ignore
+                              {t("mainScreen.ignore")}
                             </button>
                           ) : null}
                           <button
                             type="button"
-                            aria-label={`${hidden ? "Show" : "Hide"} ${row.label}`}
+                            aria-label={t(hidden ? "mainScreen.showLabel" : "mainScreen.hideLabel", { label: row.label })}
                             onClick={() => toggleRowHidden(row)}
                             className={actionClassName}
                           >
-                            {hidden ? "Show" : "Hide"}
+                            {hidden ? t("mainScreen.show") : t("mainScreen.hide")}
                           </button>
                         </div>
                       ) : null}
@@ -1032,7 +1036,7 @@ export function MainScreenView({
                           onClick={toggleHiddenExpanded}
                           className="flex w-full items-center justify-between px-3.5 py-3 text-label text-muted hover:text-foreground phone:min-h-11 phone:px-0"
                         >
-                          <span>Hidden ({hiddenRows.length})</span>
+                          <span>{t("mainScreen.hiddenCount", { count: hiddenRows.length })}</span>
                           <ChevronIcon open={hiddenExpanded} />
                         </button>
                         {hiddenExpanded ? hiddenRows.map(renderRow) : null}
@@ -1044,7 +1048,7 @@ export function MainScreenView({
                         onClick={() => setHiddenExpanded((prev) => !prev)}
                         className="px-3.5 py-3 text-caption text-faint hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
                       >
-                        {hiddenExpanded ? "Done" : "Edit list"}
+                        {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
                       </button>
                     ) : null}
                   </>
@@ -1081,7 +1085,7 @@ export function MainScreenView({
                   <SkeletonRow />
                 </>
               ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
-                <EmptyState message="No activity yet. Once you send or receive, it'll show up here." />
+                <EmptyState message={t("mainScreen.noActivity")} />
               ) : (
                 activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => (
                   <ActivityRow
@@ -1089,21 +1093,28 @@ export function MainScreenView({
                     activityType={entry.type}
                     title={
                       entry.swap
-                        ? `Swap order · ${swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances)}`
-                        : `${activityVerb(entry.type)} · ${entry.collectible ? collectibleLabel(entry.collectible) : truncateAddress(entry.address, 6)}`
+                        ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
+                        : t("mainScreen.activityTitle", {
+                            verb: activityVerb(t, entry.type),
+                            target: entry.collectible ? collectibleLabel(t, entry.collectible) : truncateAddress(entry.address, 6),
+                          })
                     }
                     subtitle={
                       entry.swap && entry.status === "confirmed"
-                        ? `Order placed${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        ? entry.timestamp > 0
+                          ? t("mainScreen.orderPlacedAt", { time: relativeTime(t, entry.timestamp) })
+                          : t("mainScreen.orderPlaced")
                         : entry.unverified
-                        ? `Unverified transfer request${entry.timestamp > 0 ? ` · ${relativeTime(entry.timestamp)}` : ""}`
+                        ? entry.timestamp > 0
+                          ? t("mainScreen.unverifiedTransferAt", { time: relativeTime(t, entry.timestamp) })
+                          : t("mainScreen.unverifiedTransfer")
                         : entry.status === "pending"
-                        ? "Pending confirmation"
+                        ? t("mainScreen.pendingConfirmation")
                         : entry.status === "failed"
                           ? entry.error
-                            ? `Failed · ${entry.error}`
-                            : "Failed"
-                          : relativeTime(entry.timestamp)
+                            ? t("mainScreen.failedWithError", { error: entry.error })
+                            : t("mainScreen.failed")
+                          : relativeTime(t, entry.timestamp)
                     }
                     amountLabel={
                       entry.amount
@@ -1113,7 +1124,7 @@ export function MainScreenView({
                     amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
-                        ? { name: collectibleLabel(entry.collectible), imageUrl: entry.collectible.imageUrl }
+                        ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
                         : undefined
                     }
                     pending={entry.status === "pending"}
@@ -1128,7 +1139,7 @@ export function MainScreenView({
                 onClick={() => openInExplorer(wallet.address)}
                 className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
               >
-                View all
+                {t("mainScreen.viewAll")}
               </button>
             </div>
           </>
@@ -1204,20 +1215,20 @@ function openInExplorer(path: string): void {
   window.open(explorerUrlFor(path), "_blank", "noopener,noreferrer");
 }
 
-function activityVerb(type: "send" | "receive" | "upload"): string {
-  if (type === "send") return "Sent";
-  if (type === "receive") return "Received";
-  return "Uploaded";
+function activityVerb(t: TFunction, type: "send" | "receive" | "upload"): string {
+  if (type === "send") return t("mainScreen.verbSent");
+  if (type === "receive") return t("mainScreen.verbReceived");
+  return t("mainScreen.verbUploaded");
 }
 
-function relativeTime(timestampMs: number): string {
-  if (timestampMs <= 0) return "Pending";
+function relativeTime(t: TFunction, timestampMs: number): string {
+  if (timestampMs <= 0) return t("mainScreen.timePending");
   const diffMs = Date.now() - timestampMs;
   const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("mainScreen.justNow");
+  if (minutes < 60) return t("mainScreen.minutesAgo", { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("mainScreen.hoursAgo", { count: hours });
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return t("mainScreen.daysAgo", { count: days });
 }

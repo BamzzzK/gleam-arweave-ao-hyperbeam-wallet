@@ -33,6 +33,7 @@ import { attestationId, type ParsedAttestation } from "@gleam/core/src/scan/atte
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { attestFailure, serverAttestFailure } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -74,7 +75,7 @@ const HEARTBEAT_INTERVAL_MS = 20 * 3_600_000;
 const ATTEST_TIMEOUT_MS = 30_000;
 
 function failureOf(response: SiteAttestResponse): AttestationCheck {
-  return { ok: false, error: response.ok ? "The points server refused the attestation." : response.error };
+  return { ok: false, error: response.ok ? userErrorMessage("attestationRefused") : response.error };
 }
 
 /** A wallet's signed proof that it owns its address, in the body shape `/register`, `/leave` and `/attestations` take. */
@@ -139,7 +140,7 @@ export class PointsHandler {
   async join(req: { walletId: string; inviteCode?: string }): Promise<PointsMembership> {
     await this.requirePointsCapability(req.walletId, JOIN);
     const typed = req.inviteCode?.trim() ? normalizeInviteCode(req.inviteCode) : null;
-    if (typed !== null && !isValidInviteCode(typed)) throw new Error("That invite code isn't valid.");
+    if (typed !== null && !isValidInviteCode(typed)) throw new Error(userErrorMessage("inviteCodeInvalid"));
     const pending = await this.deps.storage.get<string>(POINTS_PENDING_INVITE_KEY);
     const inviteCode = typed ?? (typeof pending === "string" && isValidInviteCode(pending) ? pending : null);
 
@@ -171,10 +172,10 @@ export class PointsHandler {
         throw new Error(INVITE_REQUIRED_MESSAGE);
       }
       const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
-      throw new Error(`Couldn't join Gleam Points: ${reason}`);
+      throw new Error(userErrorMessage("pointsJoinFailed", { reason }));
     }
     if (body?.address !== proof.address || typeof body.inviteCode !== "string" || typeof body.referred !== "boolean") {
-      throw new Error("The points server sent an unexpected response.");
+      throw new Error(userErrorMessage("pointsUnexpectedResponse"));
     }
 
     const membership: PointsMembership = {
@@ -215,7 +216,7 @@ export class PointsHandler {
       return { ...(await this.deps.deviceProof({ walletId, message: buildMessage })), proof: "transaction" };
     }
     const signer = await this.deps.signer(walletId);
-    if (!signer) throw new Error(`Unlock this wallet to ${action}.`);
+    if (!signer) throw new Error(userErrorMessage("unlockToAction", { action }));
     const message = buildMessage(signer.address);
     const signature = await signMessage(signer, new TextEncoder().encode(message).buffer as ArrayBuffer);
     return {
@@ -268,7 +269,7 @@ export class PointsHandler {
   async submitAttestation(attestation: ParsedAttestation, proof: OwnershipProof): Promise<SiteAttestResponse> {
     const id = await attestationId(attestation);
     if (proof.message !== buildAttestMessage(attestation.release, id)) {
-      throw new Error("The signed message isn't for this attestation.");
+      throw new Error(userErrorMessage("attestationSignedMismatch"));
     }
     let response: Response;
     let body: Record<string, unknown> | null;
@@ -332,7 +333,7 @@ export class PointsHandler {
    */
   async redeemInvite(rawCode: string): Promise<InviteUnlock> {
     const code = normalizeInviteCode(rawCode);
-    if (!isValidInviteCode(code)) throw new Error("That invite code isn't valid.");
+    if (!isValidInviteCode(code)) throw new Error(userErrorMessage("inviteCodeInvalid"));
     const existing = await this.getInviteUnlock();
     if (existing?.result === "ok") return existing;
 
@@ -418,7 +419,7 @@ export class PointsHandler {
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
       const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
-      throw new Error(`Couldn't leave Gleam Points: ${reason}`);
+      throw new Error(userErrorMessage("pointsLeaveFailed", { reason }));
     }
 
     const remaining = { ...(await this.getMemberships()) };
@@ -451,9 +452,9 @@ export class PointsHandler {
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
       return null;
     }
-    if (!response.ok) throw new Error(`Couldn't load Gleam Points (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(userErrorMessage("pointsLoadFailed", { status: response.status }));
     const body = (await response.json()) as PointsScores;
-    if (!Array.isArray(body?.wallets)) throw new Error("The points server sent an unexpected response.");
+    if (!Array.isArray(body?.wallets)) throw new Error(userErrorMessage("pointsUnexpectedResponse"));
     await this.syncSeats(body).catch((error: unknown) => console.error("Gleam Points seat check failed:", error));
     return body;
   }

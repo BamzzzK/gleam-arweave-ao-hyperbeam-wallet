@@ -81,6 +81,8 @@
 4 apps/extension/src/hardware/panels/
 4 packages/keystone/src/KeystonePanel.tsx
 4 packages/app/src/approval/
+4 packages/app/src/i18n/
+4 packages/core/src/models/user-errors.ts
 4 apps/mobile/src/adapters/approval-presenter.ts
 4 apps/mobile/src/adapters/approval-sheet.ts
 

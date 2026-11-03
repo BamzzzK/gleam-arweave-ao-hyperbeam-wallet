@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { RuntimePort, ThemeSettings } from "@gleam/core";
 import { UnlockView } from "@gleam/app/src/screens/unlock/index.tsx";
 import { PasskeySetup, type PasskeySetupProps } from "./PasskeySetup";
+import { useT } from "@gleam/app/src/i18n/index.tsx";
+import { LocalizedRoot } from "@gleam/app/src/i18n/LocalizedRoot.tsx";
 
 export interface PasskeyRootProps {
   mode: "setup" | "unlock";
@@ -16,7 +18,16 @@ export interface PasskeyRootProps {
  * with the prompt already started, so the password is still right there
  * if the passkey isn't to hand.
  */
-export function PasskeyRoot({ mode, runtime, onFinish, createPasskey }: PasskeyRootProps) {
+export function PasskeyRoot(props: PasskeyRootProps) {
+  return (
+    <LocalizedRoot>
+      <PasskeyContent {...props} />
+    </LocalizedRoot>
+  );
+}
+
+function PasskeyContent({ mode, runtime, onFinish, createPasskey }: PasskeyRootProps) {
+  const t = useT();
   const [theme, setTheme] = useState<ThemeSettings["theme"]>("light");
 
   useEffect(() => {
@@ -42,7 +53,7 @@ export function PasskeyRoot({ mode, runtime, onFinish, createPasskey }: PasskeyR
       ) : (
         <UnlockView
           runtime={runtime}
-          tagline="Unlock with your passkey"
+          tagline={t("extension.passkeyTagline")}
           autoStartPasskey
           onUnlocked={() => onFinish(true)}
           onResetComplete={() => onFinish(true)}

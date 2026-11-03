@@ -3,6 +3,8 @@ import type { AddTokenApprovalPreview } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
+import { useT } from "../i18n";
+import { errorText } from "../i18n/errors";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -27,6 +29,7 @@ function hostnameOf(origin: string): string {
 }
 
 export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScreenProps) {
+  const t = useT();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const host = hostnameOf(origin);
@@ -38,7 +41,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
     try {
       await onAdd();
     } catch (addError) {
-      setError(addError instanceof Error ? addError.message : String(addError));
+      setError(errorText(addError));
       setSubmitting(false);
     }
   };
@@ -53,17 +56,17 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
       </div>
 
       <div className="flex flex-1 flex-col gap-5 px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">Add token</div>
+        <div className="text-center text-body font-bold text-foreground">{t("approval.addToken")}</div>
 
         <div className="flex flex-col items-center gap-1 py-1 text-center">
           <span className="text-[28px] font-semibold tracking-[-0.02em] text-foreground">
-            {preview.ticker ?? "Unknown token"}
+            {preview.ticker ?? t("approval.unknownToken")}
           </span>
           {preview.name !== null ? <span className="text-label text-muted">{preview.name}</span> : null}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Process id</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.processId")}</span>
           <MemorableAddress
             address={preview.processId}
             emphasisPick={identity.emphasisPick}
@@ -72,7 +75,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">To wallet</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.toWallet")}</span>
           <MemorableAddress
             address={preview.address}
             emphasisPick={identity.emphasisPick}
@@ -81,8 +84,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
         </div>
 
         <p className="text-caption leading-snug text-muted">
-          The name and ticker are set by whoever created the token. Adding it only shows its balance in your
-          wallet.
+          {t("approval.tokenNotice")}
         </p>
 
         {error ? (
@@ -93,7 +95,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
 
         <div className="mt-auto flex gap-2.5 pt-1">
           <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
-            Reject
+            {t("approval.reject")}
           </Button>
           <Button
             type="button"
@@ -103,7 +105,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
             onClick={() => void handleAdd()}
             className="flex-1"
           >
-            {submitting ? "Adding…" : "Add token"}
+            {submitting ? t("approval.adding") : t("approval.addToken")}
           </Button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, 
 import { animatedNumberTintStyle, useAnimatedNumber, type AnimatedNumberTrend } from "../../primitives/animated-number";
 import { cn } from "../../primitives/cn";
 import { NetworkErrorBanner } from "./NetworkErrorBanner";
+import { useUiLabels, useUiLocale } from "../../labels";
 
 /**
  * The main screen's total-portfolio-value chart — a hand-rolled SVG
@@ -126,17 +127,6 @@ const EMPTY_STATE_POINTS: PortfolioChartPoint[] = [
 
 const SCOPE_FLASH_MS = 2500;
 
-/** The toggle's accessible name, i.e. what a click does next. */
-const SCOPE_ACTION_LABEL: Record<PortfolioScope, string> = {
-  wallet: "Show all wallets",
-  all: "Show this wallet",
-};
-
-const SCOPE_CONFIRMATION: Record<PortfolioScope, string> = {
-  wallet: "This wallet",
-  all: "All wallets",
-};
-
 /** Maps a series to a `0..CHART_WIDTH x 0..CHART_HEIGHT` SVG polyline's points, flat-lining a single-point or zero-range series at the vertical midpoint rather than dividing by zero. */
 function buildLinePath(points: PortfolioChartPoint[]): string {
   if (points.length === 0) return "";
@@ -208,6 +198,8 @@ export function PortfolioChart({
   compact = false,
   className,
 }: PortfolioChartProps) {
+  const labels = useUiLabels();
+  const locale = useUiLocale();
   const [flash, setFlash] = useState<string | null>(null);
   const flashTimerRef = useRef<number | null>(null);
   // Keeps the scope text through its fade-out instead of blanking first.
@@ -220,7 +212,7 @@ export function PortfolioChart({
     if (!onToggleScope) return;
     const nextScope: PortfolioScope = scope === "all" ? "wallet" : "all";
     onToggleScope();
-    setFlash(SCOPE_CONFIRMATION[nextScope]);
+    setFlash(nextScope === "all" ? labels.chart.allWallets : labels.chart.thisWallet);
     if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
     flashTimerRef.current = window.setTimeout(() => setFlash(null), SCOPE_FLASH_MS);
   };
@@ -231,16 +223,16 @@ export function PortfolioChart({
   const linePoints = buildLinePath(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS));
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
-  const totalText = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency);
+  const totalText = masked ? HIDDEN_AMOUNT : formatCurrencyValue(currentValue, currency, locale);
   // Both run on every render so hook order holds; masked figures never show a frame.
-  const totalParts = formatCurrencyParts(currentValue, currency);
+  const totalParts = formatCurrencyParts(currentValue, currency, locale);
   // While loading, `currentValue` is a stand-in, so the first real figure swaps in rather than ticking up from it.
   const figureIdentity = `${walletKey}|${activeRange}|${scope}|${currency}`;
   const total = useAnimatedNumber({
     value: loading ? Number.NaN : currentValue,
     text: totalParts.amount,
-    format: (value) => formatCurrencyParts(value, currency).amount,
-    step: currencyStep(currentValue, currency),
+    format: (value) => formatCurrencyParts(value, currency, locale).amount,
+    step: currencyStep(currentValue, currency, locale),
     identity: figureIdentity,
     cached,
   });
@@ -266,7 +258,7 @@ export function PortfolioChart({
         className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
         style={{ color: lineColorVar }}
       >
-        {formatPercent(change)}
+        {formatPercent(change, locale)}
       </span>
       <span
         aria-live="polite"
@@ -295,13 +287,13 @@ export function PortfolioChart({
   );
 
   const chart = (
-    <ChartArea onToggle={onToggleScope ? toggleScope : undefined} scope={scope} compact={compact}>
+    <ChartArea onToggle={onToggleScope ? toggleScope : undefined} scope={scope} compact={compact} actionLabel={scope === "all" ? labels.chart.showThisWallet : labels.chart.showAllWallets}>
       {loading ? (
         // Faded: a chart is mostly white, so a full-strength block is heavier than what replaces it.
         <div className="h-full w-full gleam-shimmer rounded-md opacity-60" />
       ) : points.length === 0 ? (
         <div className="flex h-full w-full items-center justify-center text-caption text-faint">
-          No chart data
+          {labels.chart.noChartData}
         </div>
       ) : isEmpty ? (
         <EmptyLine />
@@ -312,7 +304,7 @@ export function PortfolioChart({
           width="100%"
           height="100%"
           role="img"
-          aria-label={`Portfolio value ${totalText}, ${formatPercent(change)} for ${periodLabel}`}
+          aria-label={labels.chart.summary(totalText, formatPercent(change, locale), periodLabel)}
         >
           {compact ? null : <polygon points={areaPoints} fill={lineColorVar} opacity={0.12} stroke="none" />}
           <polyline
@@ -342,11 +334,11 @@ export function PortfolioChart({
         <>
           {figures}
           {chart}
-          {isEmpty && <div className="text-center text-caption text-faint">Your portfolio value will appear here.</div>}
+          {isEmpty && <div className="text-center text-caption text-faint">{labels.chart.valueWillAppear}</div>}
         </>
       )}
 
-      <div role="tablist" aria-label="Chart range" className="flex items-center gap-1 phone:-mx-2.5">
+      <div role="tablist" aria-label={labels.chart.rangeTabs} className="flex items-center gap-1 phone:-mx-2.5">
         {RANGE_TABS.map((range) => (
           <button
             key={range}
@@ -373,6 +365,8 @@ const HEADLINE_CLASS = "text-[36px] font-semibold tracking-[-0.02em] tabular-num
 
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
 function Headline({ parts, trend, masked, onToggle }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void }) {
+  const labels = useUiLabels();
+  const toggleLabel = masked ? labels.chart.showBalances : labels.chart.hideBalances;
   const label = (
     <>
       <span style={animatedNumberTintStyle(trend)}>{parts.amount}</span>
@@ -391,8 +385,8 @@ function Headline({ parts, trend, masked, onToggle }: { parts: CurrencyValuePart
       type="button"
       onClick={onToggle}
       aria-pressed={masked}
-      aria-label={masked ? "Show balances" : "Hide balances"}
-      title={masked ? "Show balances" : "Hide balances"}
+      aria-label={toggleLabel}
+      title={toggleLabel}
       className={cn(HEADLINE_CLASS, "-mx-1 cursor-pointer rounded-md px-1 text-left focus-visible:outline-2 focus-visible:outline-foreground")}
     >
       {label}
@@ -404,6 +398,7 @@ const EMPTY_LINE = buildLinePath(EMPTY_STATE_POINTS);
 
 /** The empty chart: a faint beam-tinted wave with a light traveling along it. */
 function EmptyLine() {
+  const labels = useUiLabels();
   return (
     <svg
       viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
@@ -411,7 +406,7 @@ function EmptyLine() {
       width="100%"
       height="100%"
       role="img"
-      aria-label="No portfolio history yet"
+      aria-label={labels.chart.noHistory}
     >
       <defs>
         <linearGradient id="portfolio-chart-empty-gradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={CHART_WIDTH} y2="0">
@@ -450,11 +445,12 @@ interface ChartAreaProps {
   onToggle?: () => void;
   scope: PortfolioScope;
   compact: boolean;
+  actionLabel: string;
   children: ReactNode;
 }
 
 /** The chart slot, full width or a sparkline beside the figures: a plain box, or a button over it when the scope toggle is enabled. */
-function ChartArea({ onToggle, scope, compact, children }: ChartAreaProps) {
+function ChartArea({ onToggle, scope, compact, actionLabel, children }: ChartAreaProps) {
   const size = compact ? "h-8 w-32 flex-shrink-0" : "h-16 w-full phone:[@media(max-height:700px)]:h-12";
   if (!onToggle) return <div className={size}>{children}</div>;
 
@@ -463,7 +459,7 @@ function ChartArea({ onToggle, scope, compact, children }: ChartAreaProps) {
       type="button"
       onClick={onToggle}
       aria-pressed={scope === "all"}
-      aria-label={SCOPE_ACTION_LABEL[scope]}
+      aria-label={actionLabel}
       className={cn(
         size,
         "block cursor-pointer rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground",

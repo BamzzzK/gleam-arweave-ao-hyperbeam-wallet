@@ -3,6 +3,7 @@ import type { PermissionType, RuntimePort } from "@gleam/core";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
+import { useT } from "../../../i18n";
 import { hostnameOf, siteCardFor } from "./site-card";
 import { useActiveSite, useDismissSiteSuggestion, useStopGleamOnSite } from "./useActiveSite";
 
@@ -19,6 +20,7 @@ export interface SiteWalletCardProps {
  * and its name.
  */
 export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
+  const t = useT();
   const site = useActiveSite(runtime);
   const dismiss = useDismissSiteSuggestion(runtime);
   const stop = useStopGleamOnSite(runtime);
@@ -29,10 +31,10 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
 
   if (card.kind === "active") {
     return (
-      <section aria-label="This site" className="mx-5 mb-1 flex items-center gap-2 pl-0.5">
+      <section aria-label={t("siteWallet.thisSite")} className="mx-5 mb-1 flex items-center gap-2 pl-0.5">
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-positive" />
         <span className="min-w-0 flex-1 truncate font-mono text-caption text-muted">
-          <span className="sr-only">Connected to </span>
+          <span className="sr-only">{t("siteWallet.connectedTo")} </span>
           {host}
         </span>
         <button
@@ -41,14 +43,14 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
           onClick={() => stop.mutate(card.origin)}
           className="flex-shrink-0 rounded-md px-2 py-1 text-caption font-semibold text-muted hover:bg-mist hover:text-foreground disabled:opacity-50"
         >
-          {stop.isPending ? "Disconnecting…" : "Disconnect"}
+          {stop.isPending ? t("siteWallet.disconnecting") : t("siteWallet.disconnect")}
         </button>
       </section>
     );
   }
 
   return (
-    <section aria-label="This site" className="mx-5 mb-2 overflow-hidden rounded-lg border-[0.5px] border-line bg-background">
+    <section aria-label={t("siteWallet.thisSite")} className="mx-5 mb-2 overflow-hidden rounded-lg border-[0.5px] border-line bg-background">
       <Beam className="h-0.5 rounded-none" />
       <div className="flex items-center gap-2.5 py-1.5 pl-2.5">
         <SiteIcon origin={card.origin} favIconUrl={card.favIconUrl} />
@@ -62,11 +64,11 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
             onUseGleam({ origin: card.origin, favIconUrl: card.favIconUrl, requestedPermissions: card.requestedPermissions })
           }
         >
-          Use Gleam here
+          {t("siteWallet.useGleamHere")}
         </Button>
         <button
           type="button"
-          aria-label="Dismiss"
+          aria-label={t("siteWallet.dismiss")}
           onClick={() => dismiss.mutate(card.origin)}
           className="flex h-8 w-7 flex-shrink-0 items-center justify-center text-body text-faint hover:text-foreground"
         >

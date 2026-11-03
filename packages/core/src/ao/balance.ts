@@ -3,6 +3,7 @@ import { L1_TOKEN_NODE_URLS } from "../models/network";
 import type { TokenTransport } from "../models/token-metadata";
 import { readLegacyTokenBalance } from "./legacy-token";
 import { AO_LEGACY_CU_URL } from "./result";
+import { userErrorMessage } from "../models/user-errors";
 
 /** Matches `token-state.ts`: a busy HyperBEAM node can hold a compute read open indefinitely. */
 const COMPUTE_TIMEOUT_MS = 8_000;
@@ -38,7 +39,7 @@ async function queryBalance(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to read AO token balance for "${address}" on process "${processId}" from ${peerUrl} (HTTP ${response.status}).`,
+      userErrorMessage("aoBalanceFailed", { address, process: processId, peer: peerUrl, status: response.status }),
     );
   }
 
@@ -207,7 +208,7 @@ export async function readL1Balance(
 
 function balanceReadError(label: string | undefined, failures: string[]): Error {
   return new Error(
-    `Couldn't read your ${label ?? "token"} balance. Tried ${failures.join(", ")}. The token's node may be busy, so try again in a minute.`,
+    userErrorMessage("tokenBalanceUnreadable", { label: label ?? "token", failures: failures.join(", ") }),
   );
 }
 

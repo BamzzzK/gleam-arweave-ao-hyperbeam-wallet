@@ -5,9 +5,11 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { EmptyState, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { useT } from "../../../i18n";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
@@ -27,6 +29,7 @@ export interface ContactsViewProps {
 const MAX_NAME_LENGTH = 32;
 
 export function ContactsView({ runtime, onBack }: ContactsViewProps) {
+  const t = useT();
   const contactsQuery = useContacts(runtime);
   const saveContactMutation = useSaveContact(runtime);
   const deleteContactMutation = useDeleteContact(runtime);
@@ -75,11 +78,11 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
     const address = newAddress.trim();
     const name = newName.trim();
     if (!isValidArweaveAddress(address)) {
-      setAddError("Enter a valid Arweave address.");
+      setAddError(t("contacts.invalidAddress"));
       return;
     }
     if (name.length === 0) {
-      setAddError("Enter a name.");
+      setAddError(t("contacts.nameRequired"));
       return;
     }
     setAddError(null);
@@ -91,7 +94,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
           setNewName("");
           setNewAddress("");
         },
-        onError: (error) => setAddError(error instanceof Error ? error.message : String(error)),
+        onError: (error) => setAddError(errorText(error)),
       },
     );
   };
@@ -118,12 +121,12 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
   return (
     <div className="relative flex min-h-full flex-col">
       <ScreenHeader
-        title="Contacts"
+        title={t("contacts.title")}
         onBack={onBack}
         end={
           <button
             type="button"
-            aria-label="Add contact"
+            aria-label={t("contacts.add")}
             onClick={() => {
               setAdding((prev) => !prev);
               setAddError(null);
@@ -142,7 +145,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
             autoFocus
             value={newName}
             onChange={(event) => setNewName(event.target.value.slice(0, MAX_NAME_LENGTH))}
-            placeholder="Name"
+            placeholder={t("contacts.name")}
             className="w-full rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
           />
           <input
@@ -152,7 +155,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
             onKeyDown={(event) => {
               if (event.key === "Enter") handleAdd();
             }}
-            placeholder="Arweave address (43 characters)"
+            placeholder={t("contacts.addressPlaceholder")}
             className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
           />
           {addError ? (
@@ -171,10 +174,10 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               }}
               className="text-label font-medium text-muted hover:text-foreground phone:hit-target"
             >
-              Cancel
+              {t("contacts.cancel")}
             </button>
             <Button type="button" size="sm" disabled={saveContactMutation.isPending} onClick={handleAdd} className="phone:hit-target">
-              {saveContactMutation.isPending ? "Saving…" : "Save"}
+              {saveContactMutation.isPending ? t("contacts.saving") : t("contacts.save")}
             </Button>
           </div>
         </div>
@@ -187,7 +190,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
             <SkeletonRow />
           </>
         ) : contacts.length === 0 ? (
-          <EmptyState message="No contacts yet." />
+          <EmptyState message={t("contacts.empty")} />
         ) : (
           contacts.map((contact) =>
             editingAddress === contact.address ? (
@@ -212,7 +215,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                 </div>
                 <button
                   type="button"
-                  aria-label={`Delete ${contact.name}`}
+                  aria-label={t("contacts.delete", { name: contact.name })}
                   onClick={() => handleDelete(contact)}
                   className="mr-2.5 flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning"
                 >
@@ -225,7 +228,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
       </div>
 
       {undo ? (
-        <Toast message={`${undo.name} deleted`} actionLabel="Undo" onAction={handleUndo} />
+        <Toast message={t("contacts.deleted", { name: undo.name })} actionLabel={t("contacts.undo")} onAction={handleUndo} />
       ) : null}
     </div>
   );

@@ -15,14 +15,16 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
+import { useLocale, useT, type MessageKey } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
-const TIMEOUT_OPTIONS: Array<{ value: AutoLockTimeout; label: string }> = [
-  { value: "never", label: "Never" },
-  { value: "immediate", label: "After 1 minute" },
-  { value: "5min", label: "5 minutes" },
-  { value: "1hr", label: "1 hour" },
-  { value: "4hr", label: "4 hours" },
-];
+const TIMEOUT_OPTIONS = [
+  { value: "never", key: "lockSettings.timeoutNever" },
+  { value: "immediate", key: "lockSettings.timeoutImmediate" },
+  { value: "5min", key: "lockSettings.timeout5min" },
+  { value: "1hr", key: "lockSettings.timeout1hr" },
+  { value: "4hr", key: "lockSettings.timeout4hr" },
+] as const satisfies ReadonlyArray<{ value: AutoLockTimeout; key: MessageKey }>;
 
 /**
  * Lock & auto-lock settings — "Lock now" triggers `lockWallet()`
@@ -59,6 +61,7 @@ export function LockSettingsView({
   biometrics,
   lockOnSystemLock = true,
 }: LockSettingsViewProps) {
+  const t = useT();
   const [state, setState] = useState<LoadState>({
     settings: null,
     loading: true,
@@ -81,7 +84,7 @@ export function LockSettingsView({
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime]);
@@ -101,7 +104,7 @@ export function LockSettingsView({
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
       setLocking(false);
     }
@@ -119,7 +122,7 @@ export function LockSettingsView({
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     } finally {
       setSavingTimeout(null);
@@ -128,7 +131,7 @@ export function LockSettingsView({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Lock & unlock" onBack={onBack} />
+      <ScreenHeader title={t("lockSettings.title")} onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
@@ -144,10 +147,10 @@ export function LockSettingsView({
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-label font-semibold text-foreground">
-                {locking ? "Locking…" : "Lock now"}
+                {locking ? t("lockSettings.locking") : t("lockSettings.lockNow")}
               </span>
               <span className="text-caption text-muted">
-                Immediately clears this session, regardless of timeout
+                {t("lockSettings.lockNowHint")}
               </span>
             </span>
           </button>
@@ -167,7 +170,7 @@ export function LockSettingsView({
 
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-            Auto-lock
+            {t("lockSettings.autoLock")}
           </div>
           <div>
             {state.loading ? (
@@ -188,7 +191,7 @@ export function LockSettingsView({
                     className="flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist disabled:opacity-60"
                   >
                     <span className="flex-1 text-label font-semibold text-foreground">
-                      {option.label}
+                      {t(option.key)}
                     </span>
                     {selected ? (
                       <span
@@ -208,13 +211,13 @@ export function LockSettingsView({
               role="note"
               className="pt-2.5 text-caption leading-relaxed text-warning"
             >
-              {lockOnSystemLock ? "Gleam stays unlocked always, even when your computer locks." : "Gleam stays unlocked always."}
+              {lockOnSystemLock ? t("lockSettings.neverWithSystemLock") : t("lockSettings.never")}
             </p>
           ) : (
             <p className="pt-2.5 text-caption leading-relaxed text-faint">
               {lockOnSystemLock
-                ? "Gleam locks after this long without use, and whenever your computer locks."
-                : "Gleam locks after this long without use."}
+                ? t("lockSettings.afterWithSystemLock")
+                : t("lockSettings.after")}
             </p>
           )}
         </div>
@@ -227,8 +230,8 @@ type PasskeyState =
   | { kind: "loading" }
   | { kind: "ready"; status: PasskeyStatus; busy: boolean; error?: string };
 
-function formatSetUpDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, {
+function formatSetUpDate(timestamp: number, locale: string): string {
+  return new Date(timestamp).toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -249,6 +252,8 @@ function PasskeySection({
   supported: boolean;
   onSetUp: () => Promise<void>;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [passkey, setPasskey] = useState<PasskeyState>({ kind: "loading" });
 
   const loadStatus = useCallback(async () => {
@@ -267,7 +272,7 @@ function PasskeySection({
         kind: "ready",
         status: { enrolled: false },
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   }, [runtime]);
@@ -288,7 +293,7 @@ function PasskeySection({
       setPasskey({
         ...passkey,
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
       return;
     }
@@ -310,7 +315,7 @@ function PasskeySection({
       setPasskey({
         ...passkey,
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   };
@@ -318,7 +323,7 @@ function PasskeySection({
   return (
     <div className="pb-10 phone:pb-8">
       <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-        Passkey
+        {t("lockSettings.passkey")}
       </div>
       {passkey.kind === "loading" ? (
         <SkeletonRow />
@@ -329,10 +334,10 @@ function PasskeySection({
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-label font-semibold text-foreground">
-              Unlock with passkey is on
+              {t("lockSettings.passkeyOn")}
             </span>
             <span className="text-caption text-muted">
-              Set up {formatSetUpDate(passkey.status.createdAt)}
+              {t("lockSettings.passkeySetUpOn", { date: formatSetUpDate(passkey.status.createdAt, locale) })}
             </span>
           </span>
           <button
@@ -341,7 +346,7 @@ function PasskeySection({
             onClick={() => void handleRemove()}
             className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
           >
-            {passkey.busy ? "Removing…" : "Remove"}
+            {passkey.busy ? t("lockSettings.removing") : t("lockSettings.remove")}
           </button>
         </div>
       ) : supported ? (
@@ -356,16 +361,16 @@ function PasskeySection({
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-label font-semibold text-foreground">
-              Set up a passkey
+              {t("lockSettings.passkeySetUp")}
             </span>
             <span className="text-caption text-muted">
-              Unlock with your fingerprint, face or security key
+              {t("lockSettings.passkeySetUpHint")}
             </span>
           </span>
         </button>
       ) : (
         <p className="py-3.5 text-caption text-muted">
-          Passkeys aren&apos;t available in this browser.
+          {t("lockSettings.passkeyUnavailable")}
         </p>
       )}
       {passkey.kind === "ready" && passkey.error ? (

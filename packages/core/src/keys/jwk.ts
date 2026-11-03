@@ -1,5 +1,6 @@
 import { addressFromOwner } from "./address";
 import type { JWKInterface } from "../models/wallet";
+import { userErrorMessage } from "../models/user-errors";
 
 const REQUIRED_JWK_FIELDS = ["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"] as const;
 
@@ -23,10 +24,8 @@ export type JWKValidationResult =
  * rejection reason rather than a generic error.
  */
 export function validateJWKShape(input: unknown): JWKValidationResult {
-  const GENERIC_REASON = "That file isn't a valid Arweave keyfile.";
-
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
-    return { valid: false, reason: GENERIC_REASON };
+    return { valid: false, reason: userErrorMessage("keyfileInvalid") };
   }
 
   const candidate = input as Record<string, unknown>;
@@ -35,7 +34,7 @@ export function validateJWKShape(input: unknown): JWKValidationResult {
     if (!(field in candidate)) {
       return {
         valid: false,
-        reason: `${GENERIC_REASON} Missing required field "${field}".`,
+        reason: userErrorMessage("keyfileMissingField", { key: field }),
       };
     }
   }
@@ -43,7 +42,7 @@ export function validateJWKShape(input: unknown): JWKValidationResult {
   if (candidate.kty !== "RSA") {
     return {
       valid: false,
-      reason: `${GENERIC_REASON} Expected key type "RSA", got "${String(candidate.kty)}".`,
+      reason: userErrorMessage("keyfileWrongKeyType", { kty: String(candidate.kty) }),
     };
   }
 
@@ -53,13 +52,13 @@ export function validateJWKShape(input: unknown): JWKValidationResult {
     if (typeof value !== "string" || value.length === 0) {
       return {
         valid: false,
-        reason: `${GENERIC_REASON} Field "${field}" must be a non-empty string.`,
+        reason: userErrorMessage("keyfileEmptyField", { key: field }),
       };
     }
     if (!BASE64URL_PATTERN.test(value)) {
       return {
         valid: false,
-        reason: `${GENERIC_REASON} Field "${field}" is not valid base64url.`,
+        reason: userErrorMessage("keyfileBadField", { key: field }),
       };
     }
   }

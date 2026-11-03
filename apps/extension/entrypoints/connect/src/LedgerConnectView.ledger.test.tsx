@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { bytesToBase64Url, type RuntimePort } from "@gleam/core";
+import { setLanguagePreference } from "@gleam/app/src/i18n/index.tsx";
 import { LedgerTransportError } from "@/src/hardware/ledger";
 import { LedgerConnectView } from "./LedgerConnectView";
 
@@ -175,6 +176,18 @@ describe("LedgerConnectView", () => {
     await screen.findByLabelText("Name");
     fireEvent.click(connectButton());
     expect((await screen.findByRole("alert")).textContent).toBe('This Ledger is already in Gleam as "Ledger 1".');
+  });
+
+  it("recognises the duplicate-address refusal in another language", async () => {
+    const send = vi.fn().mockRejectedValue(new Error('This address is already in Gleam as "Ledger 1".'));
+    await renderView({ versions: [VERSION_OK] }, send as never);
+    fireEvent.click(connectButton());
+    await screen.findByLabelText("Name");
+    const add = connectButton();
+    act(() => setLanguagePreference("zh-CN"));
+    fireEvent.click(add);
+    expect((await screen.findByRole("alert")).textContent).toBe("此 Ledger 已作为“Ledger 1”添加到 Gleam。");
+    act(() => setLanguagePreference("system"));
   });
 
   it("tells the user to unlock Gleam when the background refuses", async () => {

@@ -1,0 +1,22 @@
+import { defineMessages } from "../define";
+
+export const language = defineMessages({
+  en: {
+    title: "Language",
+    description: "Language the wallet is shown in",
+    system: "Same as device",
+    systemHint: "Follows your browser or phone language",
+  },
+  "zh-CN": {
+    title: "语言",
+    description: "钱包显示所使用的语言",
+    system: "跟随设备",
+    systemHint: "跟随浏览器或手机的语言",
+  },
+  "zh-TW": {
+    title: "語言",
+    description: "錢包顯示所使用的語言",
+    system: "跟隨裝置",
+    systemHint: "跟隨瀏覽器或手機的語言",
+  },
+});

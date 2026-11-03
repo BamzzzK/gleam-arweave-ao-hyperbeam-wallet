@@ -3,17 +3,19 @@ import { addressFromOwner, type RuntimePort, type WalletSummary } from "@gleam/c
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { CAMERA_UNAVAILABLE_MESSAGE, CameraDeniedNotice } from "./CameraDeniedNotice";
+import { CameraDeniedNotice, type CameraDeniedHelp } from "./CameraDeniedNotice";
 import { decodeKeystoneAccount, KEYSTONE_ACCOUNT_UR_TYPE, type KeystoneAccount } from "./decode-account";
 import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
+import { errorText as defaultErrorText } from "@gleam/app/src/i18n/errors.ts";
+import { useT, type MessageKey } from "@gleam/app/src/i18n/index.tsx";
 
 export interface KeystoneConnectViewProps {
   runtime: RuntimePort;
   /** The account was added as a wallet. */
   onConnected: (wallet: WalletSummary) => void;
   /** Where this shell lets the user turn the camera back on. */
-  cameraDeniedHelp: string;
-  /** Rewrites the background's refusal of `addHardwareWallet` for this shell. Defaults to its message. */
+  cameraDeniedHelp: CameraDeniedHelp;
+  /** Rewrites the background's refusal of `addHardwareWallet` for this shell. Defaults to its translated message. */
   errorText?: (error: unknown) => string;
   /** Swapped in tests, which have no camera. */
   Scanner?: ComponentType<QrScannerProps>;
@@ -24,22 +26,18 @@ type Step =
   | { kind: "scan-error"; error: ScannerError }
   | { kind: "confirm"; account: KeystoneAccount; address: string };
 
-const SCAN_ERROR: Record<Exclude<ScannerError, "camera-denied">, string> = {
-  "camera-unavailable": CAMERA_UNAVAILABLE_MESSAGE,
-  "wrong-type": "That's not a Keystone Arweave account QR. On the Keystone, open the Arweave wallet and show its connection QR.",
-  invalid: "Gleam couldn't read that QR. Hold the Keystone steady and try again.",
+const SCAN_ERROR: Record<Exclude<ScannerError, "camera-denied">, MessageKey> = {
+  "camera-unavailable": "extension.cameraUnavailable",
+  "wrong-type": "extension.scanWrongAccount",
+  invalid: "extension.scanInvalid",
 };
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /** Scans a Keystone's account QR and adds that account as a wallet. Each shell draws the page around it. */
 export function KeystoneConnectView({
   runtime,
   onConnected,
   cameraDeniedHelp,
-  errorText = messageOf,
+  errorText = defaultErrorText,
   Scanner = QrScanner,
 }: KeystoneConnectViewProps) {
   const [step, setStep] = useState<Step>({ kind: "scan", attempt: 0, percent: 0 });
@@ -102,12 +100,13 @@ function ScanStep({
   onComplete: QrScannerProps["onComplete"];
   onError: QrScannerProps["onError"];
 }) {
+  const t = useT();
   return (
     <>
       <ol className="flex list-decimal flex-col gap-1 pl-5 text-body leading-relaxed text-muted">
-        <li>On the Keystone, choose Connect Software Wallet and select an Arweave wallet.</li>
-        <li>Choose Wander or Beacon.</li>
-        <li>Hold the QR it shows up to the camera.</li>
+        <li>{t("extension.keystoneStepConnect")}</li>
+        <li>{t("extension.keystoneStepApp")}</li>
+        <li>{t("extension.keystoneStepScan")}</li>
       </ol>
       <Scanner
         key={attempt}
@@ -119,7 +118,7 @@ function ScanStep({
       <div className="flex flex-col gap-1.5">
         <div
           role="progressbar"
-          aria-label="Scan progress"
+          aria-label={t("extension.scanProgress")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
@@ -128,7 +127,7 @@ function ScanStep({
           <div className="h-full bg-foreground transition-[width]" style={{ width: `${percent}%` }} />
         </div>
         <p className="text-caption text-muted">
-          {percent > 0 ? `Scanning… ${percent}%. Keep the QR in view until it finishes.` : "Waiting for the QR…"}
+          {percent > 0 ? t("extension.scanning", { percent }) : t("extension.waitingForQr")}
         </p>
       </div>
     </>
@@ -141,20 +140,21 @@ function ScanErrorStep({
   onRetry,
 }: {
   error: ScannerError;
-  cameraDeniedHelp: string;
+  cameraDeniedHelp: CameraDeniedHelp;
   onRetry: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-4">
       {error === "camera-denied" ? (
         <CameraDeniedNotice help={cameraDeniedHelp} />
       ) : (
         <p role="alert" className="text-body leading-relaxed text-warning">
-          {SCAN_ERROR[error]}
+          {t(SCAN_ERROR[error])}
         </p>
       )}
       <Button type="button" onClick={onRetry}>
-        Try again
+        {t("extension.tryAgain")}
       </Button>
     </div>
   );
@@ -175,6 +175,7 @@ function ConfirmStep({
   onConnected: (wallet: WalletSummary) => void;
   onRescan: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,13 +206,13 @@ function ConfirmStep({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <span className="text-caption font-semibold text-muted">Address</span>
+        <span className="text-caption font-semibold text-muted">{t("extension.address")}</span>
         <span title={address} className="font-mono text-label text-foreground">
           {truncateAddress(address)}
         </span>
       </div>
       <TextField
-        label="Name"
+        label={t("extension.name")}
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="Keystone"
@@ -225,10 +226,10 @@ function ConfirmStep({
       ) : null}
       <div className="flex flex-col gap-2.5">
         <Button type="button" onClick={() => void connect()} disabled={submitting}>
-          {submitting ? "Connecting…" : "Connect"}
+          {submitting ? t("extension.connecting") : t("extension.connect")}
         </Button>
         <Button type="button" variant="secondary" onClick={onRescan} disabled={submitting}>
-          Scan again
+          {t("extension.scanAgain")}
         </Button>
       </div>
     </div>

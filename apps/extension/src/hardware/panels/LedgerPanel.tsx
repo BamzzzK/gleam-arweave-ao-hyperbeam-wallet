@@ -7,13 +7,13 @@ import {
   ledgerMaxPayloadBytes,
   LEDGER_PERMAWEB_INSTALLER_URL,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
-  LEDGER_PERMAWEB_REQUIRED_REASON,
   LEDGER_MESSAGE_UNSUPPORTED,
   type LedgerTransport,
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { connectLedger, LedgerCancelled, ledgerErrorText, waitForLedgerApp } from "../ledger";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
+import { t, useT } from "@gleam/app/src/i18n/index.tsx";
 
 export interface LedgerPanelOptions {
   /** Swapped in tests, which have no WebHID. */
@@ -31,19 +31,22 @@ type Step =
   | { kind: "waiting"; reason: "app" | "key" }
   | { kind: "signing"; index: number };
 
-export const WRONG_LEDGER_MESSAGE = "This is a different Ledger than the one connected to this wallet.";
+export function wrongLedgerMessage(): string {
+  return t("extension.ledgerWrongDevice");
+}
 
 /** Gleam doesn't ship the Permaweb app, so the refusal links to the wallet that installs it. */
 function PermawebRequiredError() {
+  const t = useT();
   return (
     <span className="flex flex-col gap-2">
-      <span>{LEDGER_PERMAWEB_REQUIRED_REASON}</span>
+      <span>{t("errors.ledgerPermawebReason")}</span>
       <span>
-        To send AO on Gleam, install the beta Permaweb app using the{" "}
+        {t("extension.permawebInstallPrefix")}
         <a href={LEDGER_PERMAWEB_INSTALLER_URL} target="_blank" rel="noreferrer" className="underline">
-          permawebOS extension
+          {t("extension.permawebInstallLink")}
         </a>
-        .
+        {t("extension.permawebInstallSuffix")}
       </span>
     </span>
   );
@@ -64,6 +67,7 @@ export function createLedgerPanel({
   activityMs = 30_000,
 }: LedgerPanelOptions = {}): DeviceSignPanel {
   return function LedgerPanel({ payloads, wallet, onSignatures, onActivity, onError }: DeviceSignPanelProps) {
+    const t = useT();
     const [step, setStep] = useState<Step>({ kind: "start" });
     const abortRef = useRef<AbortController | null>(null);
     const callbacks = useRef({ onSignatures, onActivity, onError });
@@ -97,7 +101,7 @@ export function createLedgerPanel({
           appTimeoutMs,
           keyTimeoutMs,
           onWaiting: (reason) => setStep({ kind: "waiting", reason }),
-          appTimeoutMessage: `Gleam couldn't find the ${appName} app. Unlock your Ledger, open the ${appName} app and try again.`,
+          appTimeoutMessage: t("extension.ledgerAppNotFound", { app: appName }),
         });
 
         if (needsPermaweb) {
@@ -112,7 +116,7 @@ export function createLedgerPanel({
         }
 
         const account = await client.getAccount();
-        if (account.address !== wallet.address) throw new LedgerError("owner-mismatch", WRONG_LEDGER_MESSAGE);
+        if (account.address !== wallet.address) throw new LedgerError("owner-mismatch", wrongLedgerMessage());
 
         const maxBytes = ledgerMaxPayloadBytes(version);
         const signed: string[] = [];
@@ -149,10 +153,10 @@ export function createLedgerPanel({
       return (
         <div className="flex flex-col gap-4">
           <p className="text-center text-label leading-snug text-muted">
-            Plug in your Ledger, unlock it and open the {appName} app.
+            {t("extension.ledgerPlugIn", { app: appName })}
           </p>
           <Button type="button" onClick={() => void run()} disabled={busy}>
-            {busy ? "Connecting…" : "Sign on Ledger"}
+            {busy ? t("extension.connecting") : t("extension.signOnLedger")}
           </Button>
         </div>
       );
@@ -162,8 +166,8 @@ export function createLedgerPanel({
       return (
         <p role="status" className="text-center text-label leading-snug text-muted">
           {step.reason === "key"
-            ? "Your Ledger is generating its Arweave key. This happens once per recovery phrase and can take several minutes. Keep it plugged in and the app open."
-            : `Waiting for the ${appName} app. Unlock your Ledger and open the ${appName} app.`}
+            ? t("extension.ledgerGeneratingKey")
+            : t("extension.ledgerWaitingForApp", { app: appName })}
         </p>
       );
     }
@@ -172,11 +176,11 @@ export function createLedgerPanel({
       <div className="flex flex-col gap-2">
         {total > 1 ? (
           <p className="text-center text-caption font-semibold text-foreground">
-            Item {step.index + 1} of {total}
+            {t("extension.itemOfTotal", { index: step.index + 1, total })}
           </p>
         ) : null}
         <p role="status" className="text-center text-label leading-snug text-muted">
-          Confirm on your Ledger. Check that it shows the details above.
+          {t("extension.ledgerConfirm")}
         </p>
       </div>
     );

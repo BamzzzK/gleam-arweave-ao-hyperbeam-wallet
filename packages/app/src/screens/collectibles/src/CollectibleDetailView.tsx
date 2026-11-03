@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Collectible } from "@gleam/core";
 import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+import { useT } from "../../../i18n";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
@@ -14,6 +15,7 @@ export interface CollectibleDetailViewProps {
 }
 
 export function CollectibleDetailView({ collectible, onBack, onSend }: CollectibleDetailViewProps) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -27,7 +29,7 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Collectible" onBack={onBack} />
+      <ScreenHeader title={t("collectibles.detailTitle")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 pb-6 phone:pb-0 pt-6">
         <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="mx-auto max-w-[280px]" />
@@ -38,7 +40,7 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-line pt-3.5 phone:border-t-0 phone:pt-0">
-          <span className="text-label text-muted">Process ID</span>
+          <span className="text-label text-muted">{t("collectibles.processId")}</span>
           <span className="flex items-center gap-1.5">
             <span className="font-mono text-label" title={collectible.id}>
               {truncateAddress(collectible.id, 6)}
@@ -46,7 +48,7 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
             <button
               type="button"
               onClick={copyId}
-              aria-label={copied ? "Process ID copied" : "Copy process ID"}
+              aria-label={copied ? t("collectibles.processIdCopied") : t("collectibles.copyProcessId")}
               className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-mist ${copied ? "text-positive" : "text-muted hover:text-foreground"}`}
             >
               {copied ? <CheckIcon /> : <CopyIcon />}
@@ -60,12 +62,12 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
           rel="noopener noreferrer"
           className="text-label font-medium text-muted underline decoration-faint underline-offset-2 hover:text-foreground"
         >
-          View on Lunar
+          {t("collectibles.viewOnLunar")}
         </a>
 
         {onSend ? (
           <ScreenFooter className="gap-0 pt-2">
-            <Button onClick={() => onSend(collectible)}>Send</Button>
+            <Button onClick={() => onSend(collectible)}>{t("collectibles.send")}</Button>
           </ScreenFooter>
         ) : null}
       </div>

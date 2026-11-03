@@ -3,8 +3,10 @@ import { WALLET_APPROVAL_ORIGIN, type DeviceSigningRequest, type DeviceSigningSu
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
+import { useT } from "../i18n";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
+import { errorText } from "../i18n/errors";
 
 /**
  * Shown once the user has approved a hardware wallet's request: the
@@ -43,6 +45,7 @@ function hostnameOf(origin: string): string {
 }
 
 export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, onActivity, token }: AwaitingDeviceViewProps) {
+  const t = useT();
   const [attempt, setAttempt] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<ReactNode>();
@@ -63,7 +66,7 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
     try {
       await onSubmit(signatures);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : String(submitError));
+      setError(errorText(submitError));
       setSubmitting(false);
     }
   };
@@ -83,10 +86,10 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
       </div>
 
       <div className="flex flex-1 flex-col gap-5 px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">Confirm on your {name}</div>
+        <div className="text-center text-body font-bold text-foreground">{t("approval.confirmOnDevice", { device: name })}</div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">Signing as</span>
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.signingAs")}</span>
           <AddressValue address={device.address} />
         </div>
 
@@ -94,7 +97,7 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
           {device.summaries.map((summary, index) => (
             <div key={index} className="flex flex-col">
               {device.summaries.length > 1 ? (
-                <span className="pb-1 text-caption font-semibold text-foreground">Item {index + 1}</span>
+                <span className="pb-1 text-caption font-semibold text-foreground">{t("approval.itemNumber", { number: index + 1 })}</span>
               ) : null}
               <SummaryRows summary={summary} token={token} />
             </div>
@@ -107,7 +110,7 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
           </div>
         ) : submitting ? (
           <p role="status" className="text-center text-caption text-muted">
-            Checking the signature…
+            {t("approval.checkingSignature")}
           </p>
         ) : (
           <Panel
@@ -123,11 +126,11 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
 
         <div className="mt-auto flex gap-2.5 pt-1">
           <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
-            Cancel
+            {t("approval.cancel")}
           </Button>
           {error ? (
             <Button type="button" variant="primary" onClick={retry} className="flex-1">
-              Try again
+              {t("approval.tryAgain")}
             </Button>
           ) : null}
         </div>
@@ -137,13 +140,14 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
 }
 
 function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token: AwaitingDeviceViewProps["token"] }) {
+  const t = useT();
   if (summary.kind === "transaction") {
     return (
       <>
-        {summary.recipient !== null ? <Row label="Amount" value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
-        {summary.recipient !== null ? <AddressRow label="Recipient" address={summary.recipient} /> : null}
-        <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
-        {summary.dataSize !== "0" ? <Row label="Data" value={`${summary.dataSize} bytes`} /> : null}
+        {summary.recipient !== null ? <Row label={t("approval.amount")} value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
+        {summary.recipient !== null ? <AddressRow label={t("approval.recipient")} address={summary.recipient} /> : null}
+        <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+        {summary.dataSize !== "0" ? <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} /> : null}
       </>
     );
   }
@@ -154,38 +158,38 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
     const quantity =
       scale?.denomination != null
         ? `${formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)} ${scale.ticker ?? ""}`.trim()
-        : `${summary.quantity} smallest units`;
+        : t("approval.amountSmallestUnits", { quantity: summary.quantity });
     return (
       <>
         {/* A resolved ticker already names the token in the amount. */}
-        {scale === undefined ? <Row label="Token" value="Unknown token" /> : null}
-        <Row label="Amount" value={quantity} />
-        <AddressRow label="Recipient" address={summary.recipient} />
-        <AddressRow label="Token process" address={summary.process} />
-        {summary.kind === "l1TokenTransfer" ? <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} /> : null}
+        {scale === undefined ? <Row label={t("approval.token")} value={t("approval.unknownToken")} /> : null}
+        <Row label={t("approval.amount")} value={quantity} />
+        <AddressRow label={t("approval.recipient")} address={summary.recipient} />
+        <AddressRow label={t("approval.tokenProcess")} address={summary.process} />
+        {summary.kind === "l1TokenTransfer" ? <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} /> : null}
       </>
     );
   }
   if (summary.kind === "collectibleTransfer") {
     return (
       <>
-        <AddressRow label="Collectible" address={summary.asset} />
-        <AddressRow label="Recipient" address={summary.recipient} />
-        <Row label="Fee" value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
+        <AddressRow label={t("approval.collectible")} address={summary.asset} />
+        <AddressRow label={t("approval.recipient")} address={summary.recipient} />
+        <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
       </>
     );
   }
   if (summary.kind === "message") {
     return summary.text !== null ? (
-      <Row label="Message" value={summary.text} />
+      <Row label={t("approval.message")} value={summary.text} />
     ) : (
-      <Row label="Message" value={`${summary.size} bytes`} />
+      <Row label={t("approval.message")} value={t("approval.bytes", { size: summary.size })} />
     );
   }
   return (
     <>
-      {summary.target !== null ? <AddressRow label="Target" address={summary.target} /> : null}
-      <Row label="Data" value={`${summary.dataSize} bytes`} />
+      {summary.target !== null ? <AddressRow label={t("approval.target")} address={summary.target} /> : null}
+      <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} />
     </>
   );
 }

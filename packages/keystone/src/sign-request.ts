@@ -1,6 +1,7 @@
 import { ArweaveSignature, ArweaveSignRequest, SaltLen, SignType } from "@keystonehq/bc-ur-registry-arweave";
 import { UREncoder, type UR } from "@ngraveio/bc-ur";
 import { base64UrlToBytes, bytesToBase64Url, type DeviceSigningPayload } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 export const KEYSTONE_SIGNATURE_UR_TYPE = "arweave-signature";
 
@@ -58,7 +59,7 @@ function payloadBytes(payload: DeviceSigningPayload): { bytes: Buffer; signType:
   // Written so a missing or non-numeric size (NaN) is refused too.
   if (!(Number(transaction.data_size) <= KEYSTONE_MAX_TRANSACTION_DATA)) {
     throw new KeystoneRequestError(
-      `This transaction carries more than ${Math.floor(KEYSTONE_MAX_TRANSACTION_DATA / 1000)} KB of data, which is too much to show as a QR for Keystone to sign. Try a smaller request.`,
+      userErrorMessage("keystoneDataTooLarge", { limit: Math.floor(KEYSTONE_MAX_TRANSACTION_DATA / 1000) }),
     );
   }
   // The Keystone parses the transaction's JSON and needs `owner` in it to
@@ -82,7 +83,7 @@ export function keystoneQrEncoder(ur: UR): UREncoder {
   const encoder = new UREncoder(ur, KEYSTONE_FRAGMENT_LENGTH);
   if (encoder.fragmentsLength > KEYSTONE_MAX_FRAMES) {
     throw new KeystoneRequestError(
-      `This request is too large to show as a QR (${encoder.fragmentsLength} frames). Try a smaller request.`,
+      userErrorMessage("keystoneTooManyFrames", { frames: encoder.fragmentsLength }),
     );
   }
   return encoder;

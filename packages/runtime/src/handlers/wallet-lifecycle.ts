@@ -43,6 +43,7 @@ import {
   generateJWK,
 } from "@gleam/core/signer";
 import { isSessionExpired, isValidSession, SESSION_KEY, WALLETS_KEY, type KeySession } from "./key-session";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -483,7 +484,7 @@ export class WalletLifecycleHandler {
     }
     const opened = await this.opensVault(wallets, keys);
     if (!opened) {
-      throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+      throw new Error(userErrorMessage("vaultPasswordFailed"));
     }
     return this.encryptOptionsFor(opened);
   }
@@ -522,10 +523,10 @@ export class WalletLifecycleHandler {
   async checkVaultPassword(req: { password: string }): Promise<void> {
     const wallets = await loadWallets(this.storage);
     if (!hasVaultPassword(wallets)) {
-      throw new Error("Gleam has no password to protect. Add a wallet with a keyfile first.");
+      throw new Error(userErrorMessage("noVaultPassword"));
     }
     if (!(await this.opensVault(wallets, new VaultKeys(req.password)))) {
-      throw new Error("That password didn't work. Use the password you unlock Gleam with.");
+      throw new Error(userErrorMessage("vaultPasswordFailed"));
     }
   }
 
@@ -603,10 +604,10 @@ export class WalletLifecycleHandler {
       // would fork the activity log and token list the address is keyed by.
       const existing = wallets.find((wallet) => wallet.address === address);
       if (existing && isHardwareWalletMethod(existing.method)) {
-        throw new Error(`This address is already in Gleam as the hardware wallet "${existing.name}".`);
+        throw new Error(userErrorMessage("addressInGleamHardware", { name: existing.name }));
       }
       if (existing?.method === "watch") {
-        throw new Error(`This address is already in Gleam as the watch-only wallet "${existing.name}". Remove it, then import the keyfile.`);
+        throw new Error(userErrorMessage("addressInGleamWatch", { name: existing.name }));
       }
       if (existing) {
         await this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id);
@@ -665,29 +666,29 @@ export class WalletLifecycleHandler {
         throw new Error(`"${String(req.method)}" isn't a hardware wallet type.`);
       }
       if (!isValidDevice(req.device) || req.device.kind !== req.method) {
-        throw new Error("The device details don't match this wallet type.");
+        throw new Error(userErrorMessage("deviceDetailsMismatch"));
       }
       let modulus: Uint8Array;
       try {
         modulus = base64UrlToBytes(req.publicKey);
       } catch {
-        throw new Error("The device sent a public key that isn't valid base64url.");
+        throw new Error(userErrorMessage("deviceKeyEncoding"));
       }
       if (modulus.length !== RSA_MODULUS_BYTES) {
         throw new Error(
-          `The device sent a ${modulus.length}-byte public key. An Arweave key is ${RSA_MODULUS_BYTES} bytes.`,
+          userErrorMessage("deviceKeyLength", { size: modulus.length, expected: RSA_MODULUS_BYTES }),
         );
       }
 
       const wallets = await loadWallets(this.storage);
       if (hasVaultPassword(wallets) && (await loadSession(this.storage, this.keySession, wallets)) === null) {
-        throw new Error("Unlock Gleam before adding a hardware wallet.");
+        throw new Error(userErrorMessage("unlockBeforeAddingHardware"));
       }
 
       const address = await addressFromOwner(req.publicKey);
       const existing = wallets.find((wallet) => wallet.address === address);
       if (existing) {
-        throw new Error(`This address is already in Gleam as "${existing.name}".`);
+        throw new Error(userErrorMessage("addressInGleam", { name: existing.name }));
       }
 
       const label = HARDWARE_METHOD_NAME[req.method];
@@ -726,16 +727,16 @@ export class WalletLifecycleHandler {
     return this.keySession.withSessionLock(async () => {
       const address = req.address.trim();
       if (!isValidArweaveAddress(address)) {
-        throw new Error("That isn't an Arweave address. An address is 43 letters, numbers, - and _.");
+        throw new Error(userErrorMessage("invalidWatchAddress"));
       }
 
       const wallets = await loadWallets(this.storage);
       if (hasVaultPassword(wallets) && (await loadSession(this.storage, this.keySession, wallets)) === null) {
-        throw new Error("Unlock Gleam before adding a wallet.");
+        throw new Error(userErrorMessage("unlockBeforeAddingWallet"));
       }
       const existing = wallets.find((wallet) => wallet.address === address);
       if (existing) {
-        throw new Error(`This address is already in Gleam as "${existing.name}".`);
+        throw new Error(userErrorMessage("addressInGleam", { name: existing.name }));
       }
 
       const watchCount = wallets.filter((wallet) => wallet.method === "watch").length;
@@ -796,7 +797,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
     if (index === -1) {
-      throw new Error(`No stored wallet with id "${req.walletId}".`);
+      throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
     }
     wallets[index] = { ...wallets[index]!, name: req.name, updatedAt: Date.now() };
     await saveWallets(this.storage, wallets);
@@ -811,7 +812,7 @@ export class WalletLifecycleHandler {
     const wallets = await loadWallets(this.storage);
     const index = wallets.findIndex((wallet) => wallet.id === req.walletId);
     if (index === -1) {
-      throw new Error(`No stored wallet with id "${req.walletId}".`);
+      throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
     }
     wallets[index] = { ...wallets[index]!, backupConfirmedAt: Date.now() };
     await saveWallets(this.storage, wallets);
@@ -820,7 +821,7 @@ export class WalletLifecycleHandler {
   async switchWallet(req: { walletId: string }): Promise<void> {
     const wallets = await loadWallets(this.storage);
     if (!wallets.some((wallet) => wallet.id === req.walletId)) {
-      throw new Error(`No stored wallet with id "${req.walletId}".`);
+      throw new Error(userErrorMessage("noStoredWallet", { wallet: req.walletId }));
     }
     await this.storage.set(ACTIVE_WALLET_ID_KEY, req.walletId);
   }
@@ -835,18 +836,18 @@ export class WalletLifecycleHandler {
   async downloadKeyfile(req: { walletId: string; password: string }): Promise<FileDownloadResult> {
     const downloads = this.downloads;
     if (!downloads) {
-      throw new Error("Keyfile downloads aren't available here.");
+      throw new Error(userErrorMessage("keyfileDownloadsUnavailable"));
     }
     const wallets = await loadWallets(this.storage);
     const wallet = wallets.find((w) => w.id === req.walletId);
     if (wallet?.method === "watch") {
-      throw new Error("This wallet is watch-only. Gleam has no keyfile for it.");
+      throw new Error(userErrorMessage("keyfileNoneWatch"));
     }
     if (wallet && !capabilitiesFor(wallet.method).exportKey) {
-      throw new Error("This wallet's key stays on its device. There's no keyfile to export.");
+      throw new Error(userErrorMessage("keyfileNoneHardware"));
     }
     if (!wallet || !wallet.encryptedKeyfile) {
-      throw new Error(`No exportable key material for wallet "${req.walletId}".`);
+      throw new Error(userErrorMessage("keyfileNoKeyMaterial", { wallet: req.walletId }));
     }
     const envelope = wallet.encryptedKeyfile;
     // One VaultKeys so the decrypt after a permission grant reuses the
@@ -1000,12 +1001,12 @@ export class WalletLifecycleHandler {
         // there is nothing to check it against.
         if (unlockedWalletIds.length === 0 && hasVaultPassword(wallets)) {
           throw new Error(
-            "That password didn't work. Try again, or use your recovery method.",
+            userErrorMessage("passwordFailed"),
           );
         }
         unlockedWalletIds.push(...keylessWalletIds(ordered));
         if (unlockedWalletIds.length === 0) {
-          throw new Error("There's no wallet to unlock.");
+          throw new Error(userErrorMessage("noWalletToUnlock"));
         }
 
         const now = Date.now();
@@ -1073,7 +1074,7 @@ export class WalletLifecycleHandler {
           const check = await decryptFromEnvelope(upgraded, verifyKeys, wallet.id, wallet.address);
           const matches = sameBytes(check, plaintext);
           zeroize(check);
-          if (!matches) throw new Error("A re-encrypted keyfile didn't read back.");
+          if (!matches) throw new Error(userErrorMessage("keyfileReadBackFailed"));
           upgrades.push({ walletId: wallet.id, from: envelope, to: upgraded });
         } finally {
           zeroize(plaintext);

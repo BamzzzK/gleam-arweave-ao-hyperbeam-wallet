@@ -13,6 +13,7 @@ import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
+import { useT } from "../../../i18n";
 import { inviteLinkFor, invitesRemainingLine } from "../../../points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
 import { usePlatform } from "../../../app-platform/context";
@@ -30,6 +31,7 @@ import {
 } from "./usePoints";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { errorText } from "../../../i18n/errors";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -52,11 +54,12 @@ const BEAM_COLORS = [
 ];
 
 export function PointsView({ runtime, wallet, onBack }: PointsViewProps) {
+  const t = useT();
   const standing = usePointsStanding(runtime, wallet);
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Gleam Points" onBack={onBack} />
+      <ScreenHeader title={t("points.title")} onBack={onBack} />
       {standing.status === "joined" ? (
         <JoinedView runtime={runtime} wallet={wallet} standing={standing} />
       ) : standing.status === "not-joined" ? (
@@ -86,6 +89,7 @@ function JoinView({
   runtime: RuntimePort;
   wallet: WalletSummary;
 }) {
+  const t = useT();
   const join = useJoinPoints(runtime);
   const pending = usePendingInvite(runtime);
   const [typed, setTyped] = useState<string | null>(null);
@@ -113,18 +117,18 @@ function JoinView({
         });
       }}
     >
-      <InkCard label="What Gleam Points are">
+      <InkCard label={t("points.whatAre")}>
         <p className="text-h3 font-semibold tracking-tight">
-          Earn Gleam Points every day
+          {t("points.earnDaily")}
         </p>
         <p className="text-label text-on-ink-muted">
-          Every AR and AO you hold earns points daily. Bigger balances (whales) earn on a curve, so points stay fair.
+          {t("points.earnDailyDetail")}
         </p>
       </InkCard>
 
       <TextField
-        label="Invite code"
-        placeholder="Optional. Earn more with an invite code."
+        label={t("points.inviteCode")}
+        placeholder={t("points.inviteCodePlaceholder")}
         value={inviteCode}
         onChange={(event) => setTyped(event.target.value)}
         autoCapitalize="characters"
@@ -133,19 +137,19 @@ function JoinView({
         maxLength={16}
         disabled={!canJoin}
         errorMessage={
-          join.error instanceof Error ? join.error.message : undefined
+          join.error ? errorText(join.error) : undefined
         }
       />
 
       <ScreenFooter className="phone:order-last">
         <Button type="submit" disabled={!canJoin || join.isPending}>
-          {join.isPending ? "Joining…" : "Join Gleam Points"}
+          {join.isPending ? t("points.joining") : t("points.join")}
         </Button>
         {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
         {canJoin ? (
           <JoinNote withLink={false} />
         ) : (
-          <p className="text-center text-caption text-faint">{capabilityRefusal(wallet.method, "points", "join Gleam Points")}</p>
+          <p className="text-center text-caption text-faint">{errorText(capabilityRefusal(wallet.method, "points", "join Gleam Points"))}</p>
         )}
       </ScreenFooter>
 
@@ -156,10 +160,11 @@ function JoinView({
 
 /** The total the way the site draws it: whole points large, decimals and unit beside them. */
 function PointsTotal({ value, highlighted }: { value: string; highlighted: boolean }) {
+  const t = useT();
   const [whole, decimals] = value.split(".");
   return (
     <p className="flex items-end gap-1 leading-none">
-      <span className="sr-only">{value} points</span>
+      <span className="sr-only">{t("points.pointsAmount", { amount: value })}</span>
       <span
         aria-hidden="true"
         className={cn(
@@ -176,7 +181,7 @@ function PointsTotal({ value, highlighted }: { value: string; highlighted: boole
           </span>
         ) : null}
         <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-ink-muted">
-          Points
+          {t("points.unit")}
         </span>
       </span>
     </p>
@@ -231,6 +236,7 @@ function JoinedView({
   wallet: WalletSummary;
   standing: Extract<ReturnType<typeof usePointsStanding>, { status: "joined" }>;
 }) {
+  const t = useT();
   const { score } = standing;
   const total = useCountUp(standing.estimateAtomic, score?.totalAtomic ?? null);
   const { copied, copy } = useCopy(inviteLinkFor(standing.membership.inviteCode));
@@ -243,47 +249,51 @@ function JoinedView({
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
-      <InkCard label="Standing">
+      <InkCard label={t("points.standing")}>
         <div className="flex flex-col gap-2">
           <PointsTotal value={formatPoints(total.shown)} highlighted={total.highlighted} />
           {score?.originalFounder ? (
             <span className="text-label text-on-ink-muted">
-              Earning 10% more as an early member
+              {t("points.earlyMember")}
             </span>
           ) : null}
         </div>
         <dl className="grid grid-cols-3 gap-3 border-t border-ink-line pt-3">
-          <InkStat label="Per day">
+          <InkStat label={t("points.perDay")}>
             +{formatPoints(standing.dailyRateAtomic)}
           </InkStat>
-          <InkStat label="Rank">
+          <InkStat label={t("points.rank")}>
             {/* The leader is "#1" because an only ranked wallet is also "Top 100%". */}
             {!score ? (
               "—"
             ) : score.rank === 1 ? (
               "#1"
             ) : topPercent !== null ? (
-              `Top ${topPercent}%`
+              t("points.top", { percent: topPercent })
             ) : (
               <span
-                title="You're ranked once a daily snapshot credits your points. Snapshots run just after midnight UTC."
+                title={t("points.unrankedHint")}
                 className="cursor-help underline decoration-dotted underline-offset-4"
               >
-                Unranked
+                {t("points.unranked")}
               </span>
             )}
           </InkStat>
-          <InkStat label="Friends joined">{score?.refereeCount ?? 0}</InkStat>
+          <InkStat label={t("points.friendsJoined")}>{score?.refereeCount ?? 0}</InkStat>
         </dl>
         {score && score.rank !== 1 && topPercent === null ? (
           // The explanation behind "Unranked" is a hover tooltip, which a touch screen can't show.
           <p className="hidden text-caption text-on-ink-muted phone:block">
-            You're ranked once a daily snapshot credits your points. Snapshots run just after midnight UTC.
+            {t("points.unrankedHint")}
           </p>
         ) : null}
         {score?.rank != null && score.pointsToNextRankAtomic !== null ? (
           <p className="text-label text-on-ink-muted">
-            You're #{score.rank}. {formatPoints(score.pointsToNextRankAtomic)} points to pass #{score.rank - 1}.
+            {t("points.toNextRank", {
+              rank: score.rank,
+              amount: formatPoints(score.pointsToNextRankAtomic),
+              next: score.rank - 1,
+            })}
           </p>
         ) : null}
       </InkCard>
@@ -293,13 +303,15 @@ function JoinedView({
       ) : (
         <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
           <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
-            Ways to earn
+            {t("points.waysToEarn")}
           </h2>
           <div className="flex flex-col gap-6">
-            <EarnItem label="Invite" title="Invite a friend">
+            <EarnItem label={t("points.invite")} title={t("points.inviteFriend")}>
               <div className="flex flex-col gap-1">
                 <p className="text-label text-muted">
-                  Earn an extra <Reward>{REFERRAL_PERCENT}%</Reward> daily for every friend who joins.
+                  {t("points.referralBefore")}
+                  <Reward>{REFERRAL_PERCENT}%</Reward>
+                  {t("points.referralAfter")}
                 </p>
                 {status ? (
                   <p className="flex items-center gap-2 text-caption text-muted">
@@ -308,7 +320,7 @@ function JoinedView({
                   </p>
                 ) : null}
                 {full ? (
-                  <p className="text-caption text-muted">You get two more when a friend you invited joins Points.</p>
+                  <p className="text-caption text-muted">{t("points.twoMore")}</p>
                 ) : null}
               </div>
               {full ? null : (
@@ -323,7 +335,7 @@ function JoinedView({
                       prompt?.finish();
                     }}
                   >
-                    {copied ? "Copied" : "Copy invite link"}
+                    {copied ? t("points.copied") : t("points.copyInvite")}
                   </Button>
                 </div>
               )}
@@ -352,20 +364,20 @@ function JoinedView({
  * keeps one primary action.
  */
 function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: WalletSummary }) {
+  const t = useT();
   const join = useJoinPoints(runtime);
 
   return (
-    <section aria-label="Left on another browser" className="flex flex-col gap-3">
-      <h2 className="text-h3 font-semibold text-foreground">Left on another browser</h2>
+    <section aria-label={t("points.elsewhereTitle")} className="flex flex-col gap-3">
+      <h2 className="text-h3 font-semibold text-foreground">{t("points.elsewhereTitle")}</h2>
       <p className="text-label text-muted">
-        This wallet left Gleam Points on another browser, which removed its points data, so it isn't earning here. Join
-        again to start earning.
+        {t("points.elsewhereBody")}
       </p>
       <Button type="button" disabled={join.isPending} onClick={() => join.mutate({ walletId: wallet.id })}>
-        {join.isPending ? "Joining…" : "Join again"}
+        {join.isPending ? t("points.joining") : t("points.joinAgain")}
       </Button>
       {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
-      {join.error instanceof Error ? <p className="text-caption text-warning">{join.error.message}</p> : null}
+      {join.error instanceof Error ? <p className="text-caption text-warning">{errorText(join.error)}</p> : null}
     </section>
   );
 }
@@ -403,6 +415,7 @@ function Reward({ children }: { children: ReactNode }) {
  * and a confirmed vulnerability still earns from the bounty pool.
  */
 function ReviewItem({ runtime }: { runtime: RuntimePort }) {
+  const t = useT();
   const { version } = usePlatform().buildInfo;
   const stats = useScanStats(runtime);
   const placesLeft = stats.data?.paidPlacesLeft ?? null;
@@ -411,30 +424,32 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const paying = placesLeft !== null && placesLeft > 0;
 
   return (
-    <EarnItem label="Review" title="Review a release">
+    <EarnItem label={t("points.review")} title={t("points.reviewRelease")}>
       <div className="flex flex-col gap-1">
         <p className="text-label text-muted">
           {paying && rewardAtomic ? (
             <>
-              Earn <Reward>{formatPoints(rewardAtomic)} GLEAM</Reward> to review Gleam with your coding agent.
+              {t("points.reviewEarnBefore")}
+              <Reward>{formatPoints(rewardAtomic)} GLEAM</Reward>
+              {t("points.reviewEarnAfter")}
             </>
           ) : (
-            "Review Gleam with your coding agent."
+            t("points.reviewPlain")
           )}
         </p>
         {placesLeft === 0 ? (
           <p className="text-caption text-muted">
             {pool
-              ? `Paid places for this release are taken. Confirmed vulnerabilities still share the ${pool} GLEAM bounty pool.`
-              : "Paid places for this release are taken. Confirmed vulnerabilities still earn a share of the bounty pool."}
+              ? t("points.placesTakenPool", { pool })
+              : t("points.placesTaken")}
           </p>
         ) : pool ? (
-          <p className="text-caption text-muted">{`Plus a ${pool} GLEAM bounty pool for confirmed vulnerabilities.`}</p>
+          <p className="text-caption text-muted">{t("points.poolPlus", { pool })}</p>
         ) : null}
       </div>
       <Button asChild variant="secondary" size="sm" className="self-start">
         <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer">
-          Start a review
+          {t("points.startReview")}
           <span aria-hidden="true">↗</span>
         </a>
       </Button>
@@ -454,6 +469,7 @@ function AboutPoints({
   className?: string;
   children?: ReactNode;
 }) {
+  const t = useT();
   const { version } = usePlatform().buildInfo;
   const [open, setOpen] = useState(false);
 
@@ -466,7 +482,7 @@ function AboutPoints({
         onClick={() => setOpen((value) => !value)}
         className="flex items-center gap-1 text-caption text-muted hover:text-foreground phone:min-h-11"
       >
-        About Gleam Points
+        {t("points.about")}
         <ChevronIcon open={open} />
       </button>
       {open ? (
@@ -474,13 +490,13 @@ function AboutPoints({
           <ul className="flex flex-col gap-6">
             <AboutLink
               href={howItWorksUrl(version)}
-              title="How to earn points"
-              detail="Rates, invites and the rules"
+              title={t("points.howToEarn")}
+              detail={t("points.howToEarnDetail")}
             />
             <AboutLink
               href={gleamUrl(version)}
-              title="The future of Gleam"
-              detail="What your points will become"
+              title={t("points.future")}
+              detail={t("points.futureDetail")}
             />
           </ul>
           {children ? (
@@ -532,6 +548,7 @@ function LeaveControl({
   wallet: WalletSummary;
   points: string;
 }) {
+  const t = useT();
   const leave = useLeavePoints(runtime);
   const [confirming, setConfirming] = useState(false);
   useBackHandler(confirming ? () => setConfirming(false) : null);
@@ -543,7 +560,7 @@ function LeaveControl({
         onClick={() => setConfirming(true)}
         className="text-label text-faint hover:text-muted"
       >
-        Leave Gleam Points
+        {t("points.leave")}
       </button>
     );
   }
@@ -551,15 +568,14 @@ function LeaveControl({
   return (
     <div
       role="alertdialog"
-      aria-label="Leave Gleam Points"
+      aria-label={t("points.leave")}
       className="flex w-full flex-col gap-3 rounded-lg border border-line p-4"
     >
       <p className="text-label text-foreground">
-        You'll lose your {points} points and your invite link will stop working.
-        This cannot be undone.
+        {t("points.leaveWarning", { points })}
       </p>
       {leave.error instanceof Error ? (
-        <p className="text-caption text-warning">{leave.error.message}</p>
+        <p className="text-caption text-warning">{errorText(leave.error)}</p>
       ) : null}
       <div className="flex gap-2">
         <Button
@@ -569,7 +585,7 @@ function LeaveControl({
           className="flex-1"
           onClick={() => setConfirming(false)}
         >
-          Cancel
+          {t("points.cancel")}
         </Button>
         <Button
           type="button"
@@ -579,7 +595,7 @@ function LeaveControl({
           disabled={leave.isPending}
           onClick={() => leave.mutate({ walletId: wallet.id })}
         >
-          {leave.isPending ? "Leaving…" : "Leave"}
+          {leave.isPending ? t("points.leaving") : t("points.leaveConfirm")}
         </Button>
       </div>
       {leave.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
@@ -589,9 +605,10 @@ function LeaveControl({
 
 /** A hardware wallet proves ownership on the device, in the approval window the background opens. */
 function DeviceApprovalNote() {
+  const t = useT();
   return (
     <p role="status" className="text-center text-caption text-muted">
-      Approve on your device in the window that opened.
+      {t("points.deviceApproval")}
     </p>
   );
 }

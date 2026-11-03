@@ -1,6 +1,7 @@
 import type { Collectible } from "../models/collectible";
 import { classifyAsset, createAssetScanner, mapLimit, PROCESS_ID, tagMap, withRequestTimeout, type Tag } from "./asset-scan";
 import { readL1Balance } from "./balance";
+import { userErrorMessage } from "../models/user-errors";
 
 export { classifyAsset } from "./asset-scan";
 export type { AssetClass } from "./asset-scan";
@@ -54,7 +55,7 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
     maxPages,
     concurrency,
     deadline,
-    describe: (gw, detail) => `Collectible lookup against "${gw}" failed: ${detail}`,
+    describe: (gateway, detail) => userErrorMessage("collectibleLookupFailed", { gateway, detail }),
   });
 
   const [initial = [], market = [], received = []] = await scanMany([
@@ -87,7 +88,7 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
     }
   });
   if (uniques.length > 0 && checks.every((quantity) => quantity === undefined)) {
-    throw new Error(`Could not read any collectible balance from ${peerUrl}.`);
+    throw new Error(userErrorMessage("collectibleBalanceFailed", { peer: peerUrl }));
   }
   const held = uniques.filter((_, index) => {
     const quantity = checks[index];

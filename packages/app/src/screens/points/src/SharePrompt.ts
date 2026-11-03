@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointsSharePrompt, PointsWalletScore, RuntimePort, WalletSummary } from "@gleam/core";
+import { useT, type TFunction } from "../../../i18n";
 import { usePlatform } from "../../../app-platform/context";
 import {
   useMarkSeatsSeen,
@@ -41,14 +42,14 @@ export interface PromptContent {
   text: string;
 }
 
-function promptContent(kind: SharePromptKind): PromptContent {
+function promptContent(kind: SharePromptKind, t: TFunction): PromptContent {
   switch (kind) {
     case "gainedSeat":
-      return { text: "A friend joined. You got more invites." };
+      return { text: t("points.promptGainedSeat") };
     case "lastSeat":
-      return { text: "Your last invite" };
+      return { text: t("points.promptLastSeat") };
     case "joined":
-      return { text: "You're in and earning Gleam Points." };
+      return { text: t("points.promptJoined") };
   }
 }
 
@@ -71,6 +72,7 @@ export interface ActiveSharePrompt extends PromptContent {
  * the invite link from it.
  */
 export function useSharePrompt({ runtime, wallet, score }: SharePromptArgs): ActiveSharePrompt | null {
+  const t = useT();
   const seats = score?.seatsLeft ?? null;
   const ready = usePlatform().buildInfo.foundingGate && seats !== null;
   const shareSeen = usePointsShareSeen(runtime, ready);
@@ -107,7 +109,7 @@ export function useSharePrompt({ runtime, wallet, score }: SharePromptArgs): Act
   const kind = shown ?? pick;
   if (kind === null || score === null) return null;
   return {
-    ...promptContent(kind),
+    ...promptContent(kind, t),
     // A new invite was marked seen when it showed; the named prompts only once acted on.
     finish: () => {
       if (kind !== "gainedSeat") markShare.mutate({ walletId: wallet.id, prompt: kind });

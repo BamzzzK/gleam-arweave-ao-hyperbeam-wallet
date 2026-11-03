@@ -5,8 +5,10 @@ import type { RuntimePort, TokenBalance } from "@gleam/core";
 import { NetworkErrorBanner, TokenGlyph } from "@gleam/ui/src/components/wallet/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { useT } from "../../../i18n";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Reached from Settings. AR and AO aren't listed: they can't be removed,
@@ -31,6 +33,7 @@ interface LoadState {
 }
 
 export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewProps) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [state, setState] = useState<LoadState>({
     processIds: [],
@@ -62,7 +65,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime, address]);
@@ -77,13 +80,11 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
   const handlePreview = async (processId: string) => {
     if (!PROCESS_ID.test(processId)) {
-      setAddError(
-        `A process id is 43 letters, digits, - and _ (this is ${processId.length}). Copy the whole id from the token's page or explorer.`,
-      );
+      setAddError(t("manageTokens.badIdLength", { length: processId.length }));
       return;
     }
     if (state.processIds.includes(processId) || state.discovered.some((token) => token.processId === processId)) {
-      setAddError("That token is already in your list.");
+      setAddError(t("manageTokens.alreadyListed"));
       return;
     }
 
@@ -97,7 +98,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       });
       if (currentIdRef.current === processId) setPreview(balance);
     } catch (error) {
-      if (currentIdRef.current === processId) setAddError(error instanceof Error ? error.message : String(error));
+      if (currentIdRef.current === processId) setAddError(errorText(error));
     } finally {
       if (currentIdRef.current === processId) setPreviewing(false);
     }
@@ -120,7 +121,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       setPreview(null);
       setNewProcessId("");
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : String(error));
+      setAddError(errorText(error));
     } finally {
       setAdding(false);
     }
@@ -141,7 +142,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       invalidateBalances();
       if (preview?.processId === processId) setPreview(null);
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
+      setState((prev) => ({ ...prev, error: errorText(error) }));
     } finally {
       setRemovingId(null);
     }
@@ -149,20 +150,20 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Manage tokens" onBack={onBack} />
+      <ScreenHeader title={t("manageTokens.title")} onBack={onBack} />
       {state.error ? <NetworkErrorBanner onRetry={() => void load()} /> : null}
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div>
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-            Watched AO tokens
+            {t("manageTokens.watched")}
           </div>
           <div>
             {state.loading ? (
               <TokenSkeletonRow />
             ) : state.processIds.length === 0 ? (
               <p className="py-3.5 text-caption text-faint">
-                No extra tokens added yet.
+                {t("manageTokens.none")}
               </p>
             ) : (
               state.processIds.map((processId) => {
@@ -174,21 +175,21 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     ) : null}
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="truncate text-label font-semibold text-foreground">
-                        {balance ? displayTicker(balance.ticker) : "Unavailable"}
+                        {balance ? displayTicker(balance.ticker) : t("manageTokens.unavailable")}
                       </span>
                       <span className="truncate font-mono text-caption text-muted">{truncateAddress(processId, 6)}</span>
                     </span>
                     {balance ? (
                       <span
                         className="flex-shrink-0 font-mono text-label text-muted"
-                        title={balance.available === false ? balance.unavailableReason : undefined}
+                        title={balance.available === false && balance.unavailableReason ? errorText(balance.unavailableReason) : undefined}
                       >
-                        {balance.available === false ? "Unavailable" : formatAtomicAsDisplay(balance.quantity, balance.denomination)}
+                        {balance.available === false ? t("manageTokens.unavailable") : formatAtomicAsDisplay(balance.quantity, balance.denomination)}
                       </span>
                     ) : null}
                     <button
                       type="button"
-                      aria-label={`Remove ${balance?.ticker ?? processId}`}
+                      aria-label={t("manageTokens.remove", { token: balance?.ticker ?? processId })}
                       disabled={removingId === processId}
                       onClick={() => void handleRemove(processId)}
                       className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
@@ -205,7 +206,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         {state.discovered.length > 0 ? (
           <div className="pt-10">
             <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-              Found in your wallet
+              {t("manageTokens.found")}
             </div>
             {state.discovered.map((token) => (
               <div key={token.processId} className="flex items-center gap-2.5 py-3.5">
@@ -218,7 +219,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 </span>
                 <button
                   type="button"
-                  aria-label={`Ignore ${token.ticker}`}
+                  aria-label={t("manageTokens.ignore", { token: token.ticker })}
                   disabled={removingId === token.processId}
                   onClick={() => void handleRemove(token.processId)}
                   className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
@@ -232,12 +233,12 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
         <div className="pt-10">
           <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-            Add a token
+            {t("manageTokens.add")}
           </div>
           <div className="flex flex-col gap-2 py-3.5">
             <input
               type="text"
-              placeholder="AO process id"
+              placeholder={t("manageTokens.placeholder")}
               value={newProcessId}
               onChange={(event) => {
                 const processId = event.target.value.trim();
@@ -276,23 +277,24 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     </span>
                   </span>
                   <span className="flex-shrink-0 font-mono text-label text-muted">
-                    {preview.available === false ? "Unavailable" : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
+                    {preview.available === false ? t("manageTokens.unavailable") : formatAtomicAsDisplay(preview.quantity, preview.denomination)}
                   </span>
                 </div>
                 {preview.available === false ? (
-                  <div className="flex flex-col gap-2 text-caption leading-snug text-muted" title={preview.unavailableReason}>
-                    <p>
-                      Gleam can't read this token right now. Its node may be busy, or it may be an older token Gleam
-                      doesn't support.
-                    </p>
-                    <p>You can still add it - the balance shows once it can be read.</p>
+                  <div className="flex flex-col gap-2 text-caption leading-snug text-muted" title={preview.unavailableReason ? errorText(preview.unavailableReason) : undefined}>
+                    <p>{t("manageTokens.unreadable")}</p>
+                    <p>{t("manageTokens.unreadableAdd")}</p>
                   </div>
                 ) : null}
               </div>
             ) : null}
             {preview ? (
               <Button className="mt-1" disabled={adding} onClick={() => void handleConfirmAdd()}>
-                {adding ? "Adding…" : preview.ticker === preview.processId ? "Add token" : `Add ${preview.ticker}`}
+                {adding
+                  ? t("manageTokens.adding")
+                  : preview.ticker === preview.processId
+                    ? t("manageTokens.addToken")
+                    : t("manageTokens.addNamed", { token: preview.ticker })}
               </Button>
             ) : null}
           </div>

@@ -5,6 +5,7 @@ import type {
   ReviewMoment,
   Collectible,
   CollectibleSendDraft,
+  CollectibleSendRequest,
   ApprovalRequest,
   Contact,
   RecipientAssessment,
@@ -209,7 +210,7 @@ export interface ProtocolMap {
   /** Quotes the AR network fee for sending one collectible; fails when the wallet's AR can't cover it. */
   estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
   /** Sends one collectible as an L1 transaction to its process (`core/ao/collectible-transfer.ts`). */
-  sendCollectible(req: CollectibleSendDraft): { txId: string };
+  sendCollectible(req: CollectibleSendRequest): { txId: string };
 
   // approvals
   getApproval(req: { requestId: string }): ApprovalRequest;

@@ -1,6 +1,7 @@
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
 import { ExistingWalletOptions } from "./ExistingWallet";
+import { useT } from "../../../i18n";
 
 /**
  * Start of the add-wallet flow from the wallet switcher. Whoever lands
@@ -18,15 +19,16 @@ export interface AddWalletStartProps {
 }
 
 export function AddWalletStart({ onBack, onCreate, ...existing }: AddWalletStartProps) {
+  const t = useT();
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Add wallet" onBack={onBack} />
+      <ScreenHeader title={t("onboarding.addWallet")} onBack={onBack} />
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 py-6">
-        <h1 className="text-h3 font-semibold tracking-tight text-foreground">Add a wallet</h1>
-        <OptionSection title="New">
+        <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.addAWallet")}</h1>
+        <OptionSection title={t("onboarding.sectionNew")}>
           <OptionRow
-            title="Create a wallet"
-            description="A new address, protected by your Gleam password"
+            title={t("onboarding.createWallet")}
+            description={t("onboarding.createOptionHint")}
             onClick={onCreate}
           />
         </OptionSection>

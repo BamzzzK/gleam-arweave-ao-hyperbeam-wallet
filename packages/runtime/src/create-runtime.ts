@@ -15,6 +15,7 @@ import {
   type ProviderMethod,
   type WalletState,
   type WalletSummary,
+  type Winston,
   vaultHasPassword,
   WATCH_ONLY_CONNECT_REFUSAL,
 } from "@gleam/core";
@@ -65,6 +66,7 @@ import { dispatchSiteMessage } from "./dispatch/site";
 import { redeemSiteInvite } from "./points-invite";
 import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -127,6 +129,12 @@ function arweaveConfigFromGatewayUrl(gatewayUrl: string): { protocol: string; ho
  * timeout, resolving to "unresolved" either way rather than ever rejecting.
  */
 const TOKEN_METADATA_LOOKUP_TIMEOUT_MS = 3_000;
+
+/**
+ * Longer than the metadata budget: an L1 send with no quote is refused, and a
+ * cold token lookup can spend `core/ao/token-state.ts`'s 8s reading a logo.
+ */
+const TOKEN_FEE_QUOTE_TIMEOUT_MS = 10_000;
 
 /** What a provider handler gets once the dispatcher has checked the origin's grant. */
 interface GrantedCall {
@@ -238,7 +246,7 @@ export function createRuntime(platform: Platform): Runtime {
     walletMethod: getWalletMethod,
     deviceProof: async ({ walletId, message }) => {
       const wallet = await getStoredWallet(walletId);
-      if (!wallet) throw new Error(`Wallet "${walletId}" doesn't exist.`);
+      if (!wallet) throw new Error(userErrorMessage("walletNotFound", { wallet: walletId }));
       const text = message(wallet.address);
       return { ...(await approval.requestPointsProof({ walletId, message: text })), message: text };
     },
@@ -369,7 +377,7 @@ export function createRuntime(platform: Platform): Runtime {
 
   async function walletAddress(walletId: string): Promise<string> {
     const wallet = (await lifecycle.getState()).wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) throw new Error(`No stored wallet with id "${walletId}".`);
+    if (!wallet) throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
     return wallet.address;
   }
 
@@ -385,6 +393,21 @@ export function createRuntime(platform: Platform): Runtime {
     const timeout = new Promise<typeof UNRESOLVED>((resolve) =>
       setTimeout(() => resolve(UNRESOLVED), TOKEN_METADATA_LOOKUP_TIMEOUT_MS),
     );
+    return Promise.race([lookup, timeout]);
+  }
+
+  /**
+   * The AR reward a dApp's token transfer pays, for the preview: `null` for
+   * a token on the MU, which has none. A lookup that fails or hangs also
+   * gives `null`, and an L1 send then refuses for want of an approved fee.
+   */
+  async function quoteTokenTransferFee(processId: string): Promise<Winston | null> {
+    const lookup = (async () => {
+      if ((await reads.tokenTransport({ processId })) !== "l1") return null;
+      const { gatewayUrl } = await reads.getNetworkSettings();
+      return (await estimateFee(gatewayUrl, processId)).fee;
+    })().catch(() => null);
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_FEE_QUOTE_TIMEOUT_MS));
     return Promise.race([lookup, timeout]);
   }
 
@@ -469,7 +492,7 @@ export function createRuntime(platform: Platform): Runtime {
       return arweaveConfigFromGatewayUrl(gatewayUrl);
     },
     async getBalances(_params, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read balances for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletBalances"));
       return { ar: await reads.getBalance({ address: wallet.address }) };
     },
 
@@ -487,7 +510,7 @@ export function createRuntime(platform: Platform): Runtime {
     },
 
     async transferAoTokens({ token, recipient, amount }, { origin, wallet, activeWalletId }) {
-      if (!wallet) throw new Error("No active wallet to sign with.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
 
       // Best-effort: the same denomination/ticker read the token list uses
       // for balances, so the approval amount can render scaled with its
@@ -497,7 +520,10 @@ export function createRuntime(platform: Platform): Runtime {
       // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
       // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
       // amount and a "smallest units" label when either comes back `null`.
-      const { tokenDenomination, tokenTicker } = await resolveTokenDenominationAndTicker(wallet.address, token);
+      const [{ tokenDenomination, tokenTicker }, fee] = await Promise.all([
+        resolveTokenDenominationAndTicker(wallet.address, token),
+        quoteTokenTransferFee(token),
+      ]);
 
       return approval.requestApproval({
         kind: "transferAoTokens",
@@ -505,7 +531,7 @@ export function createRuntime(platform: Platform): Runtime {
         walletId: activeWalletId(),
         recipient,
         amount,
-        fee: null,
+        fee,
         token,
         tokenDenomination,
         tokenTicker,
@@ -535,22 +561,22 @@ export function createRuntime(platform: Platform): Runtime {
     },
 
     async tokenBalance({ id }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read a token balance for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletTokenBalance"));
       return reads.tokenBalance({ address: wallet.address, id });
     },
 
     async userTokens({ options }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read tokens for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletTokens"));
       return reads.userTokens({ address: wallet.address, options });
     },
 
     async isTokenAdded({ id: processId }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to check tokens for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletCheckTokens"));
       return reads.isTokenAdded({ address: wallet.address, processId });
     },
 
     async addToken({ id: processId }, { origin, wallet }) {
-      if (!wallet) throw new Error("No active wallet to add a token to.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletAddToken"));
       // Already listed: nothing to ask the user.
       if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
       // Resolving first proves the id answers as a token, and gives the
@@ -575,10 +601,9 @@ export function createRuntime(platform: Platform): Runtime {
     { origin, activeWalletId }: GrantedCall,
   ): Promise<unknown> {
     const { gatewayUrl } = await reads.getNetworkSettings();
-    // The dApp's reward is the fee actually charged. Without one, the
-    // preview shows a fresh quote, and the transaction fetches its own
-    // reward when it is built after approval, so the two can differ. A
-    // hardware wallet's device step shows the reward actually signed.
+    // The dApp's reward is the fee actually charged. Without one, the quote
+    // the preview shows becomes the reward, so a gateway can't charge more
+    // than the user approved. A bundled dispatch carries no reward at all.
     const fee =
       transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
     return approval.requestApproval({
@@ -593,7 +618,7 @@ export function createRuntime(platform: Platform): Runtime {
       gatewayUrl,
       target: transaction.target,
       quantity: transaction.quantity,
-      reward: transaction.reward,
+      reward: fee,
       last_tx: transaction.last_tx,
     });
   }
@@ -673,7 +698,7 @@ export function createRuntime(platform: Platform): Runtime {
       state,
       wallet,
       activeWalletId: () => {
-        if (!wallet) throw new Error("No active wallet to sign with.");
+        if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
         return wallet.id;
       },
     });

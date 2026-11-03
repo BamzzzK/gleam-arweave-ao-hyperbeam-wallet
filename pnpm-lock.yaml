@@ -293,6 +293,9 @@ importers:
       '@tanstack/react-query-persist-client':
         specifier: 5.104.5
         version: 5.104.5(@tanstack/react-query@5.104.5(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
+      flag-icons:
+        specifier: ^7.6.0
+        version: 7.6.0
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -2930,6 +2933,9 @@ packages:
   first-chunk-stream@3.0.0:
     resolution: {integrity: sha512-LNRvR4hr/S8cXXkIY5pTgVP7L3tq6LlYWcg9nWBuW7o1NMxKZo6oOVa/6GIekMGI0Iw7uC+HWimMe9u/VAeKqw==}
     engines: {node: '>=8'}
+
+  flag-icons@7.6.0:
+    resolution: {integrity: sha512-hir/PsXwr0EESyizKrXJzmkzpLIMf+1vlNKLqAfvdh+bsU94a7LYWTiubkHKqptGoCPzOUGcm6c4PfC9/BaGSQ==}
 
   flat-cache@4.0.1:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
@@ -7921,6 +7927,8 @@ snapshots:
       xml2js: 0.6.2
 
   first-chunk-stream@3.0.0: {}
+
+  flag-icons@7.6.0: {}
 
   flat-cache@4.0.1:
     dependencies:

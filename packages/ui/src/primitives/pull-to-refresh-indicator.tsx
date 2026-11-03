@@ -1,12 +1,14 @@
 import type { PullToRefreshState } from "./use-pull-to-refresh";
+import { useUiLabels } from "../labels";
 
 /** Spinner revealed under the header by the pull; it takes no space at rest. */
-export function PullToRefreshIndicator({ pull, refreshing, dragging }: PullToRefreshState) {
+export function PullToRefreshIndicator({ pull, refreshing, dragging, refreshingLabel }: PullToRefreshState & { refreshingLabel?: string }) {
+  const labels = useUiLabels();
   if (pull === 0 && !refreshing) return null;
   return (
     <div
       role={refreshing ? "status" : undefined}
-      aria-label={refreshing ? "Refreshing" : undefined}
+      aria-label={refreshing ? (refreshingLabel ?? labels.refreshing) : undefined}
       style={{ height: pull }}
       className={`flex items-center justify-center overflow-hidden ${dragging ? "" : "motion-safe:transition-[height] motion-safe:duration-200"}`}
     >

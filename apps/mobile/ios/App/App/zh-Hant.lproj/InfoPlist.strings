@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam 使用相機掃描收款地址 QR 碼，或 Keystone 帳戶和簽署 QR 碼。";
+NSFaceIDUsageDescription = "Gleam 使用 Face ID 解鎖你的錢包。";

@@ -13,6 +13,8 @@ import { ForgotPassword } from "./ForgotPassword";
 import { PasskeyError } from "../../../passkey/webauthn";
 import { unlockWithPasskey } from "./passkey-unlock";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { t } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Unlock view module (`screens/unlock/`) — same "folder, not a
@@ -151,7 +153,7 @@ export function UnlockView({
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "That password didn't work. Try again, or use your recovery method.",
+          : t("unlock.passwordFailed"),
       );
     } finally {
       unlockInFlight.current = false;
@@ -176,7 +178,7 @@ export function UnlockView({
         onResetComplete();
       } catch (error) {
         setResetErrorMessage(
-          error instanceof Error ? error.message : "Couldn't reset the wallet. Try again.",
+          error instanceof Error ? errorText(error) : t("unlock.resetFailed"),
         );
       } finally {
         setResetting(false);
@@ -251,7 +253,7 @@ async function readPasskeyStatus(runtime: RuntimePort): Promise<PasskeyStatus | 
 
 function passkeyNoticeFor(error: unknown): NonNullable<PasskeyUnlockProps["notice"]> {
   if (error instanceof PasskeyError && error.reason === "cancelled") {
-    return { text: "Passkey cancelled. Try again, or use your password.", tone: "muted" };
+    return { text: t("unlock.passkeyCancelled"), tone: "muted" };
   }
-  return { text: error instanceof Error ? error.message : String(error), tone: "error" };
+  return { text: errorText(error), tone: "error" };
 }

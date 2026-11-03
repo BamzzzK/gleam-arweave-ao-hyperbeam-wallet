@@ -1,6 +1,8 @@
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { StepDots, AddressReveal } from "@gleam/ui/src/components/onboarding/index.ts";
 
+import { useT } from "../../../i18n";
+
 /**
  * Create wallet — key generated / backup prompt. Backup is explicit and
  * skippable, never forced — both "Continue to wallet" and "I'll back this
@@ -18,10 +20,11 @@ export interface BackupProps {
 }
 
 export function Backup({ onBack, onDownload, canDownload, downloading, savedAs, downloadError, onContinue }: BackupProps) {
+  const t = useT();
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader
-        title="Create a wallet"
+        title={t("onboarding.createWallet")}
         onBack={onBack}
         subtitle={<StepDots total={2} current={2} />}
       />
@@ -33,14 +36,13 @@ export function Backup({ onBack, onDownload, canDownload, downloading, savedAs, 
         </div>
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="text-h3 font-semibold tracking-tight text-foreground">
-            Your wallet is ready
+            {t("onboarding.backupReadyTitle")}
           </h1>
           <p className="text-body leading-relaxed text-muted">
-            No seed phrase to write down. Back up your keyfile instead, whenever you
-            want.
+            {t("onboarding.backupReadyBody")}
           </p>
           <p className="text-body font-bold leading-relaxed text-foreground">
-            Anyone with the file can access your wallet, so store it somewhere safe.
+            {t("onboarding.backupReadyWarning")}
           </p>
         </div>
 

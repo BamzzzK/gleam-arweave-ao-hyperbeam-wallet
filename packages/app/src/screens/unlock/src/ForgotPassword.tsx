@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
 
 /**
  * Explicit, plainly-worded destructive reset, never a silent delete.
@@ -23,6 +24,7 @@ export function ForgotPassword({
   resetting = false,
   errorMessage,
 }: ForgotPasswordProps) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -30,16 +32,14 @@ export function ForgotPassword({
       <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-full bg-mist text-muted">
         <LockGlyph />
       </div>
-      <h2 className="text-body font-semibold text-foreground">Forgot password?</h2>
+      <h2 className="text-body font-semibold text-foreground">{t("unlock.forgotPassword")}</h2>
       <p className="text-body leading-relaxed text-muted">
-        Gleam doesn&apos;t store your password and can&apos;t recover it. Resetting removes every
-        wallet stored in this browser. You&apos;ll need each wallet&apos;s backup keyfile
-        to bring it back.
+        {t("unlock.forgotBody")}
       </p>
 
       {confirming ? (
         <p role="alert" className="text-body font-medium leading-relaxed text-warning">
-          This cannot be undone. Any wallet without a backup keyfile is lost permanently.
+          {t("unlock.cannotUndo")}
         </p>
       ) : null}
 
@@ -56,7 +56,7 @@ export function ForgotPassword({
           onClick={() => (confirming ? onReset() : setConfirming(true))}
           disabled={resetting}
         >
-          {resetting ? "Resetting…" : confirming ? "Yes, reset wallet" : "Reset wallet"}
+          {resetting ? t("unlock.resetting") : confirming ? t("unlock.confirmReset") : t("unlock.reset")}
         </Button>
         <button
           type="button"
@@ -64,7 +64,7 @@ export function ForgotPassword({
           disabled={resetting}
           className="p-1 text-label font-medium text-muted hover:text-foreground hover:underline phone:flex phone:min-h-11 phone:items-center phone:px-4"
         >
-          Cancel
+          {t("unlock.cancel")}
         </button>
       </ScreenFooter>
     </div>

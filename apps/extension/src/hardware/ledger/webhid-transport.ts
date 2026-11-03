@@ -1,4 +1,4 @@
-import type { LedgerTransport } from "@gleam/core";
+import { USER_ERRORS, type LedgerTransport } from "@gleam/core";
 
 /*
  * Ledger's HID framing is implemented here rather than through
@@ -42,11 +42,11 @@ export type LedgerTransportFailure =
   | "invalid-response";
 
 const FAILURE_COPY: Record<LedgerTransportFailure, string> = {
-  unsupported: "This browser can't talk to a Ledger. Open Gleam in Chrome or another Chromium browser.",
-  "no-device": "No Ledger was selected. Plug it in, unlock it and try again.",
-  busy: "Close Ledger Live or other wallet windows and try again.",
-  disconnected: "The Ledger was disconnected. Plug it back in and try again.",
-  "invalid-response": "Your Ledger sent an unexpected reply. Unplug it, plug it back in and try again.",
+  unsupported: USER_ERRORS.ledgerUnsupportedBrowser,
+  "no-device": USER_ERRORS.ledgerNoDevice,
+  busy: USER_ERRORS.ledgerBusy,
+  disconnected: USER_ERRORS.ledgerDisconnected,
+  "invalid-response": USER_ERRORS.ledgerTransportBadReply,
 };
 
 export class LedgerTransportError extends Error {

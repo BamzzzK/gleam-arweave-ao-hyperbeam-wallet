@@ -6,6 +6,7 @@ import {
   type PasskeyStatus,
   type StoragePort,
 } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 const PASSKEY_KEY = "local:passkey";
 
@@ -34,7 +35,7 @@ function decodePrfOutput(value: string): Uint8Array<ArrayBuffer> {
   try {
     return base64UrlToBytes(value);
   } catch {
-    throw new Error("The passkey returned an unexpected secret.");
+    throw new Error(userErrorMessage("passkeyUnexpectedSecret"));
   }
 }
 
@@ -83,7 +84,7 @@ export class PasskeyHandler {
   }): Promise<void> {
     await this.vault.checkVaultPassword({ password: req.password });
     if (req.credentialId.length === 0 || req.prfSalt.length === 0) {
-      throw new Error("The passkey didn't return what Gleam needs.");
+      throw new Error(userErrorMessage("passkeyBadResponse"));
     }
     const wrapped = await wrapWithPasskey(req.password, decodePrfOutput(req.prfOutput), req.credentialId);
     const enrollment: PasskeyEnrollment = {
@@ -99,10 +100,10 @@ export class PasskeyHandler {
   async unlockWithPasskey(req: { credentialId: string; prfOutput: string }): Promise<{ unlockedWalletIds: string[] }> {
     const enrollment = await this.loadEnrollment();
     if (!enrollment) {
-      throw new Error("No passkey is set up for Gleam. Unlock with your password.");
+      throw new Error(userErrorMessage("passkeyNotSetUp"));
     }
     if (enrollment.credentialId !== req.credentialId) {
-      throw new Error("That isn't the passkey set up for Gleam. Try again, or use your password.");
+      throw new Error(userErrorMessage("passkeyWrongCredential"));
     }
     const password = await unwrapWithPasskey(enrollment, decodePrfOutput(req.prfOutput), enrollment.credentialId);
     try {
@@ -112,7 +113,7 @@ export class PasskeyHandler {
       // protected was removed and a new password set. Keeping the passkey
       // would fail the same way on every unlock.
       await this.removePasskey();
-      throw new Error("This passkey no longer matches your password. Unlock with your password, then set the passkey up again.");
+      throw new Error(userErrorMessage("passkeyStale"));
     }
   }
 

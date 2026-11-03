@@ -1,3 +1,5 @@
+import { userErrorMessage } from "../models/user-errors";
+
 const STATE_TIMEOUT_MS = 8_000;
 
 /**
@@ -22,7 +24,7 @@ export async function readTokenStateLogo(
     method: "HEAD",
     signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
   });
-  if (response.status >= 500) throw new Error(`Token state request failed (${response.status}).`);
+  if (response.status >= 500) throw new Error(userErrorMessage("tokenStateFailed", { status: response.status }));
   if (!response.ok) return null;
   const logo = response.headers.get("logo")?.trim();
   return logo ? logo : null;
@@ -41,7 +43,7 @@ export async function readTokenSwapHeight(processId: string, nodeUrl: string, fe
   });
   const height = Number(response.headers.get("swap-height") ?? "");
   if (!response.ok || !Number.isSafeInteger(height) || height <= 0) {
-    throw new Error(`Token state request failed (${response.status}).`);
+    throw new Error(userErrorMessage("tokenStateFailed", { status: response.status }));
   }
   return height;
 }

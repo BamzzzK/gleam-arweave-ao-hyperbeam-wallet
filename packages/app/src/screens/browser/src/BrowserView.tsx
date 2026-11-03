@@ -5,6 +5,7 @@ import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { usePlatform } from "../../../app-platform/context";
 import type { DappBrowserFrame } from "../../../app-platform/types";
 import { resolveInput, knownSite, BUILT_IN_SITES, siteHost } from "./address";
+import { useT } from "../../../i18n";
 import { StartScreen } from "./StartScreen";
 import { useBrowserSites } from "./useBrowserSites";
 
@@ -50,6 +51,7 @@ function originOf(url: string): string | null {
  * the page first.
  */
 export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, onLocked }: BrowserViewProps) {
+  const t = useT();
   const platform = usePlatform();
   const browser = platform.dappBrowser;
   const sites = useBrowserSites(runtime);
@@ -245,15 +247,15 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
   return (
     <div className="flex h-[calc(100dvh-var(--safe-top)-var(--safe-bottom))] flex-col overflow-hidden">
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
-        {page === null ? <IconButton label="Back" onClick={onBack}><BackIcon /></IconButton> : null}
+        {page === null ? <IconButton label={t("browser.back")} onClick={onBack}><BackIcon /></IconButton> : null}
         {showingStart ? (
           <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1">
             <input
               type="text"
               inputMode="url"
               enterKeyHint="go"
-              aria-label="Address"
-              placeholder="Search saved sites or enter an address"
+              aria-label={t("browser.address")}
+              placeholder={t("browser.addressPlaceholder")}
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
@@ -267,21 +269,21 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
             />
             {page ? (
               <button type="button" onClick={cancelEditing} className="min-h-11 rounded-lg px-3 text-label font-semibold text-muted">
-                Cancel
+                {t("browser.cancel")}
               </button>
             ) : null}
           </form>
         ) : (
           <button
             type="button"
-            aria-label={`Address, ${host?.host ?? ""}. Edit`}
+            aria-label={t("browser.addressEdit", { host: host?.host ?? "" })}
             onClick={() => setEditing(true)}
             className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-mist px-3.5 text-body text-foreground"
           >
             {host?.insecure ? (
               <span className="flex flex-shrink-0 items-center gap-1 text-label font-semibold text-warning">
                 <WarningIcon />
-                Not secure
+                {t("browser.notSecure")}
               </span>
             ) : null}
             <span className="truncate">{host?.host ?? ""}</span>
@@ -290,7 +292,7 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
       </div>
       {rejected ? (
         <p role="alert" className="px-5 pb-2 text-caption text-warning">
-          Enter a web address like example.com.
+          {t("browser.enterAddress")}
         </p>
       ) : null}
       {page && nav?.loading && !showingStart ? <Beam /> : <div className="h-[3px]" />}
@@ -313,14 +315,14 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
         {failedUrl !== null && !showingStart ? (
           <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background px-8 text-center">
             <p className="text-body text-foreground">
-              Couldn&apos;t load {siteHost(failedUrl)?.host ?? "this page"}.
+              {t("browser.loadFailed", { host: siteHost(failedUrl)?.host ?? t("browser.thisPage") })}
             </p>
             <button
               type="button"
               onClick={retry}
               className="min-h-11 rounded-lg bg-foreground px-5 text-label font-semibold text-background"
             >
-              Try again
+              {t("browser.tryAgain")}
             </button>
           </div>
         ) : null}
@@ -328,10 +330,10 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
 
       {page && !editing ? (
         <div className="flex items-center gap-1 px-2 pt-1">
-          <IconButton label="Back in page" onClick={goBackInPage} disabled={!nav?.canGoBack}><BackIcon /></IconButton>
-          <IconButton label="Reload" onClick={retry}><ReloadIcon /></IconButton>
+          <IconButton label={t("browser.backInPage")} onClick={goBackInPage} disabled={!nav?.canGoBack}><BackIcon /></IconButton>
+          <IconButton label={t("browser.reload")} onClick={retry}><ReloadIcon /></IconButton>
           <IconButton
-            label={saved ? "Remove from saved sites" : "Save site"}
+            label={saved ? t("browser.removeSaved") : t("browser.saveSite")}
             pressed={saved}
             onClick={toggleSaved}
             disabled={origin === null}
@@ -345,11 +347,11 @@ export function BrowserView({ runtime, onBack, initialUrl, onOpenConnectedApp, o
               className="ml-1 flex min-h-11 min-w-0 items-center gap-1.5 rounded-full bg-mist px-3.5 text-label font-semibold text-foreground"
             >
               <span aria-hidden="true" className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-positive" />
-              <span className="truncate">Connected</span>
+              <span className="truncate">{t("browser.connected")}</span>
             </button>
           ) : null}
           <div className="flex-1" />
-          <IconButton label="Close browser" onClick={closePage}><CloseIcon /></IconButton>
+          <IconButton label={t("browser.close")} onClick={closePage}><CloseIcon /></IconButton>
         </div>
       ) : null}
     </div>

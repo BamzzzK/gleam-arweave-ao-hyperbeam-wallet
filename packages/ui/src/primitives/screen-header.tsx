@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useBackHandler } from "./back-stack";
 import { cn } from "./cn";
+import { useUiLabels } from "../labels";
 
 /**
  * The back-button + centered title header shared by every multi-step
@@ -20,17 +21,20 @@ export interface ScreenHeaderProps {
   busy?: boolean;
   end?: ReactNode;
   subtitle?: ReactNode;
+  /** Accessible name of the back arrow. */
+  backLabel?: string;
   className?: string;
 }
 
-export function ScreenHeader({ title, center, onBack, busy = false, end, subtitle, className }: ScreenHeaderProps) {
+export function ScreenHeader({ title, center, onBack, busy = false, end, subtitle, backLabel, className }: ScreenHeaderProps) {
+  const labels = useUiLabels();
   useBackHandler(onBack ? (busy ? ignoreBack : onBack) : null);
   return (
     <div className={cn("flex items-center gap-2.5 border-b border-line px-4 py-3.5 phone:sticky phone:top-[var(--safe-top)] phone:z-30 phone:gap-1 phone:border-b-0 phone:bg-background phone:px-2 phone:py-1", className)}>
       {onBack ? (
         <button
           type="button"
-          aria-label="Back"
+          aria-label={backLabel ?? labels.back}
           onClick={onBack}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground phone:h-11 phone:w-11 phone:active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
         >

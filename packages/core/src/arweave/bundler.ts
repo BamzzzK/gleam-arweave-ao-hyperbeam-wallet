@@ -1,3 +1,5 @@
+import { userErrorMessage } from "../models/user-errors";
+
 const BUNDLER_TX_ENDPOINT_SUFFIX = "/tx";
 
 /**
@@ -15,7 +17,7 @@ export async function postDataItemToBundler(bundlerUrl: string, rawBytes: Uint8A
 
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
-      `Failed to submit data item to bundler ${bundlerUrl} (HTTP ${response.status}: ${response.statusText}).`,
+      userErrorMessage("bundlerSubmitFailed", { bundler: bundlerUrl, status: response.status, statusText: response.statusText }),
     );
   }
 }

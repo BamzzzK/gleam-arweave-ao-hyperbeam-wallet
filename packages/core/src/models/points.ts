@@ -1,3 +1,5 @@
+import { USER_ERRORS } from "./user-errors";
+
 /** A wallet's Gleam Points registration, as the extension stores it. */
 export interface PointsMembership {
   address: string;
@@ -50,7 +52,7 @@ export type InviteRedeemResult = "ok" | "full" | "unknown" | "offline";
  * registration for lack of an invite. The popup matches on it to open the
  * invite gate, since errors cross the messaging boundary as plain messages.
  */
-export const INVITE_REQUIRED_MESSAGE = "An invite is required to join Gleam Points.";
+export const INVITE_REQUIRED_MESSAGE: string = USER_ERRORS.inviteRequired;
 
 /** An install's install-time redemption, as the extension stores it. */
 export interface InviteUnlock {

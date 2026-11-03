@@ -14,22 +14,31 @@ import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { PasswordField } from "@gleam/ui/src/components/onboarding/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
+import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { errorText } from "../../../i18n/errors";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
-const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
-  jwk: null,
-  ethereum: "Ethereum",
-  ledger: "Ledger",
-  keystone: "Keystone",
-  watch: "Watch only",
+const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
+  switch (method) {
+    case "jwk":
+      return null;
+    case "ethereum":
+      return "Ethereum";
+    case "ledger":
+      return "Ledger";
+    case "keystone":
+      return "Keystone";
+    case "watch":
+      return t("walletDetail.watchOnly");
+  }
 };
 
-function formatBackupDate(timestamp: number): string {
+function formatBackupDate(t: TFunction, timestamp: number): string {
   const days = Math.floor((Date.now() - timestamp) / (24 * 60 * 60 * 1000));
-  if (days <= 0) return "Backed up today";
-  if (days === 1) return "Backed up 1 day ago";
-  return `Backed up ${days} days ago`;
+  if (days <= 0) return t("walletDetail.backedUpToday");
+  if (days === 1) return t("walletDetail.backedUpYesterday");
+  return t("walletDetail.backedUpDaysAgo", { days });
 }
 
 /**
@@ -62,6 +71,7 @@ export function WalletDetailView({
   onRemoved,
   requestDownloadPermission,
 }: WalletDetailViewProps) {
+  const t = useT();
   const { downloads } = usePlatform();
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
@@ -88,7 +98,7 @@ export function WalletDetailView({
       });
       onRenamed(trimmedName);
     } catch (error) {
-      setNameError(error instanceof Error ? error.message : String(error));
+      setNameError(errorText(error));
     } finally {
       setSavingName(false);
     }
@@ -110,7 +120,7 @@ export function WalletDetailView({
       setStep({
         kind: "export-password",
         submitting: false,
-        serverError: error instanceof Error ? error.message : String(error),
+        serverError: errorText(error),
       });
     }
   };
@@ -127,14 +137,14 @@ export function WalletDetailView({
       setStep({
         kind: "remove-confirm",
         removing: false,
-        serverError: error instanceof Error ? error.message : String(error),
+        serverError: errorText(error),
       });
     }
   };
 
   const hardware = isHardwareWalletMethod(wallet.method);
   const watchOnly = wallet.method === "watch";
-  const methodLabel = WALLET_METHOD_LABEL[wallet.method];
+  const methodLabel = walletMethodLabel(t, wallet.method);
 
   if (step.kind === "remove-confirm") {
     return (
@@ -164,11 +174,11 @@ export function WalletDetailView({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Wallet" onBack={onBack} />
+      <ScreenHeader title={t("walletDetail.title")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-7 phone:pt-4">
         <div className="group flex items-center gap-3.5 phone:items-start">
-          <AccountAvatar svgMarkup={avatarSvg} label={`${wallet.name} avatar`} size={44} />
+          <AccountAvatar svgMarkup={avatarSvg} label={t("walletDetail.avatarOf", { name: wallet.name })} size={44} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Copy sits in the name line so the address keeps the full width. */}
             <div className="flex min-w-0 items-center justify-between gap-2">
@@ -179,8 +189,8 @@ export function WalletDetailView({
               <button
                 type="button"
                 onClick={copyAddress}
-                aria-label={addressCopied ? "Address copied" : "Copy address"}
-                title={addressCopied ? "Copied" : "Copy address"}
+                aria-label={addressCopied ? t("walletDetail.addressCopied") : t("walletDetail.copyAddress")}
+                title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
                 className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
               >
                 {addressCopied ? <CheckIcon /> : <CopyIcon />}
@@ -191,7 +201,7 @@ export function WalletDetailView({
         </div>
 
         <TextField
-          label="Name"
+          label={t("walletDetail.name")}
           value={name}
           disabled={savingName}
           onChange={(event) => {
@@ -215,16 +225,16 @@ export function WalletDetailView({
             className="flex w-full items-center gap-2.5 rounded-lg border border-line px-3.5 py-3 text-left hover:bg-mist"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-label font-semibold text-foreground">Back up keyfile</span>
+              <span className="text-label font-semibold text-foreground">{t("walletDetail.backUpKeyfile")}</span>
               <span
                 id="keyfile-backup-status"
                 className={`truncate text-caption ${backupConfirmedAt !== null || savedAs ? "text-muted" : "font-semibold text-warning"}`}
               >
                 {savedAs
-                  ? `Saved as ${savedAs}`
+                  ? t("walletDetail.savedAs", { filename: savedAs })
                   : backupConfirmedAt !== null
-                    ? formatBackupDate(backupConfirmedAt)
-                    : "Not backed up yet"}
+                    ? formatBackupDate(t, backupConfirmedAt)
+                    : t("walletDetail.notBackedUp")}
               </span>
             </span>
             <ChevronIcon />
@@ -238,7 +248,7 @@ export function WalletDetailView({
           onClick={() => setStep({ kind: "remove-confirm", removing: false })}
           className="mt-auto text-warning hover:text-warning"
         >
-          Remove wallet
+          {t("walletDetail.removeWallet")}
         </Button>
       </div>
     </div>
@@ -272,31 +282,32 @@ function RemoveConfirmStep({
   removing: boolean;
   serverError?: string;
 }) {
+  const t = useT();
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Remove wallet" onBack={onBack} busy={removing} />
+      <ScreenHeader title={t("walletDetail.removeWallet")} onBack={onBack} busy={removing} />
       <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0">
         <p className="text-body leading-relaxed text-muted">
-          This removes <span className="font-semibold text-foreground">{walletName}</span> from
-          this browser.
+          {t("walletDetail.removeIntroBefore")}
+          <span className="font-semibold text-foreground">{walletName}</span>
+          {t("walletDetail.removeIntroAfter")}
         </p>
 
         {watchOnly ? (
           <p className="text-body leading-relaxed text-muted">
-            Gleam only watches this address, so you can add it again later.
+            {t("walletDetail.removeWatch")}
           </p>
         ) : hardware ? (
           <p className="text-body leading-relaxed text-muted">
-            The key stays on your device, so you can add this wallet again later.
+            {t("walletDetail.removeHardware")}
           </p>
         ) : !backedUp ? (
           <RiskNotice>
-            You haven&apos;t backed up this wallet&apos;s keyfile. Once removed, there&apos;s no
-            way to recover it and access is lost permanently.
+            {t("walletDetail.removeNotBackedUp")}
           </RiskNotice>
         ) : (
           <p className="text-body leading-relaxed text-muted">
-            You backed up this wallet&apos;s keyfile, so you can re-import it later.
+            {t("walletDetail.removeBackedUp")}
           </p>
         )}
 
@@ -308,7 +319,7 @@ function RemoveConfirmStep({
 
         <ScreenFooter className="mt-8" pinned={false}>
           <Button type="button" variant="destructive" disabled={removing} onClick={onConfirm}>
-            {removing ? "Removing…" : "Yes, remove wallet"}
+            {removing ? t("walletDetail.removing") : t("walletDetail.confirmRemove")}
           </Button>
         </ScreenFooter>
       </div>
@@ -327,6 +338,7 @@ function ExportPasswordStep({
   submitting: boolean;
   serverError?: string;
 }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [capsLockOn, setCapsLockOn] = useState(false);
 
@@ -339,7 +351,7 @@ function ExportPasswordStep({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Back up keyfile" onBack={onBack} busy={submitting} />
+      <ScreenHeader title={t("walletDetail.backUpKeyfile")} onBack={onBack} busy={submitting} />
       <form
         className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
@@ -348,20 +360,19 @@ function ExportPasswordStep({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Enter your password</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("walletDetail.enterPassword")}</h1>
           <p className="text-body leading-relaxed text-muted">
-            Confirms it's you, then saves this wallet's keyfile so you can keep a copy.
+            {t("walletDetail.exportExplain")}
           </p>
         </div>
 
         <RiskNotice>
-          The keyfile isn&apos;t password-protected. Anyone who gets it controls this wallet.
-          Keep it offline, and never share or upload it.
+          {t("walletDetail.keyfileWarning")}
         </RiskNotice>
 
         <PasswordField
-          label="Password"
-          placeholder="Enter your password"
+          label={t("walletDetail.password")}
+          placeholder={t("walletDetail.enterPassword")}
           autoFocus
           autoComplete="current-password"
           value={password}
@@ -374,7 +385,7 @@ function ExportPasswordStep({
 
         <ScreenFooter className="mt-8">
           <Button type="submit" disabled={submitting || password.length === 0}>
-            {submitting ? "Saving…" : "Save keyfile"}
+            {submitting ? t("walletDetail.saving") : t("walletDetail.saveKeyfile")}
           </Button>
         </ScreenFooter>
       </form>

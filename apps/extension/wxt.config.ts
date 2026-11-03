@@ -33,6 +33,8 @@ export default defineConfig({
     // WXT falls back to package.json's "name" ("@gleam/extension") when
     // this is unset, which Chrome then shows as the extension's name.
     name: 'Gleam',
+    description: '__MSG_extDescription__',
+    default_locale: 'en',
     ...(mode === 'development' ? { key: STORE_PUBLIC_KEY } : {}),
     // runtime.getContexts, which the keyring adapter uses to find its
     // offscreen document, arrived in Chrome 116.

@@ -61,6 +61,7 @@ import type {
   Wallet,
   Winston,
 } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -350,7 +351,7 @@ export class ReadsHandler {
       try {
         const settings = await this.loadNetworkSettings();
         if (settings.activePeerUrl === null) {
-          throw new Error("No HyperBEAM peer configured. Add one in Network settings to find collectibles.");
+          throw new Error(userErrorMessage("noPeerConfigured"));
         }
         const collectibles = await discoverCollectibles({
           address: req.address,
@@ -416,8 +417,8 @@ export class ReadsHandler {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(
         message.startsWith("No spawn transaction")
-          ? "No process with that id is on Arweave yet. Check that you copied the whole id; a token spawned in the last few minutes may not be indexed yet."
-          : `Couldn't reach ${hostOf(gatewayUrl)} to look up that token. Check your connection, or switch gateways in Network settings, then try again.`,
+          ? userErrorMessage("tokenNotIndexed")
+          : userErrorMessage("tokenLookupUnreachable", { host: hostOf(gatewayUrl) }),
       );
     }
     if (metadata.transport === "mu" && (metadata.ticker === null || metadata.denomination === null)) {
@@ -481,7 +482,7 @@ export class ReadsHandler {
         name: null,
         quantity: "0",
         available: false,
-        unavailableReason: "Couldn't look up this token's details. Try again in a minute.",
+        unavailableReason: userErrorMessage("tokenDetailsUnavailable"),
         source,
       };
     }
@@ -496,7 +497,7 @@ export class ReadsHandler {
         label: identity.ticker === processId ? "token" : identity.ticker,
       });
       if (metadata.denomination === null) {
-        return { ...identity, quantity, available: false, unavailableReason: "This token doesn't say how many decimals it uses." };
+        return { ...identity, quantity, available: false, unavailableReason: userErrorMessage("tokenNoDecimals") };
       }
       return { ...identity, quantity };
     } catch (error) {
@@ -581,20 +582,20 @@ export class ReadsHandler {
    */
   async previewWatchedToken(req: { address: string; processId: string }): Promise<TokenBalance> {
     const processId = req.processId.trim();
-    if (processId.length === 0) throw new Error("Paste a token's process id.");
+    if (processId.length === 0) throw new Error(userErrorMessage("tokenPasteId"));
     if (!PROCESS_ID.test(processId)) {
       throw new Error(
-        "That isn't a process id. A process id is 43 letters, digits, - and _; copy it from the token's page or explorer.",
+        userErrorMessage("tokenBadId"),
       );
     }
-    if (processId === req.address) throw new Error("That's your wallet address, not a token's process id.");
+    if (processId === req.address) throw new Error(userErrorMessage("tokenIsOwnAddress"));
     const settings = await this.loadNetworkSettings();
     const metadata = await this.loadTokenMetadata(processId, settings);
     if (metadata.assetClass === "unique") {
-      throw new Error("That's a collectible, not a token. Collectibles you hold show up in the Collectibles tab on their own.");
+      throw new Error(userErrorMessage("tokenIsCollectible"));
     }
     if (metadata.ticker === null && metadata.name === null) {
-      throw new Error("That process doesn't describe itself as a token (it has no name or ticker). Check the id.");
+      throw new Error(userErrorMessage("tokenNoIdentity"));
     }
     return this.tokenRow(req.address, processId, settings, "watched");
   }
@@ -1010,7 +1011,7 @@ export class ReadsHandler {
   /** De-duplicated so the same address imported twice isn't counted twice in the all-wallets total. */
   private async resolvePortfolioAddresses(scope: PortfolioScope, requested: string | undefined): Promise<string[]> {
     if (requested !== undefined && !(await this.loadTrackedAddresses()).includes(requested)) {
-      throw new Error("That wallet isn't in Gleam.");
+      throw new Error(userErrorMessage("walletNotInGleam"));
     }
     if (scope === "all") return [...new Set(await this.loadTrackedAddresses())];
     const address = requested ?? (await this.resolveActiveWalletAddress());

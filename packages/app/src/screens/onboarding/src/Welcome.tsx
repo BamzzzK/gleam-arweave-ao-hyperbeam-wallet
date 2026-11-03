@@ -1,6 +1,8 @@
 import { BeamMark } from "@gleam/ui/src/components/onboarding/index.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 
+import { useT } from "../../../i18n";
+
 /**
  * Welcome — the only screen with the tagline as hero copy, one primary +
  * one secondary action, nothing else. The first question is only "new or
@@ -13,17 +15,18 @@ export interface WelcomeProps {
 }
 
 export function Welcome({ onCreate, onExisting }: WelcomeProps) {
+  const t = useT();
   return (
     <div className="flex min-h-full flex-col items-center px-8 phone:px-5 pb-8 pt-7 phone:pt-4">
       <div className="my-auto">
-        <BeamMark tagline="crypto, without the clutter." />
+        <BeamMark tagline={t("onboarding.welcomeTagline")} />
       </div>
       <div className="flex w-full flex-col gap-2.5">
         <Button type="button" onClick={onCreate}>
-          Create a wallet
+          {t("onboarding.createWallet")}
         </Button>
         <Button type="button" variant="secondary" onClick={onExisting}>
-          I already have a wallet
+          {t("onboarding.haveWallet")}
         </Button>
       </div>
     </div>

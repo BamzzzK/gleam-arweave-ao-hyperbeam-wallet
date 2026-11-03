@@ -1,5 +1,6 @@
 import { base64ToBytes, bytesToBase64 } from "./base64";
 import { zeroize } from "../signer/zeroize";
+import { userErrorMessage } from "../models/user-errors";
 
 const IV_LENGTH_BYTES = 12;
 const HKDF_INFO = new TextEncoder().encode("gleam:passkey:v1");
@@ -18,7 +19,7 @@ function buildAAD(credentialId: string): Uint8Array<ArrayBuffer> {
  */
 async function deriveWrappingKey(prfOutput: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   if (prfOutput.length !== PRF_OUTPUT_LENGTH_BYTES) {
-    throw new Error("The passkey returned an unexpected secret.");
+    throw new Error(userErrorMessage("passkeyUnexpectedSecret"));
   }
   const material = await crypto.subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
@@ -64,7 +65,7 @@ export async function unwrapWithPasskey(
       base64ToBytes(wrapped.ciphertext),
     );
   } catch {
-    throw new Error("That passkey didn't unlock Gleam. Use your password instead.");
+    throw new Error(userErrorMessage("passkeyFailed"));
   }
   const bytes = new Uint8Array(plaintext);
   try {

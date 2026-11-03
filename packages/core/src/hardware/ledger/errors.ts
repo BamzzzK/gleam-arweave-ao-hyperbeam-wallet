@@ -1,3 +1,5 @@
+import { USER_ERRORS, userErrorMessage } from "../../models/user-errors";
+
 export type LedgerErrorCode =
   | "device-locked"
   | "app-not-open"
@@ -37,20 +39,17 @@ export class LedgerError extends Error {
 export const SW_OK = 0x9000;
 
 const STATUS_WORDS: Record<number, [LedgerErrorCode, string]> = {
-  0x5515: ["device-locked", "Unlock your Ledger and open the Arweave app."],
-  0x6982: ["device-locked", "Unlock your Ledger and open the Arweave app."],
-  0x6d00: ["app-not-open", "Open the Arweave app on your Ledger."],
-  0x6e00: ["app-not-open", "Open the Arweave app on your Ledger."],
-  0x6e01: ["app-not-open", "Open the Arweave app on your Ledger."],
-  0x6986: ["user-rejected", "Request rejected on your Ledger."],
-  0x6987: [
-    "key-not-ready",
-    "Your Ledger is still setting up the Arweave key. This can take a few minutes the first time.",
-  ],
-  0x6984: ["data-invalid", "The Ledger app rejected the transaction data."],
-  0x6985: ["conditions-not-satisfied", "Your Ledger couldn't complete the request (conditions not satisfied)."],
-  0x6700: ["wrong-length", "Your Ledger rejected the request length."],
-  0x6a80: ["bad-data", "The Ledger app rejected the request data."],
+  0x5515: ["device-locked", USER_ERRORS.ledgerLocked],
+  0x6982: ["device-locked", USER_ERRORS.ledgerLocked],
+  0x6d00: ["app-not-open", USER_ERRORS.ledgerAppClosed],
+  0x6e00: ["app-not-open", USER_ERRORS.ledgerAppClosed],
+  0x6e01: ["app-not-open", USER_ERRORS.ledgerAppClosed],
+  0x6986: ["user-rejected", USER_ERRORS.ledgerRejected],
+  0x6987: ["key-not-ready", USER_ERRORS.ledgerKeyNotReady],
+  0x6984: ["data-invalid", USER_ERRORS.ledgerDataInvalid],
+  0x6985: ["conditions-not-satisfied", USER_ERRORS.ledgerConditions],
+  0x6700: ["wrong-length", USER_ERRORS.ledgerWrongLength],
+  0x6a80: ["bad-data", USER_ERRORS.ledgerBadData],
 };
 
 function hex(statusWord: number): string {
@@ -70,12 +69,12 @@ function asciiReason(body: Uint8Array): string {
 export function statusWordError(statusWord: number, body: Uint8Array = new Uint8Array()): LedgerError {
   const known = STATUS_WORDS[statusWord];
   if (!known) {
-    return new LedgerError("device-error", `Ledger command failed (${hex(statusWord)}).`, statusWord);
+    return new LedgerError("device-error", userErrorMessage("ledgerCommandFailed", { status: hex(statusWord) }), statusWord);
   }
   const [code, message] = known;
   if (statusWord === 0x6984) {
     const reason = asciiReason(body);
-    if (reason) return new LedgerError(code, `The Ledger app rejected the transaction data: ${reason}.`, statusWord);
+    if (reason) return new LedgerError(code, userErrorMessage("ledgerDataInvalidDetail", { detail: reason }), statusWord);
   }
   return new LedgerError(code, message, statusWord);
 }

@@ -1,4 +1,5 @@
 import { AO_LEGACY_CU_URL } from "./result";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -50,7 +51,7 @@ async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: 
     }),
     signal: AbortSignal.timeout(DRY_RUN_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`The AO compute unit answered ${response.status}.`);
+  if (!response.ok) throw new Error(userErrorMessage("computeUnitFailed", { status: response.status }));
   return response.json();
 }
 
@@ -82,7 +83,7 @@ export async function readLegacyTokenBalance(
     const fromTag = atomic(message.tags.find((tag) => tag.name === "Balance")?.value);
     if (fromTag !== null) return fromTag;
   }
-  throw new Error("The token's Balance reply carried no balance.");
+  throw new Error(userErrorMessage("tokenNoBalanceReply"));
 }
 
 /**
@@ -109,5 +110,5 @@ export async function readLegacyTokenInfo(
       logo: value("logo"),
     };
   }
-  throw new Error("The process didn't answer Info like a token.");
+  throw new Error(userErrorMessage("tokenNoInfo"));
 }

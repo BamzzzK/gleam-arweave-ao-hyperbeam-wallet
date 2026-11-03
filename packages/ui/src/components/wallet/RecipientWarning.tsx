@@ -1,5 +1,6 @@
 import { RiskNotice } from "../../primitives/risk-notice";
 import { MemorableAddress } from "./MemorableAddress";
+import { useUiLabels } from "../../labels";
 
 export interface RecipientWarningProps {
   firstTime: boolean;
@@ -8,7 +9,18 @@ export interface RecipientWarningProps {
   /** The known address's avatar, so its picture can be set against the recipient's. */
   lookalikeAvatarSvg?: string;
   emphasisPick?: number | null;
+  /** Notice text; English unless the caller passes its own. */
+  labels?: RecipientWarningLabels;
   className?: string;
+}
+
+export interface RecipientWarningLabels {
+  irreversible: string;
+  lookalikeTitle: string;
+  lookalikeScammers: string;
+  lookalikeCompare: string;
+  firstTime: string;
+  doubleCheck: string;
 }
 
 /**
@@ -22,21 +34,24 @@ export function RecipientWarning({
   lookalikeOf,
   lookalikeAvatarSvg,
   emphasisPick = null,
+  labels: labelsProp,
   className,
 }: RecipientWarningProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.recipientWarning;
   return (
     <RiskNotice className={className}>
-      <strong className="font-bold">This cannot be undone.</strong>
+      <strong className="font-bold">{labels.irreversible}</strong>
       <ul className="m-0 mt-1.5 flex list-disc flex-col gap-1.5 pl-4">
         {lookalikeOf ? (
           <li>
             <span className="flex min-w-0 flex-col gap-2">
               <span>
-                <strong className="font-bold">This address looks familiar, but is different.</strong>
+                <strong className="font-bold">{labels.lookalikeTitle}</strong>
                 <br />
-                Scammers create lookalike addresses to trick you.
+                {labels.lookalikeScammers}
                 <br />
-                Compare every character before sending.
+                {labels.lookalikeCompare}
               </span>
               {lookalikeAvatarSvg ? (
                 <MemorableAddress address={lookalikeOf} emphasisPick={emphasisPick} avatarSvg={lookalikeAvatarSvg} />
@@ -46,8 +61,8 @@ export function RecipientWarning({
             </span>
           </li>
         ) : null}
-        {firstTime ? <li>You haven&apos;t sent to this address before.</li> : null}
-        <li>Double-check the recipient before signing.</li>
+        {firstTime ? <li>{labels.firstTime}</li> : null}
+        <li>{labels.doubleCheck}</li>
       </ul>
     </RiskNotice>
   );

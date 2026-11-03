@@ -11,6 +11,8 @@ export type {
   HardwareDevice,
 } from "./wallet";
 export { isHardwareWalletMethod, isKeylessWalletMethod, isWatchWalletMethod, vaultHasPassword } from "./wallet";
+export { USER_ERRORS, matchUserError, userErrorMessage } from "./user-errors";
+export type { UserErrorCode } from "./user-errors";
 export type { WalletCapabilities } from "./capabilities";
 export { HARDWARE_MESSAGE_HASH, WATCH_ONLY_CONNECT_REFUSAL, capabilitiesFor, capabilityRefusal, providerMethodRefusal, unsupportedOperationMessage } from "./capabilities";
 export type {
@@ -40,7 +42,7 @@ export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
-export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collectible";
+export type { Collectible, CollectibleRef, CollectibleSendDraft, CollectibleSendRequest } from "./collectible";
 export { collectibleSendRefusal } from "./collectible";
 export type {
   TokenMetadata,

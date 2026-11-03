@@ -1,5 +1,6 @@
 import type { Collectible } from "@gleam/core";
 import { CollectibleThumbnail, EmptyState, SkeletonTile } from "@gleam/ui/src/components/wallet/index.ts";
+import { useT } from "../../../i18n";
 import { groupCollectibles } from "./groupCollectibles";
 
 export interface CollectiblesGridProps {
@@ -11,6 +12,7 @@ export interface CollectiblesGridProps {
 const SKELETON_TILES = 6;
 
 export function CollectiblesGrid({ items, loading, onOpen }: CollectiblesGridProps) {
+  const t = useT();
   if (loading && items === undefined) {
     return (
       <Grid>
@@ -21,7 +23,7 @@ export function CollectiblesGrid({ items, loading, onOpen }: CollectiblesGridPro
     );
   }
   if (!items || items.length === 0) {
-    return <EmptyState message="No collectibles yet. NFTs you hold on AO show up here." />;
+    return <EmptyState message={t("collectibles.empty")} />;
   }
 
   const { groups, ungrouped } = groupCollectibles(items);
@@ -38,8 +40,8 @@ export function CollectiblesGrid({ items, loading, onOpen }: CollectiblesGridPro
         </section>
       ))}
       {ungrouped.length > 0 ? (
-        <section aria-label={groups.length > 0 ? "Other" : "Collectibles"} className="flex flex-col gap-2.5">
-          {groups.length > 0 ? <h3 className="text-label font-semibold text-muted">Other</h3> : null}
+        <section aria-label={groups.length > 0 ? t("collectibles.other") : t("collectibles.title")} className="flex flex-col gap-2.5">
+          {groups.length > 0 ? <h3 className="text-label font-semibold text-muted">{t("collectibles.other")}</h3> : null}
           <Grid>
             {ungrouped.map((item) => (
               <Tile key={item.id} item={item} onOpen={onOpen} />

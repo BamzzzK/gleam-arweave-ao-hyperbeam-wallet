@@ -15,6 +15,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { CollectibleThumbnail, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
+import { t, useT } from "../../../i18n";
 import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useActivity } from "../../activity/src/useActivity";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
@@ -24,6 +25,7 @@ import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { namedSuggestions, RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
@@ -64,8 +66,9 @@ const FEE_DIGITS = 12;
 
 function recipientError(recipient: string, ownAddress: string, assetId: string): string | undefined {
   const result = recipientSchema.safeParse(recipient);
-  if (!result.success) return firstIssueMessage(result.error, "That doesn't look like a valid address.");
-  return collectibleSendRefusal({ sender: ownAddress, recipient: result.data, assetId }) ?? undefined;
+  if (!result.success) return firstIssueMessage(result.error, t("send.invalidAddress"));
+  const refusal = collectibleSendRefusal({ sender: ownAddress, recipient: result.data, assetId });
+  return refusal === null ? undefined : errorText(refusal);
 }
 
 function refOf(collectible: Collectible): CollectibleRef {
@@ -77,6 +80,7 @@ function refOf(collectible: Collectible): CollectibleRef {
 }
 
 export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDone }: SendCollectibleViewProps) {
+  const t = useT();
   const [step, setStep] = useState<Step>(composeStep());
   const sendMutation = useSendCollectible(runtime, wallet.address);
   const contactsQuery = useContacts(runtime);
@@ -124,20 +128,20 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         setStep({
           ...step,
           submitting: false,
-          error: estimateError instanceof Error ? estimateError.message : String(estimateError),
+          error: errorText(estimateError),
         });
       }
     };
 
     return (
       <div className="flex min-h-full flex-col">
-        <ScreenHeader title="Send collectible" onBack={onBack} />
+        <ScreenHeader title={t("send.sendCollectible")} onBack={onBack} />
         <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
           <div className="flex items-center gap-3">
             <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-12 flex-shrink-0 rounded-md" />
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-label font-semibold text-foreground">{collectible.name}</span>
-              <span className="text-caption text-muted">From {wallet.name}</span>
+              <span className="text-caption text-muted">{t("send.fromWallet", { name: wallet.name })}</span>
             </div>
           </div>
 
@@ -177,7 +181,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           {unsupported ? (
             <p role="status" className="rounded-md border border-l-[3px] border-line border-l-warning bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
-              {unsupported}
+              {errorText(unsupported)}
             </p>
           ) : null}
 
@@ -189,7 +193,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           <ScreenFooter>
             <Button type="button" disabled={!canContinue} aria-busy={step.submitting} onClick={() => void handleContinue()}>
-              {step.submitting ? "Estimating fee…" : parsed.success ? "Review and Send" : "Enter an address"}
+              {step.submitting ? t("send.estimatingFee") : parsed.success ? t("send.reviewAndSend") : t("send.enterAddress")}
             </Button>
           </ScreenFooter>
         </div>
@@ -225,16 +229,17 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           walletId: wallet.id,
           recipient: step.recipient,
           collectible: refOf(collectible),
+          fee: step.estimate.fee,
         });
         setStep({ kind: "success", txId, recipient: step.recipient });
       } catch (sendError) {
-        setStep({ ...step, submitting: false, error: sendError instanceof Error ? sendError.message : String(sendError) });
+        setStep({ ...step, submitting: false, error: errorText(sendError) });
       }
     };
 
     return (
       <div className="flex min-h-full flex-col">
-        <ScreenHeader title="Review send" onBack={() => setStep(composeStep(step.recipient))} busy={step.submitting} />
+        <ScreenHeader title={t("send.reviewSend")} onBack={() => setStep(composeStep(step.recipient))} busy={step.submitting} />
         <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
           <div className="flex flex-col items-center gap-2 pt-2 text-center">
             <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-28" />
@@ -250,12 +255,12 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             />
           ) : (
             <p className="text-label leading-relaxed text-muted">
-              You&apos;re sending {collectible.name} to this address. This cannot be undone.
+              {t("send.sendingCollectible", { name: collectible.name })}
             </p>
           )}
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-label font-semibold text-muted">To</span>
+            <span className="text-label font-semibold text-muted">{t("send.to")}</span>
             <RecipientCard
               address={step.recipient}
               name={known?.name ?? null}
@@ -267,7 +272,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           <div className="flex flex-col">
             <ReviewRow
-              label="Network fee"
+              label={t("send.networkFee")}
               value={step.estimate.fee === null ? "—" : `${formatWinstonAsAr(step.estimate.fee, FEE_DIGITS)} AR`}
             />
           </div>
@@ -280,7 +285,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           {step.submitting && signsOnDevice ? (
             <p role="status" className="text-label leading-snug text-muted">
-              Approve on your device in the window that opened.
+              {t("send.approveOnDevice")}
             </p>
           ) : null}
 
@@ -292,7 +297,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
               aria-busy={step.submitting}
               onClick={() => void handleSign()}
             >
-              {step.submitting ? (signsOnDevice ? "Waiting for approval…" : "Sending…") : "Send collectible"}
+              {step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("send.sendCollectible")}
             </Button>
           </ScreenFooter>
         </div>
@@ -302,7 +307,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
   return (
     <SuccessStep
-      summary={`${collectible.name} to ${step.recipient}`}
+      summary={t("send.summary", { amount: collectible.name, recipient: step.recipient })}
       txId={step.txId}
       onDone={onDone}
       isSaved={contactFor(step.recipient) !== undefined || ownWalletFor(step.recipient) !== undefined}

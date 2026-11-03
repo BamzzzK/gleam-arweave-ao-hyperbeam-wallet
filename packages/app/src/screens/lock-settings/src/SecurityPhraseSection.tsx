@@ -5,6 +5,8 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
+import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 type SectionState =
   | { kind: "loading" }
@@ -13,6 +15,7 @@ type SectionState =
 
 /** Lock & unlock's anti-phishing phrase: shown, set up, or changed in place. */
 export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
+  const t = useT();
   const { refresh: refreshAddressIdentity } = useAddressIdentity();
   const [state, setState] = useState<SectionState>({ kind: "loading" });
   const shownWord =
@@ -47,7 +50,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         phrase,
         draft,
         saving: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   };
@@ -55,7 +58,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
   return (
     <div className="pb-10 phone:pb-8">
       <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
-        Anti-phishing phrase
+        {t("lockSettings.phraseTitle")}
       </div>
       {state.kind === "loading" ? (
         <SkeletonRow />
@@ -72,7 +75,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
             iconSvg={icon}
             onChange={(draft) => setState({ ...state, draft, error: undefined })}
             disabled={state.saving}
-            errorMessage={state.error ?? (readSecurityPhrase(state.draft) ? undefined : "Use up to 24 letters or numbers.")}
+            errorMessage={state.error ?? (readSecurityPhrase(state.draft) ? undefined : t("lockSettings.phraseInvalid"))}
           />
           <div className="flex gap-2">
             <Button
@@ -82,10 +85,10 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
               onClick={() => setState({ kind: "showing", phrase: state.phrase })}
               className="flex-1"
             >
-              Cancel
+              {t("lockSettings.cancel")}
             </Button>
             <Button type="submit" disabled={state.saving || !readSecurityPhrase(state.draft)} className="flex-1">
-              {state.saving ? "Saving…" : "Save"}
+              {state.saving ? t("lockSettings.saving") : t("lockSettings.save")}
             </Button>
           </div>
         </form>
@@ -98,7 +101,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
             onClick={() => setState({ kind: "editing", phrase: state.phrase, draft: state.phrase!, saving: false })}
             className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3"
           >
-            Change
+            {t("lockSettings.change")}
           </button>
         </div>
       ) : (
@@ -107,12 +110,12 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           onClick={() => setState({ kind: "editing", phrase: null, draft: suggestSecurityPhrase(), saving: false })}
           className="flex w-full flex-col gap-0.5 py-3.5 text-left hover:bg-mist"
         >
-          <span className="text-label font-semibold text-foreground">Set up an anti-phishing phrase</span>
-          <span className="text-caption text-muted">A word and icon which only Gleam can show you</span>
+          <span className="text-label font-semibold text-foreground">{t("lockSettings.phraseSetUp")}</span>
+          <span className="text-caption text-muted">{t("lockSettings.phraseSetUpHint")}</span>
         </button>
       )}
       <p className="pt-2.5 text-caption leading-relaxed text-faint">
-        GLEAM shows this phrase before important actions to verify authenticity.
+        {t("lockSettings.phraseExplain")}
       </p>
     </div>
   );

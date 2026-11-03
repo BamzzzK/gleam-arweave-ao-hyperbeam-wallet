@@ -1,7 +1,10 @@
 import { cn } from "../../primitives/cn";
+import { useUiLabels } from "../../labels";
 
 export interface PasswordStrengthMeterProps {
   filled: number;
+  /** Names for strength 1 to 4, weakest first. */
+  labels?: readonly [string, string, string, string];
   className?: string;
 }
 
@@ -14,11 +17,11 @@ const STRENGTH_COLORS = [
   "var(--color-beam-green)",
 ];
 
-const STRENGTH_LABELS = ["Weak", "Fair", "Good", "Strong"];
-
-export function PasswordStrengthMeter({ filled, className }: PasswordStrengthMeterProps) {
+export function PasswordStrengthMeter({ filled, labels: labelsProp, className }: PasswordStrengthMeterProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.passwordStrength;
   const clamped = Math.max(0, Math.min(BAR_COUNT, filled));
-  const strengthLabel = clamped > 0 ? STRENGTH_LABELS[clamped - 1] : "";
+  const strengthLabel = clamped > 0 ? labels[clamped - 1] : "";
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>

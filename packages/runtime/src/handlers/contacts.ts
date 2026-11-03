@@ -1,4 +1,5 @@
 import { isValidArweaveAddress, type Contact, type StoragePort } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `listContacts`/
@@ -31,10 +32,10 @@ export class ContactsHandler {
     const address = req.address.trim();
     const name = req.name.trim();
     if (!isValidArweaveAddress(address)) {
-      throw new Error("Enter a valid Arweave address.");
+      throw new Error(userErrorMessage("enterValidAddress"));
     }
     if (name.length === 0 || name.length > MAX_NAME_LENGTH) {
-      throw new Error(`Enter a name up to ${MAX_NAME_LENGTH} characters.`);
+      throw new Error(userErrorMessage("enterContactName", { max: MAX_NAME_LENGTH }));
     }
 
     const existing = await this.loadContacts();

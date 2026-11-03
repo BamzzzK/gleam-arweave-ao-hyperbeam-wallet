@@ -23,7 +23,6 @@ function stubGateway() {
   return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input instanceof Request ? input.url : input);
     if (url.includes("tx_anchor")) return new Response("b".repeat(64), { status: 200 });
-    if (url.includes("price")) return new Response("654321", { status: 200 });
     return new Response("OK", { status: 200 });
   });
 }
@@ -32,7 +31,7 @@ describe("prepareCollectibleTransfer", () => {
   it("builds a zero-AR, data-less L1 transaction to the asset with the lowercase transfer tags", async () => {
     const fetchSpy = stubGateway();
 
-    const tx = await prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, RECIPIENT);
+    const tx = await prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, RECIPIENT, "654321");
 
     expect(tx.format).toBe(2);
     expect(tx.target).toBe(ASSET);
@@ -45,13 +44,12 @@ describe("prepareCollectibleTransfer", () => {
       { name: "recipient", value: RECIPIENT },
       { name: "quantity", value: "1" },
     ]);
-    // Priced against the asset process, the transaction's real target.
-    expect(fetchSpy.mock.calls.some(([input]) => String(input).includes(`/price/0/${ASSET}`))).toBe(true);
+    expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("/price/"))).toBe(false);
   });
 
   it("signs and posts the exact transaction it built", async () => {
     const fetchSpy = stubGateway();
-    const unsigned = await prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, RECIPIENT);
+    const unsigned = await prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, RECIPIENT, "654321");
 
     const { txId } = await finishTransfer(GATEWAY, unsigned, await signTransactionWithSigner(unsigned, signerFromJwk(jwk, "")), jwk.n);
 
@@ -62,7 +60,7 @@ describe("prepareCollectibleTransfer", () => {
 
   it("rejects a recipient that isn't an Arweave address before touching the network", async () => {
     const fetchSpy = stubGateway();
-    await expect(prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, "not-an-address")).rejects.toThrow(/Arweave address/);
+    await expect(prepareCollectibleTransfer(GATEWAY, jwk.n, ASSET, "not-an-address", "654321")).rejects.toThrow(/Arweave address/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

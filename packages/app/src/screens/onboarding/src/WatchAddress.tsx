@@ -7,8 +7,8 @@ import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
 import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { QrScanIcon } from "../../send/src/SendView";
-
-const INVALID_ADDRESS = "That isn't an Arweave address. An address is 43 letters, numbers, - and _.";
+import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Adds a watch-only wallet: an address Gleam shows balances and activity
@@ -22,6 +22,7 @@ export interface WatchAddressProps {
 }
 
 export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
+  const t = useT();
   const { capabilities, qrScanner } = usePlatform();
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -37,12 +38,12 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
       if (payload === null) return;
       const scanned = addressFromQr(payload);
       setAddress(scanned);
-      if (!isValidArweaveAddress(scanned)) setAddressError(INVALID_ADDRESS);
+      if (!isValidArweaveAddress(scanned)) setAddressError(t("onboarding.invalidAddress"));
     } catch (error) {
       setAddressError(
         error instanceof QrScanError && error.reason === "permission-denied"
-          ? "Camera access is off for Gleam. Turn it on in Settings to scan."
-          : "Couldn't scan. Try again or paste the address.",
+          ? t("onboarding.cameraOff")
+          : t("onboarding.scanFailed"),
       );
     } finally {
       setScanning(false);
@@ -52,7 +53,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
   async function submit() {
     const trimmed = address.trim();
     if (!isValidArweaveAddress(trimmed)) {
-      setAddressError(INVALID_ADDRESS);
+      setAddressError(t("onboarding.invalidAddress"));
       return;
     }
     setSubmitting(true);
@@ -65,14 +66,14 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
         }),
       );
     } catch (error) {
-      setAddressError(error instanceof Error ? error.message : String(error));
+      setAddressError(errorText(error));
       setSubmitting(false);
     }
   }
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Watch an address" onBack={onBack} busy={submitting} />
+      <ScreenHeader title={t("onboarding.watchAddress")} onBack={onBack} busy={submitting} />
       <form
         className="flex flex-1 flex-col gap-5 px-6 phone:px-5 py-6 phone:pb-0"
         onSubmit={(event) => {
@@ -81,15 +82,15 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-h3 font-semibold tracking-tight text-foreground">Watch an address</h1>
+          <h1 className="text-h3 font-semibold tracking-tight text-foreground">{t("onboarding.watchAddress")}</h1>
           <p className="text-body leading-relaxed text-muted">
-            See its balances and activity. Gleam has no key for it, so it can&apos;t send or sign.
+            {t("onboarding.watchBody")}
           </p>
         </div>
 
         <TextField
-          label="Address"
-          placeholder="Paste an address"
+          label={t("onboarding.addressLabel")}
+          placeholder={t("onboarding.addressPlaceholder")}
           spellCheck={false}
           autoComplete="off"
           autoFocus
@@ -105,7 +106,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
             capabilities.qrScanner ? (
               <button
                 type="button"
-                aria-label="Scan QR code"
+                aria-label={t("onboarding.scanQr")}
                 disabled={scanning || submitting}
                 onClick={() => void scan()}
                 // 44px target without growing the label row.
@@ -118,8 +119,8 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
         />
 
         <TextField
-          label="Name (optional)"
-          placeholder="Watched wallet"
+          label={t("onboarding.nameOptional")}
+          placeholder={t("onboarding.watchedWalletPlaceholder")}
           value={name}
           disabled={submitting}
           onChange={(event) => setName(event.target.value)}
@@ -127,7 +128,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
 
         <ScreenFooter className="mt-8">
           <Button type="submit" disabled={submitting || address.trim().length === 0}>
-            {submitting ? "Adding…" : "Watch address"}
+            {submitting ? t("onboarding.adding") : t("onboarding.watchAddressButton")}
           </Button>
         </ScreenFooter>
       </form>

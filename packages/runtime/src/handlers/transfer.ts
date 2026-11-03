@@ -23,6 +23,7 @@ import {
   isHardwareWalletMethod,
   type ActivityEntry,
   type CollectibleSendDraft,
+  type CollectibleSendRequest,
   type FeeEstimate,
   type RecipientAssessment,
   type NetworkSettings,
@@ -35,6 +36,7 @@ import {
   type Winston,
 } from "@gleam/core";
 import type { KeySession } from "./key-session";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -69,6 +71,16 @@ export type EstimateTransferRequest = SubmitTransferRequest;
 /** Opens the approval window for a hardware wallet's send; `ApprovalHandler.requestWalletTransfer` behind the scenes. */
 export interface DeviceTransferApprovals {
   requestTransfer(req: SubmitTransferRequest): Promise<{ txId: string }>;
+}
+
+/**
+ * The fee the user saw, which an L1 send pays exactly. There is no fallback
+ * to a fresh quote: that would let the gateway set the fee after the review.
+ */
+function approvedFee(req: SubmitTransferRequest): Winston {
+  // Checked by shape: arweave-js fetches its own price for an undefined reward.
+  if (typeof req.fee !== "string" || !/^\d+$/.test(req.fee)) throw new Error(userErrorMessage("noApprovedFee"));
+  return req.fee;
 }
 
 const NETWORK_SETTINGS_KEY = "local:networkSettings";
@@ -139,7 +151,7 @@ export class TransferHandler {
     const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
     const wallet = wallets.find((candidate) => candidate.id === walletId);
     if (!wallet) {
-      throw new Error(`No stored wallet with id "${walletId}".`);
+      throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
     }
     return wallet;
   }
@@ -159,7 +171,7 @@ export class TransferHandler {
   private async signerFor(walletId: string): Promise<Signer> {
     const signer = await this.keySession.getSigner(walletId);
     if (!signer) {
-      throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
+      throw new Error(userErrorMessage("walletLocked", { wallet: walletId }));
     }
     return signer;
   }
@@ -277,13 +289,13 @@ export class TransferHandler {
   }
 
   /** Sends one collectible through `submitTransfer`, so a hardware wallet signs it in the approval window too. */
-  async sendCollectible(req: CollectibleSendDraft): Promise<{ txId: string }> {
+  async sendCollectible(req: CollectibleSendRequest): Promise<{ txId: string }> {
     return this.submitTransfer({
       walletId: req.walletId,
       recipient: req.recipient,
       token: null,
       amount: "0",
-      fee: null,
+      fee: req.fee,
       collectible: {
         id: req.collectible.id,
         ...(req.collectible.name !== undefined ? { name: req.collectible.name } : {}),
@@ -293,8 +305,8 @@ export class TransferHandler {
   }
 
   /**
-   * Builds a collectible send and checks the wallet's AR covers the reward
-   * the gateway actually priced it at, before anything is signed.
+   * Builds a collectible send and checks the wallet's AR covers the approved
+   * reward, before anything is signed.
    */
   private async prepareCollectibleSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
     const collectible = req.collectible;
@@ -303,7 +315,7 @@ export class TransferHandler {
     const wallet = await this.loadWallet(req.walletId);
     refuseCollectibleSend(wallet.address, req.recipient, collectible.id);
     const [transaction, balance] = await Promise.all([
-      prepareCollectibleTransfer(settings.gatewayUrl, ownerB64Url, collectible.id, req.recipient),
+      prepareCollectibleTransfer(settings.gatewayUrl, ownerB64Url, collectible.id, req.recipient, approvedFee(req)),
       getArBalance(wallet.address, settings.gatewayUrl),
     ]);
     assertCoversNetworkFee(balance, transaction.reward);
@@ -316,7 +328,7 @@ export class TransferHandler {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     const [transaction, balance] = await Promise.all([
-      prepareL1TokenTransfer(settings.gatewayUrl, ownerB64Url, req.token, req.recipient, req.amount),
+      prepareL1TokenTransfer(settings.gatewayUrl, ownerB64Url, req.token, req.recipient, req.amount, approvedFee(req)),
       getArBalance(wallet.address, settings.gatewayUrl),
     ]);
     assertCoversNetworkFee(balance, transaction.reward);
@@ -372,7 +384,7 @@ export class TransferHandler {
           signer.owner,
         ));
       } else if (req.token === null) {
-        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount));
+        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount, approvedFee(req)));
       } else if (transport === "l1") {
         const unsigned = await this.prepareL1TokenSend(req, signer.owner);
         ({ txId } = await finishArweaveTransfer(
@@ -423,7 +435,7 @@ export class TransferHandler {
     }
     if (req.token === null) {
       const settings = await this.loadNetworkSettings();
-      const transaction = await prepareArweaveTransfer(settings.gatewayUrl, ownerB64Url, req.recipient, req.amount);
+      const transaction = await prepareArweaveTransfer(settings.gatewayUrl, ownerB64Url, req.recipient, req.amount, approvedFee(req));
       return { kind: "transaction", transaction };
     }
     if ((await this.transportOf(req)) === "l1") {

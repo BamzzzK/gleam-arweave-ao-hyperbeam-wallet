@@ -2,6 +2,7 @@ import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer } from "./l1-transfer";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * A collectible is an `arweave-scheduler@1.0` asset with a supply of one,
@@ -21,8 +22,9 @@ export async function prepareCollectibleTransfer(
   ownerB64Url: string,
   assetId: string,
   recipient: string,
+  reward: Winston,
 ): Promise<ArweaveTransactionJson> {
-  return prepareL1TokenTransfer(gatewayUrl, ownerB64Url, assetId, recipient, COLLECTIBLE_TRANSFER_QUANTITY);
+  return prepareL1TokenTransfer(gatewayUrl, ownerB64Url, assetId, recipient, COLLECTIBLE_TRANSFER_QUANTITY, reward);
 }
 
 /**
@@ -43,7 +45,7 @@ export function readCollectibleTransfer(transaction: {
 /** Throws when `arBalance` can't pay `fee`. */
 export function assertCoversNetworkFee(arBalance: Winston, fee: Winston): void {
   if (BigInt(arBalance) < BigInt(fee)) {
-    throw new Error(`Sending needs about ${formatAr(fee)} AR for the network fee.`);
+    throw new Error(userErrorMessage("networkFeeNeeded", { fee: formatAr(fee) }));
   }
 }
 

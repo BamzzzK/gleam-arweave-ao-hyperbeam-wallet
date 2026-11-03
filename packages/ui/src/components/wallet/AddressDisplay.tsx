@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "../../primitives/cn";
 import { MemorableAddress } from "./MemorableAddress";
+import { useUiLabels } from "../../labels";
 
 const HOLD_MS = 500;
 
@@ -19,7 +20,16 @@ export interface AddressDisplayProps {
   emphasisPick?: number | null;
   onCopy: () => void;
   copiedDurationMs?: number;
+  /** Accessible names and hints; English unless the caller passes its own. */
+  labels?: AddressDisplayLabels;
   className?: string;
+}
+
+export interface AddressDisplayLabels {
+  copied: string;
+  copy: (address: string) => string;
+  copiedHint: string;
+  copyHint: string;
 }
 
 export function AddressDisplay({
@@ -27,8 +37,11 @@ export function AddressDisplay({
   emphasisPick = null,
   onCopy,
   copiedDurationMs = 2000,
+  labels: labelsProp,
   className,
 }: AddressDisplayProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.addressDisplay;
   const [copied, setCopied] = React.useState(false);
   const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -85,7 +98,7 @@ export function AddressDisplay({
         onPointerCancel={stopHold}
         // Holding would otherwise select the text or open the OS menu.
         onContextMenu={(event) => event.preventDefault()}
-        aria-label={copied ? "Address copied" : `Copy address ${address}`}
+        aria-label={copied ? labels.copied : labels.copy(address)}
         className={cn(
           "flex w-full select-none justify-center rounded-lg border bg-mist px-4 py-3 transition-colors [-webkit-touch-callout:none]",
           copied ? "border-positive" : "border-line hover:border-faint",
@@ -100,7 +113,7 @@ export function AddressDisplay({
           copied ? "font-semibold text-positive" : "text-faint",
         )}
       >
-        {copied ? "Copied to clipboard" : "Tap or hold to copy"}
+        {copied ? labels.copiedHint : labels.copyHint}
       </span>
     </div>
   );

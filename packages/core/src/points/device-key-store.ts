@@ -1,5 +1,6 @@
 import type { DeviceKey, DeviceKeyPort } from "../ports/device-key";
 import { deviceKeyThumbprint, type DevicePublicJwk } from "./identity";
+import { userErrorMessage } from "../models/user-errors";
 
 const DB_NAME = "gleam-points";
 const STORE = "device";
@@ -42,7 +43,7 @@ async function loadOrCreate(): Promise<DeviceKey> {
       return created;
     } catch {
       const winner = await request<DeviceKey | undefined>(db.transaction(STORE).objectStore(STORE).get(RECORD_KEY));
-      if (!winner) throw new Error("Couldn't store the Gleam Points device key.");
+      if (!winner) throw new Error(userErrorMessage("pointsDeviceKeyFailed"));
       return winner;
     }
   } finally {

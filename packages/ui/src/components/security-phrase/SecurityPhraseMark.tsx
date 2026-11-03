@@ -1,6 +1,7 @@
 import type { SecurityPhrase } from "@gleam/core";
 import { cn } from "../../primitives/cn";
 import { SecurityPhraseIcon } from "./SecurityPhraseIcon";
+import { useUiLabels } from "../../labels";
 
 export interface SecurityPhraseMarkProps {
   phrase: SecurityPhrase;
@@ -8,6 +9,8 @@ export interface SecurityPhraseMarkProps {
   iconSvg: string;
   /** `stacked` greets the user on the unlock screen; `inline` sits in a header or a settings row. */
   layout?: "stacked" | "inline";
+  /** Accessible name for the phrase; defaults to English. */
+  label?: (word: string) => string;
   className?: string;
 }
 
@@ -15,12 +18,13 @@ export interface SecurityPhraseMarkProps {
  * The user's anti-phishing phrase. Gleam's own screens show it; a window
  * drawn by a web page can't, so its absence is the warning sign.
  */
-export function SecurityPhraseMark({ phrase, iconSvg, layout = "inline", className }: SecurityPhraseMarkProps) {
+export function SecurityPhraseMark({ phrase, iconSvg, layout = "inline", label, className }: SecurityPhraseMarkProps) {
+  const labels = useUiLabels();
   const stacked = layout === "stacked";
   return (
     <div
       role="img"
-      aria-label={`Your anti-phishing phrase: ${phrase.word}`}
+      aria-label={(label ?? labels.securityPhrase)(phrase.word)}
       className={cn(stacked ? "flex flex-col items-center gap-1.5" : "inline-flex items-center gap-2", className)}
     >
       <SecurityPhraseIcon svgMarkup={iconSvg} size={stacked ? 44 : 22} />

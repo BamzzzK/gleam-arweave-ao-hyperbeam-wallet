@@ -1,4 +1,5 @@
 import type { ActiveSite, PermissionType } from "@gleam/core";
+import type { MessageKey } from "../../../i18n";
 
 export interface SiteCard {
   /** `suggest`: the page called another wallet, so offer Gleam. `active`: the site uses Gleam, so offer to disconnect. */
@@ -31,8 +32,8 @@ export function hostnameOf(origin: string): string {
 
 export interface PermissionGroup {
   id: string;
-  title: string;
-  detail: string;
+  titleKey: MessageKey;
+  detailKey: MessageKey;
   permissions: PermissionType[];
   /** Always granted: no dApp works without the address. */
   required?: boolean;
@@ -49,37 +50,37 @@ export interface PermissionGroup {
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     id: "address",
-    title: "See your address",
-    detail: "Your address, public key and network settings",
+    titleKey: "siteWallet.groupAddress",
+    detailKey: "siteWallet.groupAddressDetail",
     permissions: ["ACCESS_ADDRESS", "ACCESS_PUBLIC_KEY", "ACCESS_ARWEAVE_CONFIG"],
     required: true,
     defaultOn: true,
   },
   {
     id: "tokens",
-    title: "See your token balances",
-    detail: "AR and AO token balances",
+    titleKey: "siteWallet.groupTokens",
+    detailKey: "siteWallet.groupTokensDetail",
     permissions: ["ACCESS_TOKENS"],
     defaultOn: true,
   },
   {
     id: "sign",
-    title: "Request payments and signatures",
-    detail: "You'll confirm each one",
+    titleKey: "siteWallet.groupSign",
+    detailKey: "siteWallet.groupSignDetail",
     permissions: ["SIGN_TRANSACTION", "DISPATCH", "SIGNATURE"],
     defaultOn: true,
   },
   {
     id: "encrypt",
-    title: "Encrypt and decrypt data",
-    detail: "Using your key",
+    titleKey: "siteWallet.groupEncrypt",
+    detailKey: "siteWallet.groupEncryptDetail",
     permissions: ["ENCRYPT", "DECRYPT"],
     defaultOn: false,
   },
   {
     id: "wallets",
-    title: "See all your wallets",
-    detail: "Every address you've added",
+    titleKey: "siteWallet.groupWallets",
+    detailKey: "siteWallet.groupWalletsDetail",
     permissions: ["ACCESS_ALL_ADDRESSES"],
     defaultOn: false,
   },

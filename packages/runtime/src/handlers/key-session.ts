@@ -12,6 +12,7 @@ import {
   type WalletMethod,
 } from "@gleam/core";
 import { signerFromKeyStore } from "@gleam/core/signer";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * The signing keys of currently-unlocked wallets, held in two places:
@@ -52,7 +53,7 @@ export const WALLETS_KEY = "local:wallets";
  */
 export class HardwareWalletSigningError extends Error {
   constructor() {
-    super("This wallet signs on its device. Signing with a hardware wallet isn't supported yet.");
+    super(userErrorMessage("hardwareSigning"));
     this.name = "HardwareWalletSigningError";
   }
 }
@@ -60,7 +61,7 @@ export class HardwareWalletSigningError extends Error {
 /** Thrown for a watch wallet, which has no key anywhere, so nothing can sign for it. */
 export class WatchWalletSigningError extends Error {
   constructor() {
-    super("This wallet is watch-only, so it can't sign.");
+    super(userErrorMessage("watchOnlySign"));
     this.name = "WatchWalletSigningError";
   }
 }
@@ -71,9 +72,7 @@ export class WatchWalletSigningError extends Error {
  */
 export class SessionKeyStorageError extends Error {
   constructor(cause: unknown) {
-    super("Gleam couldn't keep the wallet unlocked. Restart the browser and try again.", {
-      cause,
-    });
+    super(userErrorMessage("sessionKeyStorageFailed"), { cause });
     this.name = "SessionKeyStorageError";
   }
 }
@@ -285,7 +284,7 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
   }
 
   async function cacheKey(walletId: string, jwk: JWKInterface, address: string): Promise<void> {
-    if (!jwk.d) throw new Error("This keyfile has no private key.");
+    if (!jwk.d) throw new Error(userErrorMessage("keyfileNoPrivateKey"));
     try {
       await sessionKeys.importKey(walletId, jwk);
       await storage.set(entryKey(walletId), { address, owner: jwk.n } satisfies SessionKeyEntry);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "../../primitives/cn";
+import { useUiLabels } from "../../labels";
 
 /** A retry that fails faster than this would bring the banner straight back, as if the tap did nothing. */
 export const NETWORK_RETRY_MIN_MS = 700;
@@ -13,11 +14,15 @@ export interface NetworkErrorBannerProps {
   onRetry: () => void;
   /** True while the caller's retry is in flight; the button shows it's working instead of going quiet. */
   retrying?: boolean;
+  /** Message and button text; English unless the caller passes its own. */
+  labels?: { message: string; retry: string; retrying: string };
   /** On the phone the banner insets itself to the gutter; `phone:mx-0` where the parent already does. */
   className?: string;
 }
 
-export function NetworkErrorBanner({ onRetry, retrying = false, className }: NetworkErrorBannerProps) {
+export function NetworkErrorBanner({ onRetry, retrying = false, labels: labelsProp, className }: NetworkErrorBannerProps) {
+  const contextLabels = useUiLabels();
+  const labels = labelsProp ?? contextLabels.networkError;
   const [held, setHeld] = useState(false);
   useEffect(() => {
     if (!held) return;
@@ -40,7 +45,7 @@ export function NetworkErrorBanner({ onRetry, retrying = false, className }: Net
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
       </svg>
       <p className="flex-1 text-caption leading-snug text-foreground">
-        Couldn&apos;t reach the network. Check your connection and try again.
+        {labels.message}
       </p>
       <button
         type="button"
@@ -55,10 +60,10 @@ export function NetworkErrorBanner({ onRetry, retrying = false, className }: Net
         {busy ? (
           <>
             <span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-muted/30 border-t-muted animate-spin motion-reduce:animate-none" />
-            Retrying
+            {labels.retrying}
           </>
         ) : (
-          "Retry"
+          labels.retry
         )}
       </button>
     </div>

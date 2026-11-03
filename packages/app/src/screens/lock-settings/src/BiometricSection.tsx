@@ -6,6 +6,8 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-platform/types";
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
 import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
+import { useT, type MessageKey } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 type Notice = { text: string; tone: "muted" | "error" };
 
@@ -24,17 +26,18 @@ type SectionState =
       notice?: Notice;
     };
 
-const UNAVAILABLE_COPY: Record<Unavailable["reason"], string> = {
-  "not-enrolled": "Set up Face ID or a fingerprint in your device settings to unlock Gleam with it.",
-  "no-passcode": "Set a passcode on your device first, then add Face ID or a fingerprint.",
-  unavailable: "This device can't unlock Gleam with biometrics.",
-};
+const UNAVAILABLE_KEYS = {
+  "not-enrolled": "lockSettings.bioNotEnrolled",
+  "no-passcode": "lockSettings.bioNoPasscode",
+  unavailable: "lockSettings.bioUnavailable",
+} as const satisfies Record<Unavailable["reason"], MessageKey>;
 
 /**
  * Biometric unlock in Lock & unlock. The password is checked before the
  * OS stores it, so a typo never leaves an item that can't open the vault.
  */
 export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort; biometrics: BiometricUnlockPort }) {
+  const t = useT();
   const [state, setState] = useState<SectionState>({ kind: "loading" });
   const [password, setPassword] = useState("");
 
@@ -65,7 +68,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
     try {
       await runtime.send<{ password: string }, void>({ type: "checkVaultPassword", payload: { password } });
     } catch (error) {
-      setState({ ...ready, phase: "idle", passwordError: error instanceof Error ? error.message : String(error) });
+      setState({ ...ready, phase: "idle", passwordError: errorText(error) });
       return;
     }
     setState({ ...ready, phase: "enrolling", passwordError: undefined, notice: undefined });
@@ -77,8 +80,8 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
         phase: "idle",
         notice:
           error instanceof BiometricError && error.reason === "cancelled"
-            ? { text: `${title} cancelled. Try again when you're ready.`, tone: "muted" }
-            : { text: `Couldn't turn on ${label} unlock. Try again.`, tone: "error" },
+            ? { text: t("lockSettings.bioCancelled", { title }), tone: "muted" }
+            : { text: t("lockSettings.bioTurnOnFailed", { label }), tone: "error" },
       });
       return;
     }
@@ -94,7 +97,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
       await biometrics.remove();
       setState({ ...ready, enrolled: false, phase: "idle" });
     } catch (error) {
-      setState({ ...ready, phase: "idle", notice: { text: error instanceof Error ? error.message : String(error), tone: "error" } });
+      setState({ ...ready, phase: "idle", notice: { text: errorText(error), tone: "error" } });
     }
   };
 
@@ -113,11 +116,11 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             <BiometricIcon />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">Unlock with {label} is on</span>
+            <span className="text-label font-semibold text-foreground">{t("lockSettings.bioOn", { label })}</span>
             <span className="text-caption text-muted">
               {state.availability.available
-                ? "Your password still works too"
-                : "This device can't check biometrics right now. Use your password."}
+                ? t("lockSettings.bioPasswordStillWorks")
+                : t("lockSettings.bioCantCheck")}
             </span>
           </span>
           <button
@@ -126,11 +129,11 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             onClick={() => void handleRemove()}
             className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground disabled:opacity-60"
           >
-            {state.phase === "removing" ? "Turning off…" : "Turn off"}
+            {state.phase === "removing" ? t("lockSettings.turningOff") : t("lockSettings.turnOff")}
           </button>
         </div>
       ) : !state.availability.available ? (
-        <p className="py-3.5 text-caption text-muted">{UNAVAILABLE_COPY[state.availability.reason]}</p>
+        <p className="py-3.5 text-caption text-muted">{t(UNAVAILABLE_KEYS[state.availability.reason])}</p>
       ) : state.setUp ? (
         <form
           className="flex flex-col gap-4 pt-4"
@@ -140,8 +143,8 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
           }}
         >
           <PasswordField
-            label="Password"
-            placeholder="Enter your Gleam password"
+            label={t("lockSettings.password")}
+            placeholder={t("lockSettings.passwordPlaceholder")}
             autoFocus
             autoComplete="current-password"
             value={password}
@@ -160,20 +163,20 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
               }}
               className="flex-1"
             >
-              Cancel
+              {t("lockSettings.cancel")}
             </Button>
             <Button type="submit" disabled={busy || password.length === 0} aria-busy={busy} className="flex-1">
               {state.phase === "checking" ? (
-                "Checking…"
+                t("lockSettings.checking")
               ) : state.phase === "enrolling" ? (
                 // The full text would wrap on a phone; screen readers still get it.
                 <>
                   <Spinner />
-                  <span aria-hidden="true">Waiting…</span>
-                  <span className="sr-only">Waiting for {label}…</span>
+                  <span aria-hidden="true">{t("lockSettings.waiting")}</span>
+                  <span className="sr-only">{t("lockSettings.waitingFor", { label })}</span>
                 </>
               ) : (
-                "Turn on"
+                t("lockSettings.turnOn")
               )}
             </Button>
           </div>
@@ -188,8 +191,8 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
             <BiometricIcon />
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">Unlock with {label}</span>
-            <span className="text-caption text-muted">Use {label} instead of typing your password</span>
+            <span className="text-label font-semibold text-foreground">{t("lockSettings.bioUnlockWith", { label })}</span>
+            <span className="text-caption text-muted">{t("lockSettings.bioUseInstead", { label })}</span>
           </span>
         </button>
       )}
@@ -203,7 +206,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
       ) : null}
       {state.kind === "ready" && state.setUp && !state.enrolled ? (
         <p className="pt-2.5 text-caption leading-relaxed text-faint">
-          Your password still unlocks Gleam. Keep it: you&apos;ll need it if your {label} settings change.
+          {t("lockSettings.bioKeepPassword", { label })}
         </p>
       ) : null}
     </div>

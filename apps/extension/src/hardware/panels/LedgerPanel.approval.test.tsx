@@ -16,7 +16,7 @@ import { buildUnsignedDataItem, dataItemSignatureData } from "@gleam/core/src/ar
 import { signRsaPss } from "@gleam/core/src/arweave/rsa-pss.ts";
 import { buildUnsignedTransaction, transactionSignatureData } from "@gleam/core/src/arweave/transaction.ts";
 import type { DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
-import { createLedgerPanel, WRONG_LEDGER_MESSAGE } from "./LedgerPanel";
+import { createLedgerPanel, wrongLedgerMessage } from "./LedgerPanel";
 
 afterEach(cleanup);
 
@@ -230,7 +230,7 @@ describe("LedgerPanel", () => {
     view();
     start();
 
-    await waitFor(() => expect(props.onError).toHaveBeenCalledWith(WRONG_LEDGER_MESSAGE));
+    await waitFor(() => expect(props.onError).toHaveBeenCalledWith(wrongLedgerMessage()));
     expect(device.signIns).toEqual([]);
     expect(device.close).toHaveBeenCalled();
   });

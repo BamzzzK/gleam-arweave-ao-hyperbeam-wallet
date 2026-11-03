@@ -42,11 +42,10 @@ describe("submitTransfer", () => {
   it("returns the signed transaction's txId on a successful post", async () => {
     mockFetchSequence([
       { status: 200, body: "anchor12345678901234567890123456789012345678" }, // getTransactionAnchor
-      { status: 200, body: "1234567" }, // getPrice (reward)
       { status: 200, body: { ok: true } }, // post
     ]);
 
-    const result = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000");
+    const result = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000", "1234567");
     expect(typeof result.txId).toBe("string");
     expect(result.txId.length).toBeGreaterThan(0);
   });
@@ -54,12 +53,11 @@ describe("submitTransfer", () => {
   it("throws a descriptive error when the post fails", async () => {
     mockFetchSequence([
       { status: 200, body: "anchor12345678901234567890123456789012345678" },
-      { status: 200, body: "1234567" },
       { status: 500, body: "internal error" },
     ]);
 
     await expect(
-      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000"),
+      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), RECIPIENT, "1000000000000", "1234567"),
     ).rejects.toThrow(/Failed to submit transfer/);
   });
 
@@ -67,7 +65,7 @@ describe("submitTransfer", () => {
     mockFetchSequence([{ status: 200, body: "" }]);
 
     await expect(
-      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), "recipientAddr", "1000000000000"),
+      submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), "recipientAddr", "1000000000000", "1234567"),
     ).rejects.toThrow(/must be an Arweave address/);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -97,24 +95,32 @@ describe("prepareTransfer / finishTransfer", () => {
   it("makes the same requests and posts the same transaction as arweave-js's JWK path", async () => {
     const referenceCalls = recordFetch();
     const client = Arweave.init({ host: "arweave.net", port: 443, protocol: "https" });
-    const reference = await client.createTransaction({ target: TARGET, quantity: "1000" }, jwk);
+    const reference = await client.createTransaction({ target: TARGET, quantity: "1000", reward: "1234567" }, jwk);
     await client.transactions.sign(reference, jwk, { saltLength: 32 });
     await client.transactions.post(reference);
     const expected = referenceCalls();
     vi.restoreAllMocks();
 
     const calls = recordFetch();
-    const { txId } = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), TARGET, "1000");
+    const { txId } = await submitTransfer("https://arweave.net", signerFromJwk(jwk, ""), TARGET, "1000", "1234567");
 
-    expect(expected.map((call) => call.method)).toEqual(["GET", "GET", "POST"]);
-    expect(expected[2]!.body).toMatchObject({ owner: jwk.n, target: TARGET, quantity: "1000", reward: "1234567" });
+    expect(expected.map((call) => call.method)).toEqual(["GET", "POST"]);
+    expect(expected[1]!.body).toMatchObject({ owner: jwk.n, target: TARGET, quantity: "1000", reward: "1234567" });
     expect(calls()).toEqual(expected);
     expect(txId).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 
+  it("signs the approved reward and never asks the gateway for a price", async () => {
+    const calls = recordFetch();
+    const unsigned = await prepareTransfer("https://arweave.net", jwk.n, TARGET, "1000", "42");
+
+    expect(unsigned.reward).toBe("42");
+    expect(calls().some((call) => call.url.includes("price"))).toBe(false);
+  });
+
   it("posts a transfer whose signature came from elsewhere, and refuses a wrong one", async () => {
     const calls = recordFetch();
-    const unsigned = await prepareTransfer("https://arweave.net", jwk.n, TARGET, "1000");
+    const unsigned = await prepareTransfer("https://arweave.net", jwk.n, TARGET, "1000", "1234567");
     const reference = Arweave.init({}).transactions.fromRaw({ ...unsigned });
     await Arweave.init({}).transactions.sign(reference, jwk, { saltLength: 32 });
     const signature = reference.get("signature", { decode: true, string: false });

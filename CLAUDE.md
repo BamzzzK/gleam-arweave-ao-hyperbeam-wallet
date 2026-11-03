@@ -103,6 +103,20 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `@permaweb/aoconnect`: its browser build's signature check breaks raw-JWK
   signing in Chrome. Outcomes are read from `cu.ao-testnet.xyz/result/…`
   (`core/ao/result.ts`).
+- **Translations** live in `packages/app/src/i18n/messages/<screen>.ts`,
+  one `defineMessages({ en, "zh-CN", "zh-TW" })` per screen folder, keyed
+  `namespace.name` and read with `useT()` (`t()` outside React). A key
+  missing from any language fails `tsc`, and `catalog.i18n.test.ts` checks
+  placeholders match. Without a stored choice the language follows the
+  device and falls back to English. Never translate decoded transaction
+  data, addresses or tag values.
+- **User-facing errors.** `core` and `runtime` throw English. An error a
+  person can reach is declared in `core/models/user-errors.ts` and thrown
+  with `userErrorMessage`. Only `message` crosses every transport, so the
+  app matches the text back to its code and translates it at display with
+  `errorText` (`app/src/i18n/errors.ts`). dApps get the English. A new
+  one-off string outside the table stays English. Compare raw `.message`,
+  never `errorText`'s output.
 - **Amounts** are atomic-integer strings (Winston, or the token's smallest
   unit). Never floats.
 - **Activity** merges the local optimistic log with gateway GraphQL. A
@@ -167,6 +181,15 @@ One signed tag `v<version>` releases the extension and both apps.
 4. Store steps stay manual: the Chrome Web Store upload, App Store review,
    and promoting the Android build. CI holds no signing key or store
    credential.
+
+Once the GitHub Release exists, the three signed builds come from a clean
+checkout of the tag:
+
+```bash
+scripts/pack-release.sh v<version> --kdbx <db> && \
+apps/mobile/scripts/release-app.sh v<version> ios --kdbx <db> && \
+apps/mobile/scripts/release-app.sh v<version> android-apk --kdbx <db>
+```
 
 Signing keys and store credentials live in a local KeePassXC database, so
 steps 2 and 3 need the maintainer at the terminal.

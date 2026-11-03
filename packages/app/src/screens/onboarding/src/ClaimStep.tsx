@@ -6,6 +6,8 @@ import { FoundingGate } from "./FoundingGate";
 import { JoinNote } from "../../points/src/JoinNote";
 import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 export const CLAIM_PENDING_QUERY_KEY = ["points", "claimPending"] as const;
 
@@ -25,6 +27,7 @@ export interface ClaimStepProps {
  * home screen if the popup closes first.
  */
 export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepProps) {
+  const t = useT();
   const join = useJoinPoints(runtime);
   const pending = usePendingInvite(runtime);
   const queryClient = useQueryClient();
@@ -59,28 +62,28 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
 
       <div className="mt-7 flex flex-col items-center gap-2 text-center">
         <h1 className="text-h2 font-semibold tracking-tight text-foreground">
-          Start earning Gleam Points
+          {t("onboarding.claimTitle")}
         </h1>
         <p className="text-body text-muted">
-          Earn points every day for the AR and AO you hold. Invite friends and you both earn more.
+          {t("onboarding.claimBody")}
         </p>
         {pending.data ? (
           <p className="text-caption text-muted">
-            Invite code <span className="font-mono tracking-[0.08em] text-foreground">{pending.data}</span> will be applied.
+            {t("onboarding.inviteCodePre")} <span className="font-mono tracking-[0.08em] text-foreground">{pending.data}</span> {t("onboarding.inviteCodePost")}
           </p>
         ) : null}
       </div>
 
       <ScreenFooter className="pt-6">
-        {join.error instanceof Error ? <p className="text-center text-caption text-warning">{join.error.message}</p> : null}
+        {join.error instanceof Error ? <p className="text-center text-caption text-warning">{errorText(join.error)}</p> : null}
         <Button
           disabled={join.isPending}
           onClick={() => join.mutate({ walletId }, { onSuccess: onClaimed })}
         >
-          {join.isPending ? "Joining…" : "Join Gleam Points"}
+          {join.isPending ? t("onboarding.joining") : t("onboarding.joinPoints")}
         </Button>
         <Button variant="secondary" disabled={join.isPending || skip.isPending} onClick={() => skip.mutate()}>
-          Not now
+          {t("onboarding.notNow")}
         </Button>
         <JoinNote />
       </ScreenFooter>

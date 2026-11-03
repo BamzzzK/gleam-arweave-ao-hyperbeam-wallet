@@ -2,6 +2,7 @@ import { AO_MU_SIGNERS } from "../arweave/graphql";
 import { tokenMetadataFromTags } from "../arweave/token-metadata";
 import type { TokenMetadata } from "../models/token-metadata";
 import { createAssetScanner, withRequestTimeout } from "./asset-scan";
+import { userErrorMessage } from "../models/user-errors";
 
 export interface DiscoverTokensOptions {
   address: string;
@@ -58,7 +59,7 @@ export async function discoverTokens(options: DiscoverTokensOptions): Promise<To
       maxPages: options.maxPages ?? DEFAULTS.maxPages,
       concurrency: options.concurrency ?? DEFAULTS.concurrency,
       deadline: Date.now() + budgetMs,
-      describe: (gw, detail) => `Token lookup against "${gw}" failed: ${detail}`,
+      describe: (gateway, detail) => userErrorMessage("tokenLookupFailed", { gateway, detail }),
     });
   const { scan, scanMany } = scanner(options.budgetMs ?? DEFAULTS.budgetMs);
 

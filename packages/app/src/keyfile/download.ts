@@ -1,4 +1,5 @@
 import type { FileDownloadResult, RuntimePort } from "@gleam/core";
+import { t } from "../i18n";
 
 export type RequestDownloadsPermission = () => Promise<boolean>;
 
@@ -39,10 +40,10 @@ export function keyfileDownloadError(result: FileDownloadResult): string | null 
   if (result.ok) return null;
   switch (result.reason) {
     case "cancelled":
-      return "Saving the keyfile was cancelled.";
+      return t("app.keyfileCancelled");
     case "failed":
-      return "The keyfile couldn't be saved.";
+      return t("app.keyfileFailed");
     case "permission":
-      return "Gleam needs permission to manage downloads to save your keyfile. Nothing was downloaded.";
+      return t("app.keyfilePermission");
   }
 }

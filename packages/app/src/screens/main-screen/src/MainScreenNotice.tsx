@@ -4,6 +4,7 @@ import type { RuntimePort, WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
 import { sitePageUrl } from "@gleam/core";
+import { useT } from "../../../i18n";
 import { useNotice } from "./useNotice";
 
 export interface MainScreenNoticeProps {
@@ -18,6 +19,7 @@ export interface MainScreenNoticeProps {
  * the beam is identity and never a severity signal.
  */
 export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNoticeProps) {
+  const t = useT();
   const { notice, dismiss } = useNotice(runtime, wallet);
   if (notice === null) return null;
 
@@ -28,7 +30,7 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
   if (notice.kind === "invites") {
     body = (
       <button type="button" className={bodyClass} onClick={onOpenPoints}>
-        <NoticeContent title="You have new invites" text="Share them from Points" />
+        <NoticeContent title={t("mainScreen.invitesTitle")} text={t("mainScreen.invitesText")} />
       </button>
     );
   } else if (notice.kind === "review") {
@@ -47,7 +49,7 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
 
   return (
     <section
-      aria-label="Notice"
+      aria-label={t("mainScreen.noticeLabel")}
       role={critical ? "alert" : undefined}
       className={cn(
         "mx-5 mb-1 flex items-start rounded-xl border",
@@ -57,7 +59,7 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
       {body}
       <button
         type="button"
-        aria-label="Dismiss"
+        aria-label={t("mainScreen.dismiss")}
         className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center text-muted hover:text-foreground phone:mt-0 phone:h-11 phone:w-11"
         onClick={dismiss}
       >
@@ -74,12 +76,13 @@ export function MainScreenNotice({ runtime, wallet, onOpenPoints }: MainScreenNo
  * complaint rather than praise.
  */
 function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className: string }) {
+  const t = useT();
   const { buildInfo, storeReview } = usePlatform();
   const { version } = buildInfo;
   return (
     <div className={cn(className, "gap-3 pb-3.5")}>
       <span className="flex flex-col gap-0.5">
-        <NoticeContent title="Enjoying Gleam?" text="Leave a review to help others discover us." />
+        <NoticeContent title={t("mainScreen.reviewTitle")} text={t("mainScreen.reviewText")} />
       </span>
       <span className="flex items-center gap-4">
         <Button
@@ -92,7 +95,7 @@ function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className
             onAnswer();
           }}
         >
-          Leave a review
+          {t("mainScreen.leaveReview")}
           {storeReview.opensPage ? <span aria-hidden="true">↗</span> : null}
         </Button>
         <a
@@ -102,7 +105,7 @@ function ReviewPrompt({ onAnswer, className }: { onAnswer: () => void; className
           onClick={onAnswer}
           className="text-label text-muted underline-offset-4 hover:text-foreground hover:underline"
         >
-          Send us feedback
+          {t("mainScreen.sendFeedback")}
         </a>
       </span>
     </div>

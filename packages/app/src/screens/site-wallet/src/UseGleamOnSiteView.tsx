@@ -6,6 +6,8 @@ import { SiteIcon } from "./SiteWalletCard";
 import { PERMISSION_GROUPS, hostnameOf, initialGroupIds, permissionsFor } from "./site-card";
 import { useUseGleamOnSite } from "./useActiveSite";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 export interface UseGleamOnSiteViewProps {
   runtime: RuntimePort;
@@ -30,6 +32,7 @@ export function UseGleamOnSiteView({
   onBack,
   onDone,
 }: UseGleamOnSiteViewProps) {
+  const t = useT();
   const host = hostnameOf(origin);
   const [enabled, setEnabled] = useState<ReadonlySet<string>>(() => initialGroupIds(requestedPermissions));
   const useGleam = useUseGleamOnSite(runtime);
@@ -46,31 +49,31 @@ export function UseGleamOnSiteView({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title="Use Gleam here" onBack={onBack} />
+      <ScreenHeader title={t("siteWallet.useGleamHere")} onBack={onBack} />
       <div className="flex flex-1 flex-col gap-5 px-5 py-5 phone:pb-0">
         <div className="flex flex-col items-center gap-2 text-center">
           <SiteIcon origin={origin} favIconUrl={favIconUrl} size="lg" />
           <div className="font-mono text-label text-foreground">{host}</div>
         </div>
 
-        <section aria-label="Permissions" className="flex flex-col">
-          <div className="border-b border-line pb-2 text-label font-semibold text-muted phone:border-b-0">With Gleam, this site can:</div>
+        <section aria-label={t("siteWallet.permissions")} className="flex flex-col">
+          <div className="border-b border-line pb-2 text-label font-semibold text-muted phone:border-b-0">{t("siteWallet.siteCan")}</div>
           {PERMISSION_GROUPS.map((group) => {
             const on = group.required === true || enabled.has(group.id);
             return (
               <div key={group.id} className="flex items-center gap-3 border-b border-line py-3 last:border-b-0 phone:border-b-0">
                 <div className="flex min-w-0 flex-1 flex-col gap-px">
-                  <span className="text-label font-semibold text-foreground">{group.title}</span>
-                  <span className="text-caption text-muted">{group.detail}</span>
+                  <span className="text-label font-semibold text-foreground">{t(group.titleKey)}</span>
+                  <span className="text-caption text-muted">{t(group.detailKey)}</span>
                 </div>
                 {group.required ? (
-                  <span className="flex-shrink-0 text-caption text-faint">Always</span>
+                  <span className="flex-shrink-0 text-caption text-faint">{t("siteWallet.always")}</span>
                 ) : (
                   <button
                     type="button"
                     role="switch"
                     aria-checked={on}
-                    aria-label={group.title}
+                    aria-label={t(group.titleKey)}
                     onClick={() => toggle(group.id)}
                     className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors ${
                       on ? "border-foreground bg-foreground" : "border-line bg-mist"
@@ -91,15 +94,15 @@ export function UseGleamOnSiteView({
 
         <ScreenFooter>
           <p className="text-center text-caption leading-relaxed text-muted">
-            The page reloads with Gleam. You can switch back from the main screen or Connected apps.
+            {t("siteWallet.reloadNote")}
           </p>
           {useGleam.isError ? (
             <p role="alert" className="text-center text-caption text-warning">
-              {useGleam.error instanceof Error ? useGleam.error.message : "Couldn't switch this site to Gleam."}
+              {useGleam.error instanceof Error ? errorText(useGleam.error) : t("siteWallet.switchFailed")}
             </p>
           ) : null}
           <Button type="button" disabled={useGleam.isPending} onClick={submit}>
-            {useGleam.isPending ? "Switching…" : "Use Gleam here"}
+            {useGleam.isPending ? t("siteWallet.switching") : t("siteWallet.useGleamHere")}
           </Button>
         </ScreenFooter>
       </div>

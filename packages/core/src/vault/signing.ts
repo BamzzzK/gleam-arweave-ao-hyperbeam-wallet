@@ -22,6 +22,7 @@ import {
 } from "../arweave/data-item";
 import { base64ToBytes } from "./base64";
 import { signMessage, verifyMessage } from "./message-signing";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * `core/vault`'s share of the provider-signing-crypto surface: the actual
@@ -132,7 +133,7 @@ function plainTags(tags: DataItemInput["tags"]) {
 
 /**
  * The dApp's transaction, unsigned. `gatewayUrl` is only used to fetch
- * `last_tx` and `reward` when the dApp left them out.
+ * `last_tx` when the dApp left it out; `reward` is the fee the user approved.
  */
 export async function prepareSignTransaction(
   gatewayUrl: string,
@@ -238,7 +239,7 @@ export async function finishDispatch(
   const response = await broadcastTransaction(gatewayUrl, signed.transaction);
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
-      `Failed to dispatch transaction to ${gatewayUrl} (HTTP ${response.status}: ${response.statusText}).`,
+      userErrorMessage("dispatchFailed", { gateway: gatewayUrl, status: response.status, statusText: response.statusText }),
     );
   }
   return { id: signed.id, type: "BASE" };
