@@ -6,6 +6,7 @@ import {
   defaultDisplaySettings,
   isDisplayCurrency,
   isHardwareWalletMethod,
+  isHeaderStyle,
   isHeadlineBalance,
   isKeylessWalletMethod,
   isValidArweaveAddress,
@@ -253,7 +254,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
   const record = value as Record<string, unknown>;
   return (
     isDisplayCurrency(record.currency) &&
-    typeof record.compactHeader === "boolean" &&
+    isHeaderStyle(record.header) &&
     typeof record.tokenLogos === "boolean" &&
     isHeadlineBalance(record.headline) &&
     typeof record.balancesHidden === "boolean"
@@ -262,18 +263,18 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
   const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  // Older records lack `tokenLogos`, or carry `showChart` in place of `compactHeader`. Someone who
-  // had turned the chart off gets the compact header, the closest thing to it; the rest is kept.
+  // Older records lack `tokenLogos`, and carry `compactHeader` (or before it `showChart`) in place
+  // of `header`. Someone who had turned the chart off gets the compact header, the closest thing to it.
   // `tokenLogos` replaced `showTokenLogos`, which defaulted off and so was stored as false for
   // nearly everyone; it is ignored so they get logos, the new default.
   const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
   const upgraded = record
-    ? { tokenLogos: true, compactHeader: record.showChart === false, ...record }
+    ? { tokenLogos: true, header: record.compactHeader === true || record.showChart === false ? "compact" : "full", ...record }
     : raw;
   if (isDisplaySettings(upgraded)) {
     return {
       currency: upgraded.currency,
-      compactHeader: upgraded.compactHeader,
+      header: upgraded.header,
       tokenLogos: upgraded.tokenLogos,
       headline: upgraded.headline,
       balancesHidden: upgraded.balancesHidden,
@@ -1203,7 +1204,7 @@ export class WalletLifecycleHandler {
     if (!isDisplaySettings(req)) throw new Error("Invalid display settings.");
     await this.storage.set(DISPLAY_SETTINGS_KEY, {
       currency: req.currency,
-      compactHeader: req.compactHeader,
+      header: req.header,
       tokenLogos: req.tokenLogos,
       headline: req.headline,
       balancesHidden: req.balancesHidden,

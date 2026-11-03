@@ -460,7 +460,7 @@ export function MainScreenView({
   const activityQuery = useActivity(runtime, wallet.address);
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
-  const compactHeader = displaySettings?.compactHeader ?? false;
+  const headerStyle = displaySettings?.header ?? "full";
   const tokenLogos = displaySettings?.tokenLogos ?? true;
   const masked = displaySettings?.balancesHidden ?? false;
   const watchOnly = isWatchWalletMethod(wallet.method);
@@ -782,7 +782,7 @@ export function MainScreenView({
               }
               masked={masked}
               onToggleMasked={displaySettings ? toggleMasked : undefined}
-              compact={compactHeader}
+              layout={headerStyle}
               loading={portfolioHistoryQuery.isPending || (portfolioHistoryQuery.isFetching && !portfolioHasSeries)}
               cached={chartCached}
               cachedFetching={chartFetching}
@@ -820,7 +820,7 @@ export function MainScreenView({
               onSend={onSend}
               onReceive={onReceive}
               sendDisabled={watchOnly}
-              compact={compactHeader}
+              compact={headerStyle !== "full"}
             />
           </div>
         </div>

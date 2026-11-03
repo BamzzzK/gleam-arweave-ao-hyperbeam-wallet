@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type {
   AutoLockTimeout,
+  HeaderStyle,
   HeadlineBalance,
   LockSettings,
   NetworkSettings,
@@ -29,6 +30,12 @@ const HEADLINE_KEYS = [
   { value: "AR", key: "settingsHome.headlineAr" },
   { value: "AO", key: "settingsHome.headlineAo" },
 ] as const satisfies readonly { value: HeadlineBalance; key: MessageKey }[];
+
+const HEADER_KEYS = [
+  { value: "full", key: "settingsHome.headerFull" },
+  { value: "compact", key: "settingsHome.headerCompact" },
+  { value: "minimal", key: "settingsHome.headerMinimal" },
+] as const satisfies readonly { value: HeaderStyle; key: MessageKey }[];
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -85,6 +92,7 @@ export function SettingsHomeView({
   const [savingTheme, setSavingTheme] = useState(false);
   const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
   const headlineOptions = HEADLINE_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
+  const headerOptions = HEADER_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -185,11 +193,12 @@ export function SettingsHomeView({
             disabled={!display}
             onChange={(headline) => void updateDisplay({ headline })}
           />
-          <ToggleRow
-            title={t("settingsHome.compactHeader")}
-            checked={display?.compactHeader ?? false}
+          <SelectRow
+            title={t("settingsHome.header")}
+            value={display?.header ?? "full"}
+            options={headerOptions}
             disabled={!display}
-            onToggle={() => void updateDisplay({ compactHeader: !(display?.compactHeader ?? false) })}
+            onChange={(header) => void updateDisplay({ header })}
           />
           <ToggleRow
             title={t("settingsHome.tokenLogos")}

@@ -205,7 +205,7 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
 describe("MainScreenView display settings", () => {
   function sendWithDisplay(settings: Partial<DisplaySettings>, prices: TokenPrice[] = []) {
     const base = successfulSend();
-    const display: DisplaySettings = { currency: "USD", compactHeader: false, tokenLogos: true, headline: "total", balancesHidden: false, ...settings };
+    const display: DisplaySettings = { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: false, ...settings };
     return vi.fn(async (message: { type: string; payload: unknown }) => {
       if (message.type === "getDisplaySettings") return display;
       if (message.type === "setDisplaySettings") return undefined;
@@ -235,11 +235,24 @@ describe("MainScreenView display settings", () => {
   });
 
   it("keeps the chart, %-change and range tabs with the compact header on", async () => {
-    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ compactHeader: true }) }) });
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ header: "compact" }) }) });
 
     await waitFor(() => expect(screen.getByRole("img", { name: /Portfolio value/ })).toBeTruthy());
     expect(within(screen.getByRole("button", { name: "Hide balances" }).parentElement!).getByText("+20.00%")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "7D" })).toBeTruthy();
+  });
+
+  it("drops the chart and range tabs with the minimal header, naming the range beside the %-change", async () => {
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithDisplay({ header: "minimal" }) }) });
+
+    const figures = await waitFor(() => {
+      const row = screen.getByRole("button", { name: "Hide balances" }).parentElement!;
+      expect(within(row).getByText("+20.00%")).toBeTruthy();
+      return row;
+    });
+    expect(within(figures).getByText("7D")).toBeTruthy();
+    expect(screen.queryByRole("img", { name: /Portfolio value/ })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Chart range" })).toBeNull();
   });
 
   it("puts the total, change and range in the top bar once scrolled, and taps back to the top", async () => {
@@ -292,7 +305,7 @@ describe("MainScreenView display settings", () => {
     expect(screen.queryByText("1")).toBeNull();
     expect(send).toHaveBeenCalledWith({
       type: "setDisplaySettings",
-      payload: { currency: "USD", compactHeader: false, tokenLogos: true, headline: "total", balancesHidden: true },
+      payload: { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: true },
     });
   });
 });
@@ -568,7 +581,7 @@ describe("MainScreenView hidden token rows", () => {
     return vi.fn(async (message: { type: string }) => {
       if (message.type === "getTokenBalances") return tokens;
       if (message.type === "getDisplaySettings" && display) {
-        return { currency: "USD", compactHeader: false, tokenLogos: true, headline: "total", balancesHidden: false, ...display };
+        return { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: false, ...display };
       }
       return base(message as never);
     }) as RuntimePort["send"];
@@ -718,7 +731,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
   }): RuntimePort["send"] {
     return vi.fn(async ({ type }: { type: string }) => {
       if (type === "getDisplaySettings" && overrides.tokenLogos !== undefined) {
-        return { currency: "USD", compactHeader: false, tokenLogos: overrides.tokenLogos, headline: "total", balancesHidden: false };
+        return { currency: "USD", header: "full", tokenLogos: overrides.tokenLogos, headline: "total", balancesHidden: false };
       }
       if (type === "getBalance") return overrides.arBalance ?? BALANCE;
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;

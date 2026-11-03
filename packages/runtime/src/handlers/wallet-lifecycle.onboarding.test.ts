@@ -1043,7 +1043,7 @@ describe("WalletLifecycleHandler: getThemePreference", () => {
 });
 
 describe("WalletLifecycleHandler: display settings", () => {
-  const settings = { currency: "EUR", compactHeader: true, tokenLogos: false, headline: "AO", balancesHidden: true } as const;
+  const settings = { currency: "EUR", header: "minimal", tokenLogos: false, headline: "AO", balancesHidden: true } as const;
 
   afterEach(() => vi.restoreAllMocks());
 
@@ -1053,7 +1053,7 @@ describe("WalletLifecycleHandler: display settings", () => {
 
     expect(await handler.getDisplaySettings()).toEqual({
       currency: "KES",
-      compactHeader: false,
+      header: "full",
       tokenLogos: true,
       headline: "total",
       balancesHidden: false,
@@ -1068,7 +1068,7 @@ describe("WalletLifecycleHandler: display settings", () => {
 
   it("turns logos on for a record stored before the token logo toggle, or with the old off-by-default flag", async () => {
     const storage = createFakeStorage();
-    const older = { currency: settings.currency, compactHeader: settings.compactHeader, headline: settings.headline, balancesHidden: settings.balancesHidden };
+    const older = { currency: settings.currency, header: settings.header, headline: settings.headline, balancesHidden: settings.balancesHidden };
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
 
     await storage.set("local:displaySettings", older);
@@ -1078,31 +1078,29 @@ describe("WalletLifecycleHandler: display settings", () => {
     expect(await handler.getDisplaySettings()).toEqual({ ...older, tokenLogos: true });
   });
 
-  it("turns a stored record with the chart off into the compact header", async () => {
+  it.each([
+    ["the compact header toggle on", { compactHeader: true }, "compact"],
+    ["the compact header toggle off", { compactHeader: false }, "full"],
+    ["the chart off", { showChart: false }, "compact"],
+    ["the chart on", { showChart: true }, "full"],
+  ])("upgrades a stored record with %s", async (_, older, header) => {
     const storage = createFakeStorage();
     const { currency, tokenLogos, headline, balancesHidden } = settings;
-    await storage.set("local:displaySettings", { currency, showChart: false, tokenLogos, headline, balancesHidden });
+    await storage.set("local:displaySettings", { currency, ...older, tokenLogos, headline, balancesHidden });
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
-    expect(await handler.getDisplaySettings()).toEqual(settings);
-  });
-
-  it("keeps the full chart for a stored record with the chart on", async () => {
-    const storage = createFakeStorage();
-    const { currency, tokenLogos, headline, balancesHidden } = settings;
-    await storage.set("local:displaySettings", { currency, showChart: true, tokenLogos, headline, balancesHidden });
-    const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
-    expect((await handler.getDisplaySettings()).compactHeader).toBe(false);
+    expect(await handler.getDisplaySettings()).toEqual({ ...settings, header });
   });
 
   it("drops a malformed stored record back to the default", async () => {
     const storage = createFakeStorage();
     await storage.set("local:displaySettings", { ...settings, currency: "DOGE" });
     const handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
-    expect((await handler.getDisplaySettings()).compactHeader).toBe(false);
+    expect((await handler.getDisplaySettings()).header).toBe("full");
   });
 
-  it("rejects an unknown currency or headline", async () => {
+  it("rejects an unknown currency, headline or header", async () => {
     const handler = new WalletLifecycleHandler(createFakeStorage(), keySession, TEST_KDF);
+    await expect(handler.setDisplaySettings({ ...settings, header: "tiny" as never })).rejects.toThrow(/invalid display settings/i);
     await expect(handler.setDisplaySettings({ ...settings, currency: "XYZ" as never })).rejects.toThrow(/invalid display settings/i);
     await expect(handler.setDisplaySettings({ ...settings, headline: "PI" as never })).rejects.toThrow(/invalid display settings/i);
   });

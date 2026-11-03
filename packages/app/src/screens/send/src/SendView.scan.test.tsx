@@ -37,7 +37,7 @@ function renderSend(overrides: FakeAppPlatformOverrides) {
       case "getTokenPrices":
         return [];
       case "getDisplaySettings":
-        return { currency: "USD", compactHeader: false, tokenLogos: true, headline: "total", balancesHidden: false };
+        return { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: false };
       default:
         return undefined;
     }

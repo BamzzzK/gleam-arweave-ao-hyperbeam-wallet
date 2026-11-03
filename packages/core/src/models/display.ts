@@ -48,10 +48,15 @@ export type DisplayCurrency = TokenCurrency | FiatCurrency;
 /** What the main screen's large figure shows: the total value, or one token's balance. */
 export type HeadlineBalance = "total" | "AR" | "AO";
 
+/**
+ * The main screen's header: `full` has the full-width chart, `compact` a small
+ * sparkline beside the figures, and `minimal` the figures alone.
+ */
+export type HeaderStyle = "full" | "compact" | "minimal";
+
 export interface DisplaySettings {
   currency: DisplayCurrency;
-  /** Puts a small sparkline beside the figures in place of the full-width chart; off by default. */
-  compactHeader: boolean;
+  header: HeaderStyle;
   /** Draws token logos in place of ticker letters; on by default. */
   tokenLogos: boolean;
   headline: HeadlineBalance;
@@ -69,6 +74,10 @@ export function isDisplayCurrency(value: unknown): value is DisplayCurrency {
 
 export function isHeadlineBalance(value: unknown): value is HeadlineBalance {
   return value === "total" || value === "AR" || value === "AO";
+}
+
+export function isHeaderStyle(value: unknown): value is HeaderStyle {
+  return value === "full" || value === "compact" || value === "minimal";
 }
 
 const EURO_REGIONS = new Set([
@@ -90,5 +99,5 @@ export function defaultDisplayCurrency(locale: string | undefined): FiatCurrency
 }
 
 export function defaultDisplaySettings(locale: string | undefined): DisplaySettings {
-  return { currency: defaultDisplayCurrency(locale), compactHeader: false, tokenLogos: true, headline: "total", balancesHidden: false };
+  return { currency: defaultDisplayCurrency(locale), header: "full", tokenLogos: true, headline: "total", balancesHidden: false };
 }

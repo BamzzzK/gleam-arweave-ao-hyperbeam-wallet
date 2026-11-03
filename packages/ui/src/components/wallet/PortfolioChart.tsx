@@ -1,6 +1,6 @@
 import { formatPercent } from "../../format/currency";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { DisplayCurrency, PortfolioScope } from "@gleam/core";
+import type { DisplayCurrency, HeaderStyle, PortfolioScope } from "@gleam/core";
 import { currencyStep, formatCurrencyParts, formatCurrencyValue, HIDDEN_AMOUNT, type CurrencyValueParts } from "../../format/currency";
 import { animatedNumberTintStyle, useAnimatedNumber, type AnimatedNumberTrend } from "../../primitives/animated-number";
 import { cn } from "../../primitives/cn";
@@ -38,8 +38,9 @@ import { useUiLabels, useUiLocale } from "../../labels";
  * beside the %-change. `onToggleMasked` makes that figure a button that
  * hides or shows balances; `masked` swaps both figures for dots.
  *
- * `compact` moves the chart beside the figures as a small sparkline, which
- * leaves more of the popup for the token list.
+ * `layout="compact"` moves the chart beside the figures as a small sparkline,
+ * which leaves more of the popup for the token list. `layout="minimal"` drops
+ * the chart and the range tabs, so the %-change names its range beside it.
  *
  * `loading` has nothing to show yet, so the chart shimmers. `refreshing`
  * has a cached figure on screen while it's read again: the figures dim
@@ -100,7 +101,7 @@ export interface PortfolioChartProps {
   headline?: CurrencyValueParts & { value?: number };
   masked?: boolean;
   onToggleMasked?: () => void;
-  compact?: boolean;
+  layout?: HeaderStyle;
   className?: string;
 }
 
@@ -195,9 +196,11 @@ export function PortfolioChart({
   headline,
   masked = false,
   onToggleMasked,
-  compact = false,
+  layout = "full",
   className,
 }: PortfolioChartProps) {
+  const compact = layout === "compact";
+  const minimal = layout === "minimal";
   const labels = useUiLabels();
   const locale = useUiLocale();
   const [flash, setFlash] = useState<string | null>(null);
@@ -269,18 +272,27 @@ export function PortfolioChart({
     </span>
   );
 
+  const changeNote = minimal ? (
+    <>
+      {changeBadge}
+      <span className="text-label tabular-nums text-muted">{activeRange}</span>
+    </>
+  ) : (
+    changeBadge
+  );
+
   const figures = (
     <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", faded && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))}>
       <div className="flex items-baseline gap-2.5">
         <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} />
-        {headline === undefined ? changeBadge : null}
+        {headline === undefined ? changeNote : null}
       </div>
       {headline !== undefined ? (
         <div className="flex items-baseline gap-2.5">
           <span className="text-label tabular-nums text-muted" style={animatedNumberTintStyle(masked ? null : total.trend)}>
             {totalLabel}
           </span>
-          {changeBadge}
+          {changeNote}
         </div>
       ) : null}
     </div>
@@ -325,6 +337,8 @@ export function PortfolioChart({
     <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
         <NetworkErrorBanner onRetry={onRetry} retrying={retrying} className="phone:mx-0 phone:mt-0" />
+      ) : minimal ? (
+        figures
       ) : compact ? (
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">{figures}</div>
@@ -338,25 +352,27 @@ export function PortfolioChart({
         </>
       )}
 
-      <div role="tablist" aria-label={labels.chart.rangeTabs} className="flex items-center gap-1 phone:-mx-2.5">
-        {RANGE_TABS.map((range) => (
-          <button
-            key={range}
-            type="button"
-            role="tab"
-            aria-selected={range === activeRange}
-            onClick={() => onRangeChange(range)}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
-              range === activeRange
-                ? "bg-mist text-foreground"
-                : "text-muted hover:text-foreground",
-            )}
-          >
-            {range}
-          </button>
-        ))}
-      </div>
+      {minimal ? null : (
+        <div role="tablist" aria-label={labels.chart.rangeTabs} className="flex items-center gap-1 phone:-mx-2.5">
+          {RANGE_TABS.map((range) => (
+            <button
+              key={range}
+              type="button"
+              role="tab"
+              aria-selected={range === activeRange}
+              onClick={() => onRangeChange(range)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-caption font-semibold phone:hit-target",
+                range === activeRange
+                  ? "bg-mist text-foreground"
+                  : "text-muted hover:text-foreground",
+              )}
+            >
+              {range}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
