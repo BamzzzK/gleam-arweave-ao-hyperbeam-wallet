@@ -182,5 +182,14 @@ One signed tag `v<version>` releases the extension and both apps.
    and promoting the Android build. CI holds no signing key or store
    credential.
 
+Once the GitHub Release exists, the three signed builds come from a clean
+checkout of the tag:
+
+```bash
+scripts/pack-release.sh v<version> --kdbx <db> && \
+apps/mobile/scripts/release-app.sh v<version> ios --kdbx <db> && \
+apps/mobile/scripts/release-app.sh v<version> android-apk --kdbx <db>
+```
+
 Signing keys and store credentials live in a local KeePassXC database, so
 steps 2 and 3 need the maintainer at the terminal.
