@@ -361,7 +361,6 @@ describe("TransferHandler: submitTransfer", () => {
   it("submits the transfer and writes an optimistic pending activity entry immediately", async () => {
     mockFetchSequence([
       { status: 200, body: "anchor12345678901234567890123456789012345678" },
-      { status: 200, body: "1234567" },
       { status: 200, body: { ok: true } },
     ]);
 
@@ -371,10 +370,12 @@ describe("TransferHandler: submitTransfer", () => {
       recipient: AR_RECIPIENT,
       token: null,
       amount: "1000000000000",
-      fee: null,
+      fee: "1234567",
     });
 
     expect(typeof result.txId).toBe("string");
+    const [, post] = vi.mocked(globalThis.fetch).mock.calls.filter(([, init]) => init?.method === "POST").at(-1)!;
+    expect(JSON.parse(String(post?.body))).toMatchObject({ reward: "1234567" });
 
     const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
     expect(log).toHaveLength(1);
@@ -383,6 +384,21 @@ describe("TransferHandler: submitTransfer", () => {
     expect(entry?.status).toBe("pending");
     expect(entry?.address).toBe(AR_RECIPIENT);
     expect(entry?.amount).toBe("1000000000000");
+  });
+
+  it("refuses an L1 send with no approved fee rather than taking a new quote", async () => {
+    mockFetchSequence([{ status: 200, body: "999999999999" }]);
+
+    await expect(
+      new TransferHandler(storage, keySession).submitTransfer({
+        walletId: WALLET_ID,
+        recipient: AR_RECIPIENT,
+        token: null,
+        amount: "1",
+        fee: null,
+      }),
+    ).rejects.toThrow("This send has no approved network fee.");
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalled();
   });
 });
 

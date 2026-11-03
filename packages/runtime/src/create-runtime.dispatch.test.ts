@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WATCH_ONLY_CONNECT_REFUSAL, type WalletSummary } from "@gleam/core";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { GLEAM_SITES_KEY, otherWalletKey } from "./handlers/site-wallet";
@@ -83,6 +83,93 @@ describe("createRuntime", () => {
       expect(() =>
         runtime.dispatch("reportOtherWallet", { walletName: "Wander", used: false }, { ...CONTENT_SCRIPT, tabId: undefined }),
       ).toThrow("reportOtherWallet is only accepted from a web page's content script.");
+    });
+  });
+
+  describe("a transaction with no reward of its own", () => {
+    const originalFetch = globalThis.fetch;
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    /** A gateway that quotes low for the preview and high for anything after it. */
+    function stubLyingGateway() {
+      const quotes = ["1", "999999999999"];
+      const posted: Array<Record<string, unknown>> = [];
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/price/")) return new Response(quotes.shift() ?? "999999999999");
+        if (url.includes("tx_anchor")) return new Response("b".repeat(64));
+        if (url.endsWith("/balance")) return new Response("1000000000000");
+        if (url.endsWith("/tx") && init?.method === "POST") {
+          posted.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+          return new Response("OK");
+        }
+        return new Response("not found", { status: 404 });
+      }) as unknown as typeof fetch;
+      return posted;
+    }
+
+    async function setupGranted() {
+      const context = setup();
+      const present = vi.spyOn(context.platform.approvalPresenter, "present");
+      const wallet = (await context.runtime.dispatch("createWallet", { name: "Main", password: "correct horse" }, EXTENSION)) as WalletSummary;
+      await context.storage.set("local:grants", [
+        {
+          origin: ORIGIN,
+          walletId: wallet.id,
+          permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION", "DISPATCH"],
+          createdAt: Date.now(),
+          expiresAt: null,
+          budget: null,
+        },
+      ]);
+      return { ...context, present };
+    }
+
+    it.each(["sign", "dispatch"])("%s pays the fee the preview showed, whatever the gateway quotes next", async (method) => {
+      const posted = stubLyingGateway();
+      const { runtime, present } = await setupGranted();
+
+      const pending = runtime.dispatch("providerCall", { method, params: { transaction: { data: "aGVsbG8" } } }, CONTENT_SCRIPT);
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      const requestId = present.mock.calls[0]![0];
+      await expect(runtime.dispatch("getApproval", { requestId }, EXTENSION)).resolves.toMatchObject({ preview: { fee: "1" } });
+      await runtime.dispatch("resolveApproval", { requestId, approved: true }, EXTENSION);
+      const result = (await pending) as Record<string, unknown>;
+
+      if (method === "sign") expect(result.reward).toBe("1");
+      else expect(posted).toEqual([expect.objectContaining({ reward: "1" })]);
+    });
+
+    it("a dApp's L1 token transfer shows the fee and pays exactly that", async () => {
+      const posted = stubLyingGateway();
+      const { runtime, storage, present } = await setupGranted();
+      const token = "t".repeat(43);
+      await storage.set(`local:tokenMetadata:${token}`, {
+        processId: token,
+        transport: "l1",
+        assetClass: "fungible",
+        denomination: 6,
+        ticker: "TKN",
+        name: "Token",
+        description: null,
+        logo: null,
+        totalSupply: null,
+      });
+
+      const pending = runtime.dispatch(
+        "providerCall",
+        { method: "transferAoTokens", params: { token, recipient: "r".repeat(43), amount: "5" } },
+        CONTENT_SCRIPT,
+      );
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      const requestId = present.mock.calls[0]![0];
+      await expect(runtime.dispatch("getApproval", { requestId }, EXTENSION)).resolves.toMatchObject({ preview: { fee: "1" } });
+      await runtime.dispatch("resolveApproval", { requestId, approved: true }, EXTENSION);
+      await pending;
+
+      expect(posted).toEqual([expect.objectContaining({ target: token, reward: "1" })]);
     });
   });
 

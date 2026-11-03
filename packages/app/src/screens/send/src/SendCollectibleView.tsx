@@ -229,6 +229,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
           walletId: wallet.id,
           recipient: step.recipient,
           collectible: refOf(collectible),
+          fee: step.estimate.fee,
         });
         setStep({ kind: "success", txId, recipient: step.recipient });
       } catch (sendError) {

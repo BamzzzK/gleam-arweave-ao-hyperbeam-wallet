@@ -252,7 +252,7 @@ export interface SigningRequestInput {
  * The `AoTokenTransferRequest` shape a `transferAoTokens` signing approval
  * carries through to `performSigning`, so it can call
  * `TransferHandler.submitTransfer` with exactly the fields that handler
- * needs (`token`/`recipient`/`amount`/`fee: null`/`walletId`) once the user
+ * needs (`token`/`recipient`/`amount`/`fee`/`walletId`) once the user
  * approves — never re-derived from the decoded preview payload, which is
  * display-only.
  */
@@ -531,9 +531,8 @@ function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; val
 
 /**
  * Re-reads what was prepared against the request the user approved. The
- * transaction builder fetches the anchor and, when the request has none,
- * the reward after approval; everything else must come out exactly as
- * requested.
+ * transaction builder fetches the anchor after approval; everything else,
+ * the reward included, must come out exactly as requested.
  */
 function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPayload[], address: string): void {
   switch (input.kind) {
@@ -576,6 +575,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
           quantity: "0",
           tags: collectibleTransferTags(input.recipient ?? ""),
           data: new Uint8Array(),
+          reward: input.fee ?? "",
         });
         return;
       }
@@ -585,6 +585,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
           quantity: input.amount ?? "",
           tags: [],
           data: new Uint8Array(),
+          reward: input.fee ?? "",
         });
         return;
       }
@@ -595,6 +596,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
           quantity: "0",
           tags: l1TransferTags(input.recipient ?? "", input.amount ?? ""),
           data: new Uint8Array(),
+          reward: input.fee ?? "",
         });
         return;
       }
@@ -1375,7 +1377,7 @@ export class ApprovalHandler {
       token: input.token ?? null,
       recipient: input.recipient,
       amount: input.amount,
-      fee: input.kind === "transfer" ? (input.fee ?? null) : null,
+      fee: input.fee ?? null,
       walletId,
       ...(input.kind === "transfer" && input.collectible ? { collectible: input.collectible } : {}),
     };
@@ -1649,7 +1651,7 @@ export class ApprovalHandler {
   /**
    * Finalizes an approved `transferAoTokens` request by reusing the exact
    * same `TransferHandler.submitTransfer` path the popup's `SendView`
-   * already goes through (`token`/`recipient`/`amount`/`fee: null`, plus
+   * already goes through (`token`/`recipient`/`amount`/`fee`, plus
    * the `walletId` this Grant resolved) — no new signing path, no
    * duplicate AO-messaging client wiring. Returns `AoTokenTransferResult`
    * shape (`{ id }`), mirroring `submitTransfer`'s `{ txId }` under the

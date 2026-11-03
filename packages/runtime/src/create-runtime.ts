@@ -15,6 +15,7 @@ import {
   type ProviderMethod,
   type WalletState,
   type WalletSummary,
+  type Winston,
   vaultHasPassword,
   WATCH_ONLY_CONNECT_REFUSAL,
 } from "@gleam/core";
@@ -390,6 +391,21 @@ export function createRuntime(platform: Platform): Runtime {
   }
 
   /**
+   * The AR reward a dApp's token transfer pays, for the preview: `null` for
+   * a token on the MU, which has none. A lookup that fails or hangs also
+   * gives `null`, and an L1 send then refuses for want of an approved fee.
+   */
+  async function quoteTokenTransferFee(processId: string): Promise<Winston | null> {
+    const lookup = (async () => {
+      if ((await reads.tokenTransport({ processId })) !== "l1") return null;
+      const { gatewayUrl } = await reads.getNetworkSettings();
+      return (await estimateFee(gatewayUrl, processId)).fee;
+    })().catch(() => null);
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_METADATA_LOOKUP_TIMEOUT_MS));
+    return Promise.race([lookup, timeout]);
+  }
+
+  /**
    * The work behind each `PAGE_METHODS` entry. Params arrive parsed, and
    * for every method but `connect`/`disconnect` the origin's active grant
    * and permissions have been checked, so no handler here exposes an
@@ -498,7 +514,10 @@ export function createRuntime(platform: Platform): Runtime {
       // `TOKEN_METADATA_LOOKUP_TIMEOUT_MS` so a hung peer can't stall the
       // window open. `formatAmount`/`formatAmountUnit` fall back to the raw
       // amount and a "smallest units" label when either comes back `null`.
-      const { tokenDenomination, tokenTicker } = await resolveTokenDenominationAndTicker(wallet.address, token);
+      const [{ tokenDenomination, tokenTicker }, fee] = await Promise.all([
+        resolveTokenDenominationAndTicker(wallet.address, token),
+        quoteTokenTransferFee(token),
+      ]);
 
       return approval.requestApproval({
         kind: "transferAoTokens",
@@ -506,7 +525,7 @@ export function createRuntime(platform: Platform): Runtime {
         walletId: activeWalletId(),
         recipient,
         amount,
-        fee: null,
+        fee,
         token,
         tokenDenomination,
         tokenTicker,
@@ -576,10 +595,9 @@ export function createRuntime(platform: Platform): Runtime {
     { origin, activeWalletId }: GrantedCall,
   ): Promise<unknown> {
     const { gatewayUrl } = await reads.getNetworkSettings();
-    // The dApp's reward is the fee actually charged. Without one, the
-    // preview shows a fresh quote, and the transaction fetches its own
-    // reward when it is built after approval, so the two can differ. A
-    // hardware wallet's device step shows the reward actually signed.
+    // The dApp's reward is the fee actually charged. Without one, the quote
+    // the preview shows becomes the reward, so a gateway can't charge more
+    // than the user approved. A bundled dispatch carries no reward at all.
     const fee =
       transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
     return approval.requestApproval({
@@ -594,7 +612,7 @@ export function createRuntime(platform: Platform): Runtime {
       gatewayUrl,
       target: transaction.target,
       quantity: transaction.quantity,
-      reward: transaction.reward,
+      reward: fee,
       last_tx: transaction.last_tx,
     });
   }

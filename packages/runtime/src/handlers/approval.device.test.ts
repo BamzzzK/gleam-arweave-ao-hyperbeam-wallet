@@ -581,7 +581,7 @@ describe("Transfers from a hardware wallet sign in the approval window", () => {
     ) as unknown as typeof fetch;
     const collectible = { id: PROCESS_ID, name: "Beam #1" };
     const { pending, view, requestId, device } = await approveOnDevice(() =>
-      transfer.sendCollectible({ walletId: HW_ID, recipient: RECIPIENT, collectible }),
+      transfer.sendCollectible({ walletId: HW_ID, recipient: RECIPIENT, collectible, fee: "1000" }),
     );
 
     expect(view).toMatchObject({ kind: "transfer", preview: { recipient: RECIPIENT, amount: "0", collectible } });
@@ -762,7 +762,7 @@ describe("ApprovalHandler: device races", () => {
 });
 
 describe("ApprovalHandler: what the device signs is what was approved", () => {
-  it("shows the reward the prepared transaction actually carries", async () => {
+  it("signs the fee the user reviewed, whatever the gateway quotes afterwards", async () => {
     mockNetwork();
     const { view } = await approveOnDevice(() =>
       transfer.submitTransfer({ walletId: HW_ID, token: null, recipient: RECIPIENT, amount: "10", fee: "999" }),
@@ -770,7 +770,7 @@ describe("ApprovalHandler: what the device signs is what was approved", () => {
 
     expect(view.preview).toMatchObject({ fee: "999" });
     expect(view.device!.summaries).toEqual([
-      { kind: "transaction", recipient: RECIPIENT, quantity: "10", fee: "1000", dataSize: "0" },
+      { kind: "transaction", recipient: RECIPIENT, quantity: "10", fee: "999", dataSize: "0" },
     ]);
   });
 

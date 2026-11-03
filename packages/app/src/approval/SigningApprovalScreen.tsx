@@ -112,7 +112,7 @@ function formatFee(fee: string | null): string {
  * AR-denominated Total (amount + fee), shown next to the raw amount for a
  * `sign`/`dispatch` preview so the review screen never implies the fee is
  * separate from what leaves the wallet. `null` for anything not
- * AR-denominated (`transferAoTokens`'s fee is always `null`).
+ * AR-denominated (a token's fee is AR, so it stays out of the total).
  */
 function formatTotal(
   amount: string | null,

@@ -105,6 +105,7 @@ describe("SendCollectibleView", () => {
         walletId: WALLET.id,
         recipient: RECIPIENT,
         collectible: { id: COLLECTIBLE.id, name: COLLECTIBLE.name, imageUrl: COLLECTIBLE.imageUrl },
+        fee: "654321",
       },
     });
     expect(screen.getByText(`Beam #1 to ${RECIPIENT}`)).toBeTruthy();

@@ -42,7 +42,7 @@ export type { Announcement } from "./announcement";
 export type { ReviewMoment } from "./review-prompt";
 export { isValidArweaveAddress } from "./contact";
 export type { Winston, Balance, PendingAmounts, PendingTransfer, TokenBalance } from "./balance";
-export type { Collectible, CollectibleRef, CollectibleSendDraft } from "./collectible";
+export type { Collectible, CollectibleRef, CollectibleSendDraft, CollectibleSendRequest } from "./collectible";
 export { collectibleSendRefusal } from "./collectible";
 export type {
   TokenMetadata,

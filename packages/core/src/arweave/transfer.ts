@@ -57,14 +57,16 @@ export interface SubmittedTransfer {
 /**
  * Builds the unsigned, data-less transaction to `recipient` that
  * `ownerB64Url` will sign: an AR value transfer, or with `tags` a message
- * to a process that reads L1 (a collectible send). Fetches the anchor and
- * the recipient-aware price from the gateway.
+ * to a process that reads L1 (a collectible send). `reward` is the fee the
+ * user approved, never a fresh quote: the gateway only supplies the anchor,
+ * so it can't raise the fee after they saw it.
  */
 export async function prepareTransfer(
   gatewayUrl: string,
   ownerB64Url: string,
   recipient: string,
   amount: Winston,
+  reward: Winston,
   tags: Tag[] = [],
 ): Promise<ArweaveTransactionJson> {
   // arweave-js decodes `target` with strict base64 and would otherwise
@@ -72,7 +74,7 @@ export async function prepareTransfer(
   if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
     throw new Error(userErrorMessage("transferRecipientInvalid", { recipient }));
   }
-  return buildUnsignedTransaction(gatewayUrl, ownerB64Url, { target: recipient, quantity: amount }, tags);
+  return buildUnsignedTransaction(gatewayUrl, ownerB64Url, { target: recipient, quantity: amount, reward }, tags);
 }
 
 /** Applies `expectedOwner`'s signature to a `prepareTransfer` result and posts it. */
@@ -98,7 +100,8 @@ export async function submitTransfer(
   signer: Signer,
   recipient: string,
   amount: Winston,
+  reward: Winston,
 ): Promise<SubmittedTransfer> {
-  const unsigned = await prepareTransfer(gatewayUrl, signer.owner, recipient, amount);
+  const unsigned = await prepareTransfer(gatewayUrl, signer.owner, recipient, amount, reward);
   return finishTransfer(gatewayUrl, unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
 }

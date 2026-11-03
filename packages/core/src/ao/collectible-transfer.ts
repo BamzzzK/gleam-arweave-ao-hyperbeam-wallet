@@ -22,8 +22,9 @@ export async function prepareCollectibleTransfer(
   ownerB64Url: string,
   assetId: string,
   recipient: string,
+  reward: Winston,
 ): Promise<ArweaveTransactionJson> {
-  return prepareL1TokenTransfer(gatewayUrl, ownerB64Url, assetId, recipient, COLLECTIBLE_TRANSFER_QUANTITY);
+  return prepareL1TokenTransfer(gatewayUrl, ownerB64Url, assetId, recipient, COLLECTIBLE_TRANSFER_QUANTITY, reward);
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { Winston } from "./balance";
 import { userErrorMessage } from "./user-errors";
 
 /** An AO NFT (a unique, non-fungible asset process) the wallet holds. */
@@ -30,6 +31,11 @@ export interface CollectibleSendDraft {
   walletId: string;
   recipient: string;
   collectible: CollectibleRef;
+}
+
+/** A reviewed collectible send; `fee` is the quote the user saw, which becomes the transaction's reward. */
+export interface CollectibleSendRequest extends CollectibleSendDraft {
+  fee: Winston | null;
 }
 
 const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;

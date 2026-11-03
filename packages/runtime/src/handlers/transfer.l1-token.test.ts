@@ -137,13 +137,14 @@ describe("TransferHandler: arweave-scheduler token sends", () => {
       recipient: RECIPIENT,
       token: PID,
       amount: "311",
-      fee: null,
+      fee: "42",
     });
 
     expect(posted).toHaveLength(1);
     const [tx] = posted;
     expect(tx?.target).toBe(PID);
     expect(tx?.quantity).toBe("0");
+    expect(tx?.reward).toBe("42");
     expect(plainTags(tx?.tags)).toEqual([
       { name: "action", value: "transfer" },
       { name: "recipient", value: RECIPIENT },
