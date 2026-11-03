@@ -475,6 +475,27 @@ describe("MainScreenView portfolio chart (main-screen-chart-wallet-core)", () =>
   });
 });
 
+describe("MainScreenView chart range", () => {
+  it("saves the picked range and opens on it next time", async () => {
+    const send = successfulSend();
+    const { unmount } = renderMainScreen({ runtime: fakeRuntime({ send }) });
+    fireEvent.click(await screen.findByRole("tab", { name: "1M" }));
+    expect(window.localStorage.getItem("gleam:portfolioRange")).toBe("1M");
+    unmount();
+
+    const reopened = successfulSend();
+    renderMainScreen({ runtime: fakeRuntime({ send: reopened }) });
+    await waitFor(() => expect(screen.getByRole("tab", { name: "1M" }).getAttribute("aria-selected")).toBe("true"));
+    expect(reopened).not.toHaveBeenCalledWith(expect.objectContaining({ type: "getPortfolioHistory", payload: expect.objectContaining({ range: "7D" }) }));
+  });
+
+  it("falls back to 7D for an unknown saved range", async () => {
+    window.localStorage.setItem("gleam:portfolioRange", "5Y");
+    renderMainScreen();
+    await waitFor(() => expect(screen.getByRole("tab", { name: "7D" }).getAttribute("aria-selected")).toBe("true"));
+  });
+});
+
 describe("MainScreenView token rows (AO-TOKEN-SEND-WALLET-CORE)", () => {
   const AO_TOKEN: TokenBalance = {
     address: WALLET.address,

@@ -361,6 +361,26 @@ function writePortfolioScope(scope: PortfolioScope): void {
   }
 }
 
+const PORTFOLIO_RANGE_STORAGE_KEY = "gleam:portfolioRange";
+const PORTFOLIO_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
+
+function readPortfolioRange(): PortfolioHistoryRange {
+  try {
+    const stored = window.localStorage.getItem(PORTFOLIO_RANGE_STORAGE_KEY);
+    return PORTFOLIO_RANGES.find((range) => range === stored) ?? "7D";
+  } catch {
+    return "7D";
+  }
+}
+
+function writePortfolioRange(range: PortfolioHistoryRange): void {
+  try {
+    window.localStorage.setItem(PORTFOLIO_RANGE_STORAGE_KEY, range);
+  } catch {
+    // Not persisting only means the next open starts on 7D.
+  }
+}
+
 interface ListedTokenRow {
   key: string;
   label: string;
@@ -472,7 +492,11 @@ export function MainScreenView({
   const hasLoadedOnce = balancesQuery.isSuccess || activityQuery.isSuccess;
   const loading = balancesQuery.isLoading || activityQuery.isLoading;
   const loadError = balancesQuery.error ?? activityQuery.error ?? null;
-  const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>("7D");
+  const [selectedRange, setSelectedRange] = useState<PortfolioHistoryRange>(readPortfolioRange);
+  const selectRange = (range: PortfolioHistoryRange) => {
+    setSelectedRange(range);
+    writePortfolioRange(range);
+  };
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
@@ -771,7 +795,7 @@ export function MainScreenView({
               change={chartChange}
               periodLabel={portfolioHistoryQuery.data?.periodLabel ?? ""}
               activeRange={selectedRange}
-              onRangeChange={setSelectedRange}
+              onRangeChange={selectRange}
               scope={portfolioScope}
               onToggleScope={hasOtherWallets ? togglePortfolioScope : undefined}
               headline={
