@@ -77,6 +77,8 @@
 /apps/extension/src/hardware/panels/                                       @skyf0xx
 /packages/keystone/src/KeystonePanel.tsx                                   @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
+/packages/app/src/i18n/                                                    @skyf0xx
+/packages/core/src/models/user-errors.ts                                   @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
 /apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
 
