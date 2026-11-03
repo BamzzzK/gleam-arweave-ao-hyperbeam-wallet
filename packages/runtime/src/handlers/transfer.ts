@@ -78,7 +78,8 @@ export interface DeviceTransferApprovals {
  * to a fresh quote: that would let the gateway set the fee after the review.
  */
 function approvedFee(req: SubmitTransferRequest): Winston {
-  if (req.fee === null) throw new Error(userErrorMessage("noApprovedFee"));
+  // Checked by shape: arweave-js fetches its own price for an undefined reward.
+  if (typeof req.fee !== "string" || !/^\d+$/.test(req.fee)) throw new Error(userErrorMessage("noApprovedFee"));
   return req.fee;
 }
 
@@ -304,8 +305,8 @@ export class TransferHandler {
   }
 
   /**
-   * Builds a collectible send and checks the wallet's AR covers the reward
-   * the gateway actually priced it at, before anything is signed.
+   * Builds a collectible send and checks the wallet's AR covers the approved
+   * reward, before anything is signed.
    */
   private async prepareCollectibleSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
     const collectible = req.collectible;

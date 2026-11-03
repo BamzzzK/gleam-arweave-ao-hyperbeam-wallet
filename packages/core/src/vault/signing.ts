@@ -133,7 +133,7 @@ function plainTags(tags: DataItemInput["tags"]) {
 
 /**
  * The dApp's transaction, unsigned. `gatewayUrl` is only used to fetch
- * `last_tx` and `reward` when the dApp left them out.
+ * `last_tx` when the dApp left it out; `reward` is the fee the user approved.
  */
 export async function prepareSignTransaction(
   gatewayUrl: string,

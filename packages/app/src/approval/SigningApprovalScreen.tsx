@@ -64,8 +64,8 @@ function shortenProcessId(processId: string): string {
  * `preview.amount`/`preview.fee` are atomic-integer strings (Winston for
  * the native AR token, `preview.token`'s own smallest unit otherwise —
  * see `SigningApprovalPreview.token`'s doc comment). `fee` is always AR
- * (an AO transfer has no sender-side fee — `core/ao/transfer.ts`'s
- * `AO_TRANSFER_HAS_NO_FEE`), so it's formatted with `formatWinstonAsAr`
+ * (an MU token transfer has no sender-side fee — `core/ao/transfer.ts`'s
+ * `AO_TRANSFER_HAS_NO_FEE` — and an L1 one pays AR), so it's formatted with `formatWinstonAsAr`
  * regardless of what `token` the amount itself is denominated in.
  *
  * An AO amount's `tokenDenomination` comes from the same balance-metadata

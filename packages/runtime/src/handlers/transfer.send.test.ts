@@ -400,6 +400,21 @@ describe("TransferHandler: submitTransfer", () => {
     ).rejects.toThrow("This send has no approved network fee.");
     expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalled();
   });
+
+  it.each([[undefined], ["abc"], [""]])("refuses the fee %j the same way", async (fee) => {
+    mockFetchSequence([{ status: 200, body: "999999999999" }]);
+
+    await expect(
+      new TransferHandler(storage, keySession).submitTransfer({
+        walletId: WALLET_ID,
+        recipient: AR_RECIPIENT,
+        token: null,
+        amount: "1",
+        fee: fee as unknown as null,
+      }),
+    ).rejects.toThrow("This send has no approved network fee.");
+    expect(vi.mocked(globalThis.fetch)).not.toHaveBeenCalled();
+  });
 });
 
 describe("TransferHandler: lookalike recipients", () => {

@@ -130,6 +130,12 @@ function arweaveConfigFromGatewayUrl(gatewayUrl: string): { protocol: string; ho
  */
 const TOKEN_METADATA_LOOKUP_TIMEOUT_MS = 3_000;
 
+/**
+ * Longer than the metadata budget: an L1 send with no quote is refused, and a
+ * cold token lookup can spend `core/ao/token-state.ts`'s 8s reading a logo.
+ */
+const TOKEN_FEE_QUOTE_TIMEOUT_MS = 10_000;
+
 /** What a provider handler gets once the dispatcher has checked the origin's grant. */
 interface GrantedCall {
   origin: string;
@@ -401,7 +407,7 @@ export function createRuntime(platform: Platform): Runtime {
       const { gatewayUrl } = await reads.getNetworkSettings();
       return (await estimateFee(gatewayUrl, processId)).fee;
     })().catch(() => null);
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_METADATA_LOOKUP_TIMEOUT_MS));
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), TOKEN_FEE_QUOTE_TIMEOUT_MS));
     return Promise.race([lookup, timeout]);
   }
 
