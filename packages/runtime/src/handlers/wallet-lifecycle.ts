@@ -9,6 +9,7 @@ import {
   isHeaderStyle,
   isHeadlineBalance,
   isKeylessWalletMethod,
+  isTokenRowDetail,
   isValidArweaveAddress,
   keyfileFilename,
   validateJWKShape,
@@ -256,6 +257,7 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
     isDisplayCurrency(record.currency) &&
     isHeaderStyle(record.header) &&
     typeof record.tokenLogos === "boolean" &&
+    isTokenRowDetail(record.tokenRows) &&
     isHeadlineBalance(record.headline) &&
     typeof record.balancesHidden === "boolean"
   );
@@ -263,19 +265,20 @@ function isDisplaySettings(value: unknown): value is DisplaySettings {
 
 async function loadDisplaySettings(storage: StoragePort): Promise<DisplaySettings> {
   const raw = await storage.get<unknown>(DISPLAY_SETTINGS_KEY);
-  // Older records lack `tokenLogos`, and carry `compactHeader` (or before it `showChart`) in place
+  // Older records lack `tokenLogos` and `tokenRows`, and carry `compactHeader` (or before it `showChart`) in place
   // of `header`. Someone who had turned the chart off gets the compact header, the closest thing to it.
   // `tokenLogos` replaced `showTokenLogos`, which defaulted off and so was stored as false for
   // nearly everyone; it is ignored so they get logos, the new default.
   const record = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
   const upgraded = record
-    ? { tokenLogos: true, header: record.compactHeader === true || record.showChart === false ? "compact" : "full", ...record }
+    ? { tokenLogos: true, tokenRows: "detailed", header: record.compactHeader === true || record.showChart === false ? "compact" : "full", ...record }
     : raw;
   if (isDisplaySettings(upgraded)) {
     return {
       currency: upgraded.currency,
       header: upgraded.header,
       tokenLogos: upgraded.tokenLogos,
+      tokenRows: upgraded.tokenRows,
       headline: upgraded.headline,
       balancesHidden: upgraded.balancesHidden,
     };
@@ -1206,6 +1209,7 @@ export class WalletLifecycleHandler {
       currency: req.currency,
       header: req.header,
       tokenLogos: req.tokenLogos,
+      tokenRows: req.tokenRows,
       headline: req.headline,
       balancesHidden: req.balancesHidden,
     });

@@ -9,6 +9,7 @@ import type {
   RuntimePort,
   ThemePreference,
   ThemeSettings,
+  TokenRowDetail,
 } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
@@ -36,6 +37,11 @@ const HEADER_KEYS = [
   { value: "compact", key: "settingsHome.headerCompact" },
   { value: "minimal", key: "settingsHome.headerMinimal" },
 ] as const satisfies readonly { value: HeaderStyle; key: MessageKey }[];
+
+const TOKEN_ROW_KEYS = [
+  { value: "detailed", key: "settingsHome.tokenRowsDetailed" },
+  { value: "simple", key: "settingsHome.tokenRowsSimple" },
+] as const satisfies readonly { value: TokenRowDetail; key: MessageKey }[];
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -93,6 +99,7 @@ export function SettingsHomeView({
   const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
   const headlineOptions = HEADLINE_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
   const headerOptions = HEADER_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
+  const tokenRowOptions = TOKEN_ROW_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -199,6 +206,13 @@ export function SettingsHomeView({
             options={headerOptions}
             disabled={!display}
             onChange={(header) => void updateDisplay({ header })}
+          />
+          <SelectRow
+            title={t("settingsHome.tokenRows")}
+            value={display?.tokenRows ?? "detailed"}
+            options={tokenRowOptions}
+            disabled={!display}
+            onChange={(tokenRows) => void updateDisplay({ tokenRows })}
           />
           <ToggleRow
             title={t("settingsHome.tokenLogos")}

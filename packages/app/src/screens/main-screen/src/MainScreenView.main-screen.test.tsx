@@ -205,7 +205,7 @@ describe("MainScreenView account avatar (main-screen-chart-wallet-core)", () => 
 describe("MainScreenView display settings", () => {
   function sendWithDisplay(settings: Partial<DisplaySettings>, prices: TokenPrice[] = []) {
     const base = successfulSend();
-    const display: DisplaySettings = { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: false, ...settings };
+    const display: DisplaySettings = { currency: "USD", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false, ...settings };
     return vi.fn(async (message: { type: string; payload: unknown }) => {
       if (message.type === "getDisplaySettings") return display;
       if (message.type === "setDisplaySettings") return undefined;
@@ -292,6 +292,15 @@ describe("MainScreenView display settings", () => {
     await waitFor(() => expect(screen.queryByText(/@ \$3\.00/)).toBeNull());
   });
 
+  it("leaves the unit price and 24h change off a token row with simple rows, keeping the value", async () => {
+    const send = sendWithDisplay({ tokenRows: "simple" }, [{ processId: null, price: 3, change24h: -0.024 }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("$3.00")).toBeTruthy());
+    expect(screen.queryByText("-2.40%")).toBeNull();
+    expect(screen.queryByText(/@ \$3\.00/)).toBeNull();
+  });
+
   it("hides every balance when the total is tapped, and saves the choice", async () => {
     const send = sendWithDisplay({}, [{ processId: null, price: 3, change24h: null }]);
     renderMainScreen({ runtime: fakeRuntime({ send }) });
@@ -305,7 +314,7 @@ describe("MainScreenView display settings", () => {
     expect(screen.queryByText("1")).toBeNull();
     expect(send).toHaveBeenCalledWith({
       type: "setDisplaySettings",
-      payload: { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: true },
+      payload: { currency: "USD", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: true },
     });
   });
 });
@@ -581,7 +590,7 @@ describe("MainScreenView hidden token rows", () => {
     return vi.fn(async (message: { type: string }) => {
       if (message.type === "getTokenBalances") return tokens;
       if (message.type === "getDisplaySettings" && display) {
-        return { currency: "USD", header: "full", tokenLogos: true, headline: "total", balancesHidden: false, ...display };
+        return { currency: "USD", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false, ...display };
       }
       return base(message as never);
     }) as RuntimePort["send"];
@@ -731,7 +740,7 @@ describe("MainScreenView default AR/AO token rows (DEFAULT-TOKEN-LIST-WALLET-COR
   }): RuntimePort["send"] {
     return vi.fn(async ({ type }: { type: string }) => {
       if (type === "getDisplaySettings" && overrides.tokenLogos !== undefined) {
-        return { currency: "USD", header: "full", tokenLogos: overrides.tokenLogos, headline: "total", balancesHidden: false };
+        return { currency: "USD", header: "full", tokenLogos: overrides.tokenLogos, tokenRows: "detailed", headline: "total", balancesHidden: false };
       }
       if (type === "getBalance") return overrides.arBalance ?? BALANCE;
       if (type === "getTokenBalances") return overrides.tokenBalances ?? NO_TOKENS;

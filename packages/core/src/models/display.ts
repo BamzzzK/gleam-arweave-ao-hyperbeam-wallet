@@ -54,11 +54,15 @@ export type HeadlineBalance = "total" | "AR" | "AO";
  */
 export type HeaderStyle = "full" | "compact" | "minimal";
 
+/** How much a main-screen token row shows: `simple` leaves out the unit price and the 24-hour change. */
+export type TokenRowDetail = "detailed" | "simple";
+
 export interface DisplaySettings {
   currency: DisplayCurrency;
   header: HeaderStyle;
   /** Draws token logos in place of ticker letters; on by default. */
   tokenLogos: boolean;
+  tokenRows: TokenRowDetail;
   headline: HeadlineBalance;
   /** Masks balances on the main screen, toggled by tapping the headline. */
   balancesHidden: boolean;
@@ -80,6 +84,10 @@ export function isHeaderStyle(value: unknown): value is HeaderStyle {
   return value === "full" || value === "compact" || value === "minimal";
 }
 
+export function isTokenRowDetail(value: unknown): value is TokenRowDetail {
+  return value === "detailed" || value === "simple";
+}
+
 const EURO_REGIONS = new Set([
   "AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK",
 ]);
@@ -99,5 +107,5 @@ export function defaultDisplayCurrency(locale: string | undefined): FiatCurrency
 }
 
 export function defaultDisplaySettings(locale: string | undefined): DisplaySettings {
-  return { currency: defaultDisplayCurrency(locale), header: "full", tokenLogos: true, headline: "total", balancesHidden: false };
+  return { currency: defaultDisplayCurrency(locale), header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false };
 }

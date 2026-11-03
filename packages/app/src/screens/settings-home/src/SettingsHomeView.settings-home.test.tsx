@@ -20,7 +20,7 @@ function fakeRuntime(overrides: Partial<RuntimePort> = {}): RuntimePort {
 
 const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
-const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", header: "full", tokenLogos: true, headline: "total", balancesHidden: false };
+const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false };
 
 function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
@@ -211,7 +211,7 @@ describe("SettingsHomeView", () => {
     expect(onOpenDisplayCurrency).toHaveBeenCalled();
   });
 
-  it("saves the main balance and header choices", async () => {
+  it("saves the main balance, header and token row choices", async () => {
     const send = successfulSend();
     renderSettingsHome({ runtime: fakeRuntime({ send }) });
 
@@ -232,6 +232,14 @@ describe("SettingsHomeView", () => {
       }),
     );
     expect((screen.getByLabelText("Header") as HTMLSelectElement).value).toBe("minimal");
+
+    fireEvent.change(screen.getByLabelText("Token rows"), { target: { value: "simple" } });
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith({
+        type: "setDisplaySettings",
+        payload: { ...DISPLAY_SETTINGS, headline: "AO", header: "minimal", tokenRows: "simple" },
+      }),
+    );
   });
 
   it("starts with token logos on and saves turning them off", async () => {

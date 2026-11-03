@@ -461,6 +461,7 @@ export function MainScreenView({
   const { settings: displaySettings, update: updateDisplaySettings } = useDisplaySettings(runtime);
   const currency = displaySettings?.currency;
   const headerStyle = displaySettings?.header ?? "full";
+  const simpleRows = displaySettings?.tokenRows === "simple";
   const tokenLogos = displaySettings?.tokenLogos ?? true;
   const masked = displaySettings?.balancesHidden ?? false;
   const watchOnly = isWatchWalletMethod(wallet.method);
@@ -918,8 +919,8 @@ export function MainScreenView({
                           row.value === undefined ? undefined : masked ? HIDDEN_AMOUNT : row.value.text
                         }
                         // `amount @ price` would give the hidden holding away.
-                        unitPrice={masked ? undefined : row.unitPrice}
-                        change={row.change}
+                        unitPrice={masked || simpleRows ? undefined : row.unitPrice}
+                        change={simpleRows ? undefined : row.change}
                         loading={loading}
                         cached={tokensCached}
                         cachedFetching={tokensFetching}
@@ -962,8 +963,8 @@ export function MainScreenView({
                                 )
                           }
                           value={value === undefined ? undefined : masked ? HIDDEN_AMOUNT : value.text}
-                          unitPrice={masked || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
-                          change={value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
+                          unitPrice={masked || simpleRows || value === undefined ? undefined : unitPriceFor(tokenPrices, currency, token.processId, token.ticker, amountNumber)}
+                          change={simpleRows || value === undefined ? undefined : changeFor(tokenPrices, token.processId)}
                           loading={loading}
                           cached={tokensCached}
                           cachedFetching={tokensFetching}
