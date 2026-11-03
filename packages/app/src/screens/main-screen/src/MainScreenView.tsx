@@ -1062,7 +1062,7 @@ export function MainScreenView({
                       <button
                         type="button"
                         onClick={() => setHiddenExpanded((prev) => !prev)}
-                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
+                        className="px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
                       >
                         {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
                       </button>
