@@ -42,7 +42,7 @@ export const onboarding = defineMessages({
     passwordsMismatch: "Passwords don't match.",
     enterPasswordTitle: "Enter your password",
     enterPasswordPlaceholder: "Enter your password",
-    vaultPasswordBody: "The new wallet is encrypted with the password you already use to unlock Gleam.",
+    vaultPasswordBody: "The new wallet will be encrypted with the password you already use to unlock Gleam.",
     importKeyfileTitle: "Add your keyfile",
     importKeyfileBody: "Import an existing Arweave wallet using its JWK keyfile.",
     dropKeyfile: "Drop your keyfile here",
