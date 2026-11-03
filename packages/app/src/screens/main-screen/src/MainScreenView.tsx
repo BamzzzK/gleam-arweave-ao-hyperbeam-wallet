@@ -18,7 +18,7 @@ import {
   SkeletonRow,
   TokenRow,
 } from "@gleam/ui/src/components/wallet/index.ts";
-import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
+import { formatCurrencyValue, formatPercent, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { ChevronIcon } from "@gleam/ui/src/primitives/chevron-icon.tsx";
@@ -708,6 +708,23 @@ export function MainScreenView({
           </div>
         )}
 
+        {headerCollapsed && history && !portfolioFailed ? (
+          // The range tabs fade out with the chart, so the range rides along to say what the change covers.
+          <button
+            type="button"
+            onClick={returnHome}
+            className="flex min-w-0 flex-1 items-baseline justify-center gap-1.5 text-label tabular-nums text-muted phone:min-h-11 phone:items-center"
+          >
+            <span className="truncate font-semibold text-foreground">
+              {masked ? HIDDEN_AMOUNT : formatCurrencyValue(history.currentValue + extraValue, currency ?? "USD", locale)}
+            </span>{" "}
+            <span className="font-semibold" style={{ color: chartChange >= 0 ? "var(--color-positive)" : "var(--color-negative)" }}>
+              {formatPercent(chartChange, locale)}
+            </span>{" "}
+            <span>{selectedRange}</span>
+          </button>
+        ) : null}
+
         <div className="flex flex-shrink-0 items-center phone:-mr-3">
           {onOpenBrowser ? (
             <button
@@ -824,8 +841,8 @@ export function MainScreenView({
         runs to the popup's bottom edge and scrolls internally — a fixed
         box can't be moved by window scroll, so without that a list longer
         than the popup would be cut off. The undocked min-height keeps the
-        page tall enough for a tab click to scroll the section all the way
-        up to its docked position even when the list is short.
+        page tall enough for a swipe or a tab click to scroll the section all
+        the way up to its docked position even when the list is short.
       */}
       {listDocked ? <div style={{ height: listSectionRef.current?.offsetHeight }} /> : null}
       <div
@@ -833,7 +850,7 @@ export function MainScreenView({
         className={`px-6 pb-6 phone:px-5 phone:pb-4 phone:[@media(max-height:700px)]:pb-2 ${
           listDocked
             ? "gleam-dock-in fixed inset-x-0 bottom-0 top-[calc(4rem+var(--inset-top))] z-20 mx-auto max-w-[var(--content-max)] overflow-y-auto bg-background"
-            : "min-h-[calc(100dvh-4rem)] phone:min-h-0"
+            : "min-h-[calc(100dvh-4rem)]"
         }`}
         style={listDocked ? ({ "--dock-offset": `${listDockOffsetRef.current}px` } as CSSProperties) : undefined}
       >
@@ -1045,7 +1062,7 @@ export function MainScreenView({
                       <button
                         type="button"
                         onClick={() => setHiddenExpanded((prev) => !prev)}
-                        className="px-3.5 py-3 text-caption text-faint hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
+                        className="px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
                       >
                         {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
                       </button>
