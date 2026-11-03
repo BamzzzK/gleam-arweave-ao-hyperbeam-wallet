@@ -41,6 +41,9 @@ import { useUiLabels, useUiLocale } from "../../labels";
  * `layout="compact"` moves the chart beside the figures as a small sparkline,
  * which leaves more of the popup for the token list. `layout="minimal"` drops
  * the chart and the range tabs, so the %-change names its range beside it.
+ * Tapping that range steps to the next one, and the empty space beside the
+ * figures takes over the chart's scope toggle. Neither is marked beyond a
+ * pointer cursor; they're there for people who go looking.
  *
  * `loading` has nothing to show yet, so the chart shimmers. `refreshing`
  * has a cached figure on screen while it's read again: the figures dim
@@ -254,28 +257,39 @@ export function PortfolioChart({
       : { amount: total.text, unit: totalParts.unit };
   const headlineTrend = masked ? null : headline ? headlineFigure.trend : total.trend;
   // The range tabs already name the period, so the scope note briefly takes the %-change's place instead.
+  // The note is out of flow: sized into the badge, it would keep the badge as wide as itself after fading.
   const changeBadge = (
-    <span className="grid text-label font-semibold tabular-nums">
+    <span className="relative text-label font-semibold tabular-nums">
       <span
         aria-hidden={flash ? true : undefined}
-        className={cn("col-start-1 row-start-1 transition-opacity duration-300", flash && "opacity-0")}
+        className={cn("transition-opacity duration-300", flash && "opacity-0")}
         style={{ color: lineColorVar }}
       >
         {formatPercent(change, locale)}
       </span>
       <span
         aria-live="polite"
-        className={cn("col-start-1 row-start-1 whitespace-nowrap text-muted transition-opacity duration-300", !flash && "opacity-0")}
+        className={cn("pointer-events-none absolute left-0 top-0 whitespace-nowrap text-muted transition-opacity duration-300", !flash && "opacity-0")}
       >
         {flash ?? lastFlashRef.current}
       </span>
     </span>
   );
 
+  const nextRange = RANGE_TABS[(RANGE_TABS.indexOf(activeRange) + 1) % RANGE_TABS.length]!;
   const changeNote = minimal ? (
     <>
       {changeBadge}
-      <span className="text-label tabular-nums text-muted">{activeRange}</span>
+      <button
+        type="button"
+        onClick={() => onRangeChange(nextRange)}
+        className={cn(
+          "-mx-1 cursor-pointer rounded-md px-1 text-label tabular-nums text-muted transition-opacity duration-300 hover:text-foreground focus-visible:outline-2 focus-visible:outline-foreground phone:hit-target",
+          flash && "opacity-0",
+        )}
+      >
+        {activeRange}
+      </button>
     </>
   ) : (
     changeBadge
@@ -338,7 +352,18 @@ export function PortfolioChart({
       {onRetry ? (
         <NetworkErrorBanner onRetry={onRetry} retrying={retrying} className="phone:mx-0 phone:mt-0" />
       ) : minimal ? (
-        figures
+        <div className="flex items-stretch gap-4">
+          <div className="min-w-0">{figures}</div>
+          {onToggleScope ? (
+            <button
+              type="button"
+              onClick={toggleScope}
+              aria-pressed={scope === "all"}
+              aria-label={scope === "all" ? labels.chart.showThisWallet : labels.chart.showAllWallets}
+              className="min-w-0 flex-1 cursor-pointer rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            />
+          ) : null}
+        </div>
       ) : compact ? (
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">{figures}</div>
