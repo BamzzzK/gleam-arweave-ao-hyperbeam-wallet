@@ -69,6 +69,7 @@ export const USER_ERRORS = {
   unsupportedAction: "This wallet can't {action}. Switch to a keyfile wallet.",
   hardwareSigning: "This wallet signs on its device. Signing with a hardware wallet isn't supported yet.",
 
+  noApprovedFee: "This send has no approved network fee. Try again.",
   networkFeeNeeded: "Sending needs about {fee} AR for the network fee.",
   recipientInvalid: 'Recipient must be an Arweave address (43 base64url characters), got "{recipient}".',
   transferRecipientInvalid: 'Transfer recipient must be an Arweave address (43 base64url characters), got "{recipient}".',

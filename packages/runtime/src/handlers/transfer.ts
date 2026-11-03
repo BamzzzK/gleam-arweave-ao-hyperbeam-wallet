@@ -78,7 +78,7 @@ export interface DeviceTransferApprovals {
  * to a fresh quote: that would let the gateway set the fee after the review.
  */
 function approvedFee(req: SubmitTransferRequest): Winston {
-  if (req.fee === null) throw new Error("This send has no approved network fee. Try again.");
+  if (req.fee === null) throw new Error(userErrorMessage("noApprovedFee"));
   return req.fee;
 }
 
