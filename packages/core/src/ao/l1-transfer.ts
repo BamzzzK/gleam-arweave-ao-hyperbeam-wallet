@@ -1,6 +1,7 @@
 import { prepareTransfer } from "../arweave/transfer";
 import type { ArweaveTransactionJson } from "../arweave/transaction";
 import type { Tag } from "../models/tag";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * Tokens on `arweave-scheduler@1.0` (fungible tokens and collectibles
@@ -33,7 +34,7 @@ export async function prepareL1TokenTransfer(
     throw new Error(`Token process must be an Arweave id (43 base64url characters), got "${processId}".`);
   }
   if (!ADDRESS.test(recipient)) {
-    throw new Error(`Recipient must be an Arweave address (43 base64url characters), got "${recipient}".`);
+    throw new Error(userErrorMessage("recipientInvalid", { recipient }));
   }
   if (!ATOMIC.test(quantity)) {
     throw new Error(`Transfer quantity must be a positive whole number of the token's smallest unit, got "${quantity}".`);

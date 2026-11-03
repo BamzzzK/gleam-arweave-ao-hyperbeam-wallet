@@ -12,6 +12,7 @@ import {
   KeystoneSignatureError,
 } from "./sign-request";
 import type { DeviceSignPanel, DeviceSignPanelProps } from "@gleam/app/src/approval/device-panels.tsx";
+import { errorText } from "@gleam/app/src/i18n/errors.ts";
 import { t, useT, type MessageKey } from "@gleam/app/src/i18n/index.tsx";
 
 interface PreparedRequest {
@@ -56,7 +57,7 @@ function prepare({ payloads, wallet }: Pick<DeviceSignPanelProps, "payloads" | "
       }),
     };
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+    return { ok: false, message: errorText(error) };
   }
 }
 

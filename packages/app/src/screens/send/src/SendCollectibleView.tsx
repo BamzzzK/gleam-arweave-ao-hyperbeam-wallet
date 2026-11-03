@@ -25,6 +25,7 @@ import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { namedSuggestions, RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
@@ -66,7 +67,8 @@ const FEE_DIGITS = 12;
 function recipientError(recipient: string, ownAddress: string, assetId: string): string | undefined {
   const result = recipientSchema.safeParse(recipient);
   if (!result.success) return firstIssueMessage(result.error, t("send.invalidAddress"));
-  return collectibleSendRefusal({ sender: ownAddress, recipient: result.data, assetId }) ?? undefined;
+  const refusal = collectibleSendRefusal({ sender: ownAddress, recipient: result.data, assetId });
+  return refusal === null ? undefined : errorText(refusal);
 }
 
 function refOf(collectible: Collectible): CollectibleRef {
@@ -126,7 +128,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         setStep({
           ...step,
           submitting: false,
-          error: estimateError instanceof Error ? estimateError.message : String(estimateError),
+          error: errorText(estimateError),
         });
       }
     };
@@ -179,7 +181,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
           {unsupported ? (
             <p role="status" className="rounded-md border border-l-[3px] border-line border-l-warning bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
-              {unsupported}
+              {errorText(unsupported)}
             </p>
           ) : null}
 
@@ -230,7 +232,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         });
         setStep({ kind: "success", txId, recipient: step.recipient });
       } catch (sendError) {
-        setStep({ ...step, submitting: false, error: sendError instanceof Error ? sendError.message : String(sendError) });
+        setStep({ ...step, submitting: false, error: errorText(sendError) });
       }
     };
 

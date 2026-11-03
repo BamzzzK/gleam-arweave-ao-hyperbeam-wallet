@@ -6,6 +6,7 @@ import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { CameraDeniedNotice, type CameraDeniedHelp } from "./CameraDeniedNotice";
 import { decodeKeystoneAccount, KEYSTONE_ACCOUNT_UR_TYPE, type KeystoneAccount } from "./decode-account";
 import { QrScanner, type QrScannerProps, type ScannerError } from "./QrScanner";
+import { errorText as defaultErrorText } from "@gleam/app/src/i18n/errors.ts";
 import { useT, type MessageKey } from "@gleam/app/src/i18n/index.tsx";
 
 export interface KeystoneConnectViewProps {
@@ -14,7 +15,7 @@ export interface KeystoneConnectViewProps {
   onConnected: (wallet: WalletSummary) => void;
   /** Where this shell lets the user turn the camera back on. */
   cameraDeniedHelp: CameraDeniedHelp;
-  /** Rewrites the background's refusal of `addHardwareWallet` for this shell. Defaults to its message. */
+  /** Rewrites the background's refusal of `addHardwareWallet` for this shell. Defaults to its translated message. */
   errorText?: (error: unknown) => string;
   /** Swapped in tests, which have no camera. */
   Scanner?: ComponentType<QrScannerProps>;
@@ -31,16 +32,12 @@ const SCAN_ERROR: Record<Exclude<ScannerError, "camera-denied">, MessageKey> = {
   invalid: "extension.scanInvalid",
 };
 
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /** Scans a Keystone's account QR and adds that account as a wallet. Each shell draws the page around it. */
 export function KeystoneConnectView({
   runtime,
   onConnected,
   cameraDeniedHelp,
-  errorText = messageOf,
+  errorText = defaultErrorText,
   Scanner = QrScanner,
 }: KeystoneConnectViewProps) {
   const [step, setStep] = useState<Step>({ kind: "scan", attempt: 0, percent: 0 });

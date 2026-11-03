@@ -17,6 +17,7 @@ import { JoinNote } from "../screens/points/src/JoinNote";
 import { formatPoints } from "../screens/points/src/formatPoints";
 import { useJoinPoints, usePendingInvite } from "../screens/points/src/usePoints";
 import { useT, type MessageKey } from "../i18n";
+import { errorText } from "../i18n/errors";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -70,7 +71,7 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
         setMembership({ status: memberships[preview.walletId] ? "joined" : "not-joined", wallet });
       })
       .catch((error: unknown) => {
-        if (!cancelled) setMembership({ status: "error", message: error instanceof Error ? error.message : String(error) });
+        if (!cancelled) setMembership({ status: "error", message: errorText(error) });
       });
     return () => {
       cancelled = true;
@@ -163,7 +164,7 @@ function JoinFirst({
       <div className="mt-auto flex flex-col gap-3 pt-2">
         {join.error instanceof Error ? (
           <p role="alert" className="text-center text-caption text-warning">
-            {join.error.message}
+            {errorText(join.error)}
           </p>
         ) : null}
         <Button disabled={join.isPending} onClick={() => join.mutate({ walletId }, { onSuccess: onJoined })}>
@@ -210,7 +211,7 @@ function AttestationReview({
       check = { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
     if (!check.ok) {
-      setCheckError(check.error);
+      setCheckError(errorText(check.error));
       setSubmitting(false);
       return;
     }

@@ -7,6 +7,7 @@ import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 export interface SecurityPhraseStepProps {
   runtime: RuntimePort;
@@ -41,7 +42,7 @@ export function SecurityPhraseStep({ runtime, onDone }: SecurityPhraseStepProps)
               refreshAddressIdentity();
               onDone();
             }, (caught: unknown) => {
-              setError(caught instanceof Error ? caught.message : String(caught));
+              setError(errorText(caught));
               setSaving(false);
             });
         }}

@@ -31,6 +31,7 @@ import {
 } from "./usePoints";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { errorText } from "../../../i18n/errors";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -136,7 +137,7 @@ function JoinView({
         maxLength={16}
         disabled={!canJoin}
         errorMessage={
-          join.error instanceof Error ? join.error.message : undefined
+          join.error ? errorText(join.error) : undefined
         }
       />
 
@@ -148,7 +149,7 @@ function JoinView({
         {canJoin ? (
           <JoinNote withLink={false} />
         ) : (
-          <p className="text-center text-caption text-faint">{capabilityRefusal(wallet.method, "points", "join Gleam Points")}</p>
+          <p className="text-center text-caption text-faint">{errorText(capabilityRefusal(wallet.method, "points", "join Gleam Points"))}</p>
         )}
       </ScreenFooter>
 
@@ -376,7 +377,7 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
         {join.isPending ? t("points.joining") : t("points.joinAgain")}
       </Button>
       {join.isPending && isHardwareWalletMethod(wallet.method) ? <DeviceApprovalNote /> : null}
-      {join.error instanceof Error ? <p className="text-caption text-warning">{join.error.message}</p> : null}
+      {join.error instanceof Error ? <p className="text-caption text-warning">{errorText(join.error)}</p> : null}
     </section>
   );
 }
@@ -574,7 +575,7 @@ function LeaveControl({
         {t("points.leaveWarning", { points })}
       </p>
       {leave.error instanceof Error ? (
-        <p className="text-caption text-warning">{leave.error.message}</p>
+        <p className="text-caption text-warning">{errorText(leave.error)}</p>
       ) : null}
       <div className="flex gap-2">
         <Button

@@ -65,6 +65,7 @@ import { dispatchSiteMessage } from "./dispatch/site";
 import { redeemSiteInvite } from "./points-invite";
 import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -238,7 +239,7 @@ export function createRuntime(platform: Platform): Runtime {
     walletMethod: getWalletMethod,
     deviceProof: async ({ walletId, message }) => {
       const wallet = await getStoredWallet(walletId);
-      if (!wallet) throw new Error(`Wallet "${walletId}" doesn't exist.`);
+      if (!wallet) throw new Error(userErrorMessage("walletNotFound", { wallet: walletId }));
       const text = message(wallet.address);
       return { ...(await approval.requestPointsProof({ walletId, message: text })), message: text };
     },
@@ -369,7 +370,7 @@ export function createRuntime(platform: Platform): Runtime {
 
   async function walletAddress(walletId: string): Promise<string> {
     const wallet = (await lifecycle.getState()).wallets.find((candidate) => candidate.id === walletId);
-    if (!wallet) throw new Error(`No stored wallet with id "${walletId}".`);
+    if (!wallet) throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
     return wallet.address;
   }
 
@@ -469,7 +470,7 @@ export function createRuntime(platform: Platform): Runtime {
       return arweaveConfigFromGatewayUrl(gatewayUrl);
     },
     async getBalances(_params, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read balances for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletBalances"));
       return { ar: await reads.getBalance({ address: wallet.address }) };
     },
 
@@ -487,7 +488,7 @@ export function createRuntime(platform: Platform): Runtime {
     },
 
     async transferAoTokens({ token, recipient, amount }, { origin, wallet, activeWalletId }) {
-      if (!wallet) throw new Error("No active wallet to sign with.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
 
       // Best-effort: the same denomination/ticker read the token list uses
       // for balances, so the approval amount can render scaled with its
@@ -535,22 +536,22 @@ export function createRuntime(platform: Platform): Runtime {
     },
 
     async tokenBalance({ id }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read a token balance for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletTokenBalance"));
       return reads.tokenBalance({ address: wallet.address, id });
     },
 
     async userTokens({ options }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to read tokens for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletTokens"));
       return reads.userTokens({ address: wallet.address, options });
     },
 
     async isTokenAdded({ id: processId }, { wallet }) {
-      if (!wallet) throw new Error("No active wallet to check tokens for.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletCheckTokens"));
       return reads.isTokenAdded({ address: wallet.address, processId });
     },
 
     async addToken({ id: processId }, { origin, wallet }) {
-      if (!wallet) throw new Error("No active wallet to add a token to.");
+      if (!wallet) throw new Error(userErrorMessage("noActiveWalletAddToken"));
       // Already listed: nothing to ask the user.
       if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
       // Resolving first proves the id answers as a token, and gives the
@@ -673,7 +674,7 @@ export function createRuntime(platform: Platform): Runtime {
       state,
       wallet,
       activeWalletId: () => {
-        if (!wallet) throw new Error("No active wallet to sign with.");
+        if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
         return wallet.id;
       },
     });

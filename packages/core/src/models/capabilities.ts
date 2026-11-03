@@ -1,5 +1,6 @@
 import type { ProviderMethod } from "./method-privileges";
 import type { WalletMethod } from "./wallet";
+import { USER_ERRORS, userErrorMessage } from "./user-errors";
 
 /**
  * What a wallet of a given kind can do. Hardware wallets sign on the
@@ -103,12 +104,11 @@ const PROVIDER_REQUIREMENTS: Partial<Record<ProviderMethod, { capability: Provid
 };
 
 export function unsupportedOperationMessage(action: string): string {
-  return `This wallet can't ${action}. Switch to a keyfile wallet.`;
+  return userErrorMessage("unsupportedAction", { action });
 }
 
 /** Why a site can't connect while a watch wallet is active. */
-export const WATCH_ONLY_CONNECT_REFUSAL =
-  "The active Gleam wallet is watch-only, so it can't connect to sites. Switch to a wallet that can sign.";
+export const WATCH_ONLY_CONNECT_REFUSAL: string = USER_ERRORS.watchOnlyConnect;
 
 /** Why a wallet of `walletMethod` can't `action`, or null when it has `capability`. */
 export function capabilityRefusal(
@@ -117,7 +117,7 @@ export function capabilityRefusal(
   action: string,
 ): string | null {
   if (capabilitiesFor(walletMethod)[capability]) return null;
-  if (walletMethod === "watch") return `This wallet is watch-only, so it can't ${action}.`;
+  if (walletMethod === "watch") return userErrorMessage("watchOnlyAction", { action });
   return unsupportedOperationMessage(action);
 }
 

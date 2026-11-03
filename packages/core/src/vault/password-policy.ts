@@ -1,4 +1,5 @@
 import { COMMON_PASSWORDS } from "./common-passwords";
+import { userErrorMessage } from "../models/user-errors";
 
 const MIN_LENGTH = 12;
 
@@ -21,14 +22,14 @@ export function validatePassword(password: string): PasswordValidationResult {
   if (password.length < MIN_LENGTH) {
     return {
       valid: false,
-      reason: `Password must be at least ${MIN_LENGTH} characters.`,
+      reason: userErrorMessage("passwordTooShort", { min: MIN_LENGTH }),
     };
   }
 
   if (COMMON_PASSWORD_SET.has(password.toLowerCase())) {
     return {
       valid: false,
-      reason: "That password is too common. Choose something less guessable.",
+      reason: userErrorMessage("passwordTooCommon"),
     };
   }
 

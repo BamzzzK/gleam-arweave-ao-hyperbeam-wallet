@@ -1,6 +1,7 @@
 import type { ArweaveTransactionJson } from "../../arweave/transaction";
 import { base64UrlToBytes } from "../../vault/base64";
 import { LedgerError } from "./errors";
+import { userErrorMessage } from "../../models/user-errors";
 
 type Bytes = Uint8Array<ArrayBuffer>;
 
@@ -21,7 +22,7 @@ export function concatBytes(...parts: Uint8Array[]): Bytes {
 
 function u16(value: number, field: string): Bytes {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
-    throw new LedgerError("payload-too-large", `This transaction's ${field} is too large for a Ledger.`);
+    throw new LedgerError("payload-too-large", userErrorMessage("ledgerFieldTooLarge", { field }));
   }
   return new Uint8Array([value >> 8, value & 0xff]);
 }

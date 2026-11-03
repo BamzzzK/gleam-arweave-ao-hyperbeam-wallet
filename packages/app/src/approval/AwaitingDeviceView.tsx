@@ -6,6 +6,7 @@ import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
+import { errorText } from "../i18n/errors";
 
 /**
  * Shown once the user has approved a hardware wallet's request: the
@@ -65,7 +66,7 @@ export function AwaitingDeviceView({ origin, device, Panel, onSubmit, onCancel, 
     try {
       await onSubmit(signatures);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : String(submitError));
+      setError(errorText(submitError));
       setSubmitting(false);
     }
   };

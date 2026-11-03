@@ -6,6 +6,7 @@ import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { securityPhraseIconSvg } from "../../../security-phrase-icon";
 import { useAddressIdentity } from "../../../address-identity";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 type SectionState =
   | { kind: "loading" }
@@ -49,7 +50,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         phrase,
         draft,
         saving: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   };

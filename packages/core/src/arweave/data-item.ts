@@ -1,6 +1,7 @@
 import type { Signer } from "../vault/signer";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * ANS-104 data items with signature type 1 (Arweave RSA-PSS 4096), built
@@ -329,7 +330,7 @@ export async function applyDataItemSignature(
   expectedOwner: string,
 ): Promise<SignedDataItem> {
   if (!(await verifyDataItemSignature(unsigned, signature, expectedOwner))) {
-    throw new Error("The signature doesn't match this data item or its owner.");
+    throw new Error(userErrorMessage("dataItemSignatureMismatch"));
   }
   const raw = new Uint8Array(unsigned);
   raw.set(signature, SIGNATURE_OFFSET);
@@ -339,7 +340,7 @@ export async function applyDataItemSignature(
 /** Signs an unsigned item's deep hash with a keyfile. Returns the raw 512-byte signature. */
 export async function signDataItemWithSigner(unsigned: Uint8Array, signer: Signer): Promise<Bytes> {
   if (!sameOwner(dataItemOwner(unsigned), signer.owner)) {
-    throw new Error("This data item names a different owner than the signing key.");
+    throw new Error(userErrorMessage("dataItemOwnerMismatch"));
   }
   const signature = await signRsaPss(signer, await dataItemSignatureData(unsigned));
   if (signature.byteLength !== SIGNATURE_LENGTH) {

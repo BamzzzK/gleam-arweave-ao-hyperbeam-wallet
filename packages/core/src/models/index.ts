@@ -11,6 +11,8 @@ export type {
   HardwareDevice,
 } from "./wallet";
 export { isHardwareWalletMethod, isKeylessWalletMethod, isWatchWalletMethod, vaultHasPassword } from "./wallet";
+export { USER_ERRORS, matchUserError, userErrorMessage } from "./user-errors";
+export type { UserErrorCode } from "./user-errors";
 export type { WalletCapabilities } from "./capabilities";
 export { HARDWARE_MESSAGE_HASH, WATCH_ONLY_CONNECT_REFUSAL, capabilitiesFor, capabilityRefusal, providerMethodRefusal, unsupportedOperationMessage } from "./capabilities";
 export type {

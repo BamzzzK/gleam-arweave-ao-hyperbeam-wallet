@@ -16,6 +16,7 @@ import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
 import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { errorText } from "../../../i18n/errors";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -97,7 +98,7 @@ export function WalletDetailView({
       });
       onRenamed(trimmedName);
     } catch (error) {
-      setNameError(error instanceof Error ? error.message : String(error));
+      setNameError(errorText(error));
     } finally {
       setSavingName(false);
     }
@@ -119,7 +120,7 @@ export function WalletDetailView({
       setStep({
         kind: "export-password",
         submitting: false,
-        serverError: error instanceof Error ? error.message : String(error),
+        serverError: errorText(error),
       });
     }
   };
@@ -136,7 +137,7 @@ export function WalletDetailView({
       setStep({
         kind: "remove-confirm",
         removing: false,
-        serverError: error instanceof Error ? error.message : String(error),
+        serverError: errorText(error),
       });
     }
   };

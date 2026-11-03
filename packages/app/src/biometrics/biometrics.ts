@@ -1,6 +1,7 @@
 import type { RuntimePort } from "@gleam/core";
 import type { BiometricUnlockPort, BiometryKind } from "../app-platform/types";
 import { t, type MessageKey } from "../i18n";
+import { errorText } from "../i18n/errors";
 
 /**
  * - `invalidated`: the device's biometrics changed, so the OS discarded the
@@ -87,7 +88,7 @@ export function biometricNotice(error: unknown, kind: BiometryKind): { text: str
   const label = biometryLabel(kind);
   const title = biometryTitle(kind);
   if (!(error instanceof BiometricError)) {
-    return { text: error instanceof Error ? error.message : String(error), tone: "error" };
+    return { text: errorText(error), tone: "error" };
   }
   switch (error.reason) {
     case "cancelled":

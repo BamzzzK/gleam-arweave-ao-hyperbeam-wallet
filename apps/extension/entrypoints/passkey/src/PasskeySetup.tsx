@@ -7,6 +7,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { PasskeyIcon } from "@gleam/app/src/screens/unlock/src/UnlockScreen.tsx";
 import { createUnlockPasskey, PasskeyError, type CreatedPasskey } from "@gleam/app/src/passkey/webauthn.ts";
 import { useT } from "@gleam/app/src/i18n/index.tsx";
+import { errorText } from "@gleam/app/src/i18n/errors.ts";
 
 export interface PasskeySetupProps {
   runtime: RuntimePort;
@@ -39,7 +40,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
     try {
       await runtime.send({ type: "checkVaultPassword", payload: { password } });
     } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : String(error));
+      setPasswordError(errorText(error));
       setPhase("idle");
       return;
     }
@@ -52,7 +53,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
       setNotice(
         error instanceof PasskeyError && error.reason === "cancelled"
           ? { text: t("extension.passkeyCancelledNotice"), tone: "muted" }
-          : { text: error instanceof Error ? error.message : String(error), tone: "error" },
+          : { text: errorText(error), tone: "error" },
       );
       setPhase("idle");
       return;
@@ -64,7 +65,7 @@ export function PasskeySetup({ runtime, onDone, createPasskey = createUnlockPass
       setPassword("");
       setPhase("done");
     } catch (error) {
-      setNotice({ text: error instanceof Error ? error.message : String(error), tone: "error" });
+      setNotice({ text: errorText(error), tone: "error" });
       setPhase("idle");
     }
   };

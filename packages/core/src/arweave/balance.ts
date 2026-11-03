@@ -1,4 +1,5 @@
 import type { Winston } from "../models/balance";
+import { userErrorMessage } from "../models/user-errors";
 
 /** A gateway that never answers would otherwise hold every balance read open. */
 const BALANCE_TIMEOUT_MS = 10_000;
@@ -19,14 +20,14 @@ export async function getBalance(
 
   if (!response.ok) {
     throw new Error(
-      `Failed to read AR balance for "${address}" from ${gatewayUrl} (HTTP ${response.status}).`,
+      userErrorMessage("arBalanceFailed", { address, gateway: gatewayUrl, status: response.status }),
     );
   }
 
   const body = (await response.text()).trim();
   if (!/^\d+$/.test(body)) {
     throw new Error(
-      `Gateway returned a non-integer balance for "${address}": "${body}".`,
+      userErrorMessage("arBalanceNotInteger", { address, body }),
     );
   }
 

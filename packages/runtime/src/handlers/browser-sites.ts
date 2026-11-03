@@ -1,4 +1,5 @@
 import type { StoragePort } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of the dApp browser's saved and recent
@@ -27,9 +28,9 @@ function webOrigin(url: string): string {
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error("Enter a web address.");
+    throw new Error(userErrorMessage("enterWebAddress"));
   }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Enter a web address.");
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error(userErrorMessage("enterWebAddress"));
   return parsed.origin;
 }
 

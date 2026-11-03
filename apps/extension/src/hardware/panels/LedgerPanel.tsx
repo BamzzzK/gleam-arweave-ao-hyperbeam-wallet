@@ -7,7 +7,6 @@ import {
   ledgerMaxPayloadBytes,
   LEDGER_PERMAWEB_INSTALLER_URL,
   LEDGER_PERMAWEB_REQUIRED_MESSAGE,
-  LEDGER_PERMAWEB_REQUIRED_REASON,
   LEDGER_MESSAGE_UNSUPPORTED,
   type LedgerTransport,
 } from "@gleam/core";
@@ -41,7 +40,7 @@ function PermawebRequiredError() {
   const t = useT();
   return (
     <span className="flex flex-col gap-2">
-      <span>{LEDGER_PERMAWEB_REQUIRED_REASON}</span>
+      <span>{t("errors.ledgerPermawebReason")}</span>
       <span>
         {t("extension.permawebInstallPrefix")}
         <a href={LEDGER_PERMAWEB_INSTALLER_URL} target="_blank" rel="noreferrer" className="underline">

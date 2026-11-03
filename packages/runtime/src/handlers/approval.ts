@@ -77,6 +77,7 @@ import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -411,7 +412,7 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "signMessage",
 ]);
 
-const TIMED_OUT = "Approval request timed out — the approval was not resolved in time.";
+const TIMED_OUT = userErrorMessage("approvalTimedOut");
 
 /** How soon a timeout looks again at a request that was being resolved when it fired. */
 const RESOLVING_RECHECK_MS = 5_000;
@@ -489,7 +490,7 @@ function normalizedQuantity(quantity: string | undefined): string {
 }
 
 function mismatch(field: string): never {
-  throw new Error(`The prepared ${field} doesn't match the request, so nothing was sent to the device.`);
+  throw new Error(userErrorMessage("approvalMismatch", { field }));
 }
 
 interface ExpectedTransaction {
@@ -628,7 +629,7 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
 /** The stored attestation, checked again: the brand doesn't survive storage. */
 function parsedAttestationOf(input: SigningRequestInput): ParsedAttestation {
   const parsed = parseAttestation(input.attestation);
-  if (!parsed.ok) throw new Error("This request's attestation isn't valid.");
+  if (!parsed.ok) throw new Error(userErrorMessage("attestationInvalid"));
   return parsed.attestation;
 }
 
@@ -703,7 +704,7 @@ async function buildScanAttestationPreview(
   const id = await attestationId(attestation);
   const message = buildAttestMessage(attestation.release, id);
   if (textDecoder.decode(input.payload) !== message) {
-    throw new Error("The message to sign isn't this attestation's.");
+    throw new Error(userErrorMessage("attestationMessageMismatch"));
   }
   return {
     kind: "scanAttestation",
@@ -985,7 +986,7 @@ export class ApprovalHandler {
     const pending = await this.loadPending();
     const entry = pending.find((candidate) => candidate.request.requestId === requestId);
     if (!entry) {
-      throw new Error(`No pending approval request with id "${requestId}".`);
+      throw new Error(userErrorMessage("approvalNotPending", { id: requestId }));
     }
     return entry;
   }
@@ -998,7 +999,7 @@ export class ApprovalHandler {
   private async findLive(requestId: string, owned: boolean): Promise<PendingApprovalRecord> {
     const entry = (await this.loadAllPending()).find((candidate) => candidate.request.requestId === requestId);
     if (!entry || entry.outcome) {
-      throw new Error(`No pending approval request with id "${requestId}".`);
+      throw new Error(userErrorMessage("approvalNotPending", { id: requestId }));
     }
     if (this.pastDeadline(entry) && (owned || !this.resolving.has(requestId))) {
       await this.timeOut(requestId);
@@ -1057,10 +1058,10 @@ export class ApprovalHandler {
   async resolveApproval(req: { requestId: string; approved: boolean }): Promise<ApprovalRequest | ApprovalShown | void> {
     const entry = await this.findPending(req.requestId);
     if (this.resolving.has(req.requestId)) {
-      throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
+      throw new Error(userErrorMessage("approvalResolving", { id: req.requestId }));
     }
     if (req.approved && entry.device) {
-      throw new Error("This request is already approved. Sign it on your device.");
+      throw new Error(userErrorMessage("approvalAwaitingDevice"));
     }
     this.resolving.add(req.requestId);
     try {
@@ -1146,7 +1147,7 @@ export class ApprovalHandler {
       return current.map((candidate) => (candidate.request.requestId === requestId ? { ...candidate, device } : candidate));
     });
     if (!stillPending) {
-      throw new Error("This request ended while it was being prepared for your device. Start again from the app.");
+      throw new Error(userErrorMessage("approvalEndedPreparing"));
     }
     return this.requestView({ ...entry, device });
   }
@@ -1165,7 +1166,7 @@ export class ApprovalHandler {
   async deviceActivity(req: { requestId: string }): Promise<{ deadline: number }> {
     const entry = await this.findLive(req.requestId, false);
     if (!entry.device) {
-      throw new Error(`Approval request "${req.requestId}" isn't waiting for a device.`);
+      throw new Error(userErrorMessage("approvalNotWaitingForDevice", { id: req.requestId }));
     }
     const deadline = this.deviceDeadline(entry.request);
     await this.updatePending((current) =>
@@ -1187,13 +1188,13 @@ export class ApprovalHandler {
    */
   async submitDeviceSignature(req: { requestId: string; signatures: string[] }): Promise<ApprovalShown | void> {
     if (this.resolving.has(req.requestId)) {
-      throw new Error(`Approval request "${req.requestId}" is already being resolved.`);
+      throw new Error(userErrorMessage("approvalResolving", { id: req.requestId }));
     }
     this.resolving.add(req.requestId);
     try {
       const entry = await this.findLive(req.requestId, true);
       if (!entry.device || !entry.walletId) {
-        throw new Error(`Approval request "${req.requestId}" isn't waiting for a device signature.`);
+        throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
       const walletId = entry.walletId;
       const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
@@ -1220,18 +1221,18 @@ export class ApprovalHandler {
     publicKey: string,
   ): Promise<Uint8Array[]> {
     if (!Array.isArray(encoded) || encoded.length !== payloads.length) {
-      throw new Error(`Expected ${payloads.length} signature(s) from the device, got ${encoded?.length ?? 0}.`);
+      throw new Error(userErrorMessage("deviceSignatureCount", { expected: payloads.length, received: encoded?.length ?? 0 }));
     }
     const signatures = encoded.map((value) => {
       if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value)) {
-        throw new Error("The device returned a signature that isn't base64url.");
+        throw new Error(userErrorMessage("deviceSignatureEncoding"));
       }
       return base64UrlToBytes(value);
     });
     for (const [index, payload] of payloads.entries()) {
       if (!(await verifyDeviceSignature(payload, signatures[index]!, publicKey))) {
         throw new Error(
-          "The signature doesn't match this wallet. Check that the right device and account signed, then try again.",
+          userErrorMessage("deviceSignatureMismatch"),
         );
       }
     }
@@ -1254,10 +1255,10 @@ export class ApprovalHandler {
   private async hardwareWallet(walletId: string): Promise<HardwareWalletInfo> {
     const wallet = await this.keySession.getStoredWallet(walletId);
     if (!wallet || !isHardwareWalletMethod(wallet.method) || wallet.publicKey.length === 0) {
-      throw new Error(`Wallet "${walletId}" isn't a hardware wallet with a stored public key.`);
+      throw new Error(userErrorMessage("notHardwareWallet", { wallet: walletId }));
     }
     if ((await addressFromOwner(wallet.publicKey)) !== wallet.address) {
-      throw new Error("This wallet's stored public key doesn't match its address. Signing was refused.");
+      throw new Error(userErrorMessage("storedKeySigningMismatch"));
     }
     return { method: wallet.method, device: wallet.device ?? null, address: wallet.address, publicKey: wallet.publicKey };
   }
@@ -1506,7 +1507,7 @@ export class ApprovalHandler {
   ): Promise<{ granted: PermissionType[] }> {
     const grantWalletId = walletId ?? (await this.activeWalletId());
     if (!grantWalletId) {
-      throw new Error("There is no wallet to connect. Create or import one first.");
+      throw new Error(userErrorMessage("noWalletToConnect"));
     }
     if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
       throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
@@ -1580,7 +1581,7 @@ export class ApprovalHandler {
 
     const signer = await this.keySession.getSigner(walletId);
     if (!signer) {
-      throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
+      throw new Error(userErrorMessage("walletLocked", { wallet: walletId }));
     }
 
     if (input.kind === "transferAoTokens" || input.kind === "transfer") {
@@ -1673,10 +1674,10 @@ export class ApprovalHandler {
   private async storedOwner(walletId: string): Promise<string> {
     const wallet = await this.keySession.getStoredWallet(walletId);
     if (!wallet || wallet.publicKey.length === 0) {
-      throw new Error(`No public key stored for wallet "${walletId}".`);
+      throw new Error(userErrorMessage("noStoredPublicKey", { wallet: walletId }));
     }
     if ((await addressFromOwner(wallet.publicKey)) !== wallet.address) {
-      throw new Error("This wallet's stored public key doesn't match its address. Encryption was refused.");
+      throw new Error(userErrorMessage("storedKeyEncryptionMismatch"));
     }
     return wallet.publicKey;
   }

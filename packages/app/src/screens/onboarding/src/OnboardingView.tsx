@@ -19,6 +19,7 @@ import { ClaimStep, type ClaimPhase } from "./ClaimStep";
 import { FoundingRevealScreen } from "./FoundingReveal";
 import { SecurityPhraseStep } from "./SecurityPhraseStep";
 import { t as translate, useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Onboarding view module (`screens/onboarding/`) — a folder, not
@@ -178,7 +179,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       await markClaimPending(summary);
       setStep({ kind: "backup", password, wallet: summary });
     } catch (error) {
-      setServerError(error instanceof Error ? error.message : String(error));
+      setServerError(errorText(error));
     } finally {
       setSubmitting(false);
     }
@@ -191,7 +192,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
     try {
       result = await downloadKeyfile(runtime, { walletId: wallet.id, password }, requestPermission);
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : String(caught);
+      error = errorText(caught);
     }
     if (result?.ok) {
       setStep((current) => (current.kind === "backup" ? { ...current, password: null } : current));
@@ -219,7 +220,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       await markClaimPending(summary);
       finish(summary);
     } catch (error) {
-      setServerError(error instanceof Error ? error.message : String(error));
+      setServerError(errorText(error));
     } finally {
       setSubmitting(false);
     }

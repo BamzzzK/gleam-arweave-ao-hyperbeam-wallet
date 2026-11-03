@@ -1,4 +1,5 @@
 import { readSecurityPhrase, type SecurityPhrase, type StoragePort } from "@gleam/core";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 const SECURITY_PHRASE_KEY = "local:securityPhrase";
 
@@ -17,7 +18,7 @@ export class SecurityPhraseHandler {
 
   async set(req: SecurityPhrase): Promise<void> {
     const phrase = readSecurityPhrase(req);
-    if (!phrase) throw new Error("Pick a word of up to 24 letters or numbers.");
+    if (!phrase) throw new Error(userErrorMessage("securityPhraseInvalid"));
     await this.storage.set(SECURITY_PHRASE_KEY, phrase);
   }
 }

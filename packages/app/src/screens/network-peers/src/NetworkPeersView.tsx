@@ -6,6 +6,7 @@ import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * The gateway and the AO-peer list are both editable, writing the full
@@ -187,7 +188,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime]);
@@ -256,7 +257,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
       await runtime.send<NetworkSettings, void>({ type: "setNetworkSettings", payload: next });
       setState((prev) => ({ ...prev, settings: next }));
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
+      setState((prev) => ({ ...prev, error: errorText(error) }));
     } finally {
       setSaving(false);
     }

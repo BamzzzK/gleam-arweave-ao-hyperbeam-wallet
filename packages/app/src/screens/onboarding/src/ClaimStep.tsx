@@ -7,6 +7,7 @@ import { JoinNote } from "../../points/src/JoinNote";
 import { useJoinPoints, usePendingInvite } from "../../points/src/usePoints";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 export const CLAIM_PENDING_QUERY_KEY = ["points", "claimPending"] as const;
 
@@ -74,7 +75,7 @@ export function ClaimStep({ runtime, walletId, onClaimed, onSkip }: ClaimStepPro
       </div>
 
       <ScreenFooter className="pt-6">
-        {join.error instanceof Error ? <p className="text-center text-caption text-warning">{join.error.message}</p> : null}
+        {join.error instanceof Error ? <p className="text-center text-caption text-warning">{errorText(join.error)}</p> : null}
         <Button
           disabled={join.isPending}
           onClick={() => join.mutate({ walletId }, { onSuccess: onClaimed })}

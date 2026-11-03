@@ -5,6 +5,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
@@ -71,7 +72,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime]);
@@ -89,7 +90,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     } finally {
       setSwitchingId(null);

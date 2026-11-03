@@ -4,6 +4,7 @@ import type { Tag } from "../models/tag";
 import { base64UrlToBytes, bytesToBase64Url } from "../vault/base64";
 import { clientForGateway } from "./client";
 import { sha256, signRsaPss, verifyRsaPss } from "./rsa-pss";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * Format-2 Arweave transactions split into build, sign and apply, so a
@@ -111,7 +112,7 @@ export async function transactionSignatureData(unsigned: ArweaveTransactionJson)
   const transaction = fromJson({ ...unsigned, data_root: "" });
   await transaction.prepareChunks(transaction.data);
   if (transaction.data_root !== unsigned.data_root || String(transaction.data.byteLength) !== unsigned.data_size) {
-    throw new Error("The transaction's data_root or data_size doesn't match its data.");
+    throw new Error(userErrorMessage("transactionDataMismatch"));
   }
   return new Uint8Array(await transaction.getSignatureData());
 }
@@ -155,7 +156,7 @@ export async function applyTransactionSignature(
   expectedOwner: string,
 ): Promise<SignedArweaveTransaction> {
   if (!(await verifyTransactionSignature(unsigned, signature, expectedOwner))) {
-    throw new Error("The signature doesn't match this transaction or its owner.");
+    throw new Error(userErrorMessage("transactionSignatureMismatch"));
   }
   const id = bytesToBase64Url(await sha256(new Uint8Array(signature)));
   return { id, transaction: { ...unsigned, id, signature: bytesToBase64Url(signature) } };
@@ -164,7 +165,7 @@ export async function applyTransactionSignature(
 /** Signs an unsigned transaction's deep hash with a keyfile. Returns the raw 512-byte signature. */
 export async function signTransactionWithSigner(unsigned: ArweaveTransactionJson, signer: Signer): Promise<Bytes> {
   if (!sameOwner(unsigned.owner, signer.owner)) {
-    throw new Error("This transaction names a different owner than the signing key.");
+    throw new Error(userErrorMessage("transactionOwnerMismatch"));
   }
   return signRsaPss(signer, await transactionSignatureData(unsigned));
 }

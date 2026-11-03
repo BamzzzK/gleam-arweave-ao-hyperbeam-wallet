@@ -6,6 +6,7 @@ import type { UnsignedPayload } from "../../vault/signing";
 import { LedgerError, SW_OK, statusWordError } from "./errors";
 import { concatBytes, encodeTransactionForLedger, ledgerChunks } from "./serialize";
 import type { LedgerTransport } from "./transport";
+import { USER_ERRORS, userErrorMessage } from "../../models/user-errors";
 
 /**
  * The Arweave Ledger app's APDU protocol (Zondax's `app-arweave`, spec in
@@ -88,7 +89,7 @@ export function ledgerMaxPayloadBytes(version: LedgerAppVersion): number {
 }
 
 function invalidResponse(what: string): LedgerError {
-  return new LedgerError("invalid-response", `Your Ledger sent an unexpected reply (${what}).`);
+  return new LedgerError("invalid-response", userErrorMessage("ledgerUnexpectedReply", { detail: what }));
 }
 
 /** Parses the reply to `B0 01 00 00`: format 1, then length-prefixed name and version. */
@@ -112,7 +113,7 @@ function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 function ownerMismatch(): LedgerError {
-  return new LedgerError("owner-mismatch", "This request belongs to a different account than the connected Ledger.");
+  return new LedgerError("owner-mismatch", userErrorMessage("ledgerOwnerMismatch"));
 }
 
 export class LedgerArweaveClient {
@@ -177,7 +178,7 @@ export class LedgerArweaveClient {
     const address = await this.getAddress({ verify });
     const publicKey = await this.getPublicKey();
     if (bytesToBase64Url(await sha256(publicKey)) !== address) {
-      throw new LedgerError("identity-mismatch", "Your Ledger's address doesn't match its public key.");
+      throw new LedgerError("identity-mismatch", userErrorMessage("ledgerAddressMismatch"));
     }
     return { address, owner: bytesToBase64Url(publicKey), publicKey };
   }
@@ -197,16 +198,16 @@ export class LedgerArweaveClient {
   /** Signs an unsigned format-2 transaction owned by the device's key. Returns the raw 512-byte signature. */
   async signTransaction(tx: ArweaveTransactionJson, { maxBytes = LEDGER_MAX_PAYLOAD_BYTES }: LedgerSignOptions = {}): Promise<Bytes> {
     if (tx.format !== 2) {
-      throw new LedgerError("unsupported-payload", "Ledger only signs format-2 Arweave transactions.");
+      throw new LedgerError("unsupported-payload", userErrorMessage("ledgerFormat2Only"));
     }
     // The app renders a Target screen before signing and fails with "Unexpected buffer end" when there is none.
     if (!tx.target) throw new LedgerError("unsupported-payload", LEDGER_TARGET_REQUIRED_MESSAGE);
     if (tx.tags.length > MAX_TAGS) {
-      throw new LedgerError("too-many-tags", `Ledger signs at most ${MAX_TAGS} tags.`);
+      throw new LedgerError("too-many-tags", userErrorMessage("ledgerTooManyTags", { max: MAX_TAGS }));
     }
     const header = encodeTransactionForLedger(tx);
     if (header.byteLength > maxBytes) {
-      throw new LedgerError("payload-too-large", "This transaction's tags are too large for your Ledger to sign.");
+      throw new LedgerError("payload-too-large", userErrorMessage("ledgerTagsTooLarge"));
     }
     const expected = await transactionSignatureData(tx);
     if (!equalBytes(await this.getPublicKey(), base64UrlToBytes(tx.owner))) throw ownerMismatch();
@@ -223,10 +224,10 @@ export class LedgerArweaveClient {
    */
   async signDataItem(raw: Uint8Array, { maxBytes = LEDGER_MAX_PAYLOAD_BYTES }: LedgerSignOptions = {}): Promise<Bytes> {
     if (raw.byteLength < 2 || raw[0] !== 1 || raw[1] !== 0) {
-      throw new LedgerError("unsupported-payload", "Ledger only signs Arweave (type 1) data items.");
+      throw new LedgerError("unsupported-payload", userErrorMessage("ledgerType1Only"));
     }
     if (raw.byteLength > maxBytes) {
-      throw new LedgerError("payload-too-large", "This data item is too large for your Ledger to sign.");
+      throw new LedgerError("payload-too-large", userErrorMessage("ledgerDataItemTooLarge"));
     }
     let tags: DataItemTag[];
     let expected: Bytes;
@@ -237,7 +238,7 @@ export class LedgerArweaveClient {
       throw new LedgerError("unsupported-payload", error instanceof Error ? error.message : String(error));
     }
     if (tags.length > MAX_TAGS) {
-      throw new LedgerError("too-many-tags", `Ledger signs at most ${MAX_TAGS} tags.`);
+      throw new LedgerError("too-many-tags", userErrorMessage("ledgerTooManyTags", { max: MAX_TAGS }));
     }
     checkPermawebTags(tags);
 
@@ -272,7 +273,7 @@ export class LedgerArweaveClient {
     if (!equalBytes(deepHash, expected)) {
       throw new LedgerError(
         "hash-mismatch",
-        `Your Ledger signed a different ${what} than Gleam built. Nothing was sent; update the Ledger app and try again.`,
+        userErrorMessage("ledgerSignedDifferent", { field: what }),
       );
     }
     // The device zeroizes the signature once the second half is read, so any failure here needs a fresh signing.
@@ -280,10 +281,10 @@ export class LedgerArweaveClient {
     try {
       signature = await this.readTwoHalves(INS.getSignature, "signature");
     } catch (error) {
-      throw new LedgerError("signature-incomplete", "Gleam couldn't read the signature from your Ledger. Sign again on your Ledger.", error instanceof LedgerError ? error.statusWord : undefined);
+      throw new LedgerError("signature-incomplete", userErrorMessage("ledgerSignatureUnread"), error instanceof LedgerError ? error.statusWord : undefined);
     }
     if (!(await verifyRsaPss(owner, expected, signature))) {
-      throw new LedgerError("signature-invalid", "Your Ledger returned a signature that doesn't check out. Nothing was sent; sign again on your Ledger.");
+      throw new LedgerError("signature-invalid", userErrorMessage("ledgerSignatureInvalid"));
     }
     return signature;
   }
@@ -304,11 +305,11 @@ function checkPermawebTags(tags: DataItemTag[]): void {
     if (!name || !printable(name) || !printable(value)) {
       throw new LedgerError(
         "unsupported-tags",
-        `Your Ledger only signs tags written in plain ASCII text, with a name. "${name}" can't be shown on the device.`,
+        userErrorMessage("ledgerTagNotAscii", { name }),
       );
     }
     if (seen.has(name)) {
-      throw new LedgerError("unsupported-tags", `Your Ledger can't sign a data item with two "${name}" tags.`);
+      throw new LedgerError("unsupported-tags", userErrorMessage("ledgerDuplicateTag", { name }));
     }
     seen.add(name);
   }
@@ -317,17 +318,14 @@ function checkPermawebTags(tags: DataItemTag[]): void {
 /** The permawebOS wallet, which installs the beta Permaweb app on a Ledger; Gleam doesn't ship the app. */
 export const LEDGER_PERMAWEB_INSTALLER_URL = "https://arweave.net/DkgYUWIl593qN_2OVeGxgK5ZHtv6ERIb_llTzzAQ594";
 
-export const LEDGER_PERMAWEB_REQUIRED_REASON = "Your Ledger can only send AR with the Arweave app.";
+export const LEDGER_PERMAWEB_REQUIRED_REASON: string = USER_ERRORS.ledgerPermawebReason;
 
 /** Plain-text form; the Ledger panel shows the same copy with the installer linked. */
-export const LEDGER_PERMAWEB_REQUIRED_MESSAGE =
-  `${LEDGER_PERMAWEB_REQUIRED_REASON}\n\nTo send AO on Gleam, install the beta Permaweb app using the permawebOS extension: ` +
-  LEDGER_PERMAWEB_INSTALLER_URL;
+export const LEDGER_PERMAWEB_REQUIRED_MESSAGE = userErrorMessage("ledgerPermawebRequired", { url: LEDGER_PERMAWEB_INSTALLER_URL });
 
-export const LEDGER_TARGET_REQUIRED_MESSAGE =
-  "The Ledger Arweave app only signs transactions sent to an address. Use a Keystone or a keyfile wallet for this one.";
+export const LEDGER_TARGET_REQUIRED_MESSAGE: string = USER_ERRORS.ledgerTargetRequired;
 
-export const LEDGER_MESSAGE_UNSUPPORTED = "The Ledger Arweave app can't sign messages. Use a Keystone or a keyfile wallet.";
+export const LEDGER_MESSAGE_UNSUPPORTED: string = USER_ERRORS.ledgerMessageUnsupported;
 
 function permawebRequired(): LedgerError {
   return new LedgerError("permaweb-app-required", LEDGER_PERMAWEB_REQUIRED_MESSAGE);

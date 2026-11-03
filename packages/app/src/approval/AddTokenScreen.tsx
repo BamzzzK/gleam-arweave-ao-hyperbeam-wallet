@@ -4,6 +4,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
+import { errorText } from "../i18n/errors";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -40,7 +41,7 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
     try {
       await onAdd();
     } catch (addError) {
-      setError(addError instanceof Error ? addError.message : String(addError));
+      setError(errorText(addError));
       setSubmitting(false);
     }
   };

@@ -31,6 +31,7 @@ import { forgetQueryCache } from "../query-cache/sweep";
 import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
+import { errorText } from "../i18n/errors";
 
 /**
  * The approval UI's top-level state machine, in a window or a sheet: loads the pending
@@ -185,7 +186,7 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
         setState({ kind: "ready", runtime, request, assessment });
       }
     } catch (error) {
-      setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+      setState({ kind: "error", message: errorText(error) });
     }
   };
 
@@ -209,7 +210,7 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
         ]);
       } catch (error) {
         if (cancelled) return;
-        setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+        setState({ kind: "error", message: errorText(error) });
       }
     }
 
@@ -324,7 +325,7 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
         }
         setState({ kind: "done", message: t(doneKey) });
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
+        const reason = errorText(error);
         setState({ kind: "failed", message: t(failureKey, { reason }) });
       }
     };

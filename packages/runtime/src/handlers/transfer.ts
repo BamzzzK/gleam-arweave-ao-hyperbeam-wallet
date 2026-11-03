@@ -35,6 +35,7 @@ import {
   type Winston,
 } from "@gleam/core";
 import type { KeySession } from "./key-session";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -139,7 +140,7 @@ export class TransferHandler {
     const wallets = Array.isArray(raw) ? raw.filter(isValidWallet) : [];
     const wallet = wallets.find((candidate) => candidate.id === walletId);
     if (!wallet) {
-      throw new Error(`No stored wallet with id "${walletId}".`);
+      throw new Error(userErrorMessage("noStoredWallet", { wallet: walletId }));
     }
     return wallet;
   }
@@ -159,7 +160,7 @@ export class TransferHandler {
   private async signerFor(walletId: string): Promise<Signer> {
     const signer = await this.keySession.getSigner(walletId);
     if (!signer) {
-      throw new Error(`Wallet "${walletId}" is locked. Unlock it to continue.`);
+      throw new Error(userErrorMessage("walletLocked", { wallet: walletId }));
     }
     return signer;
   }

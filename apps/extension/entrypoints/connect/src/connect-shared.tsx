@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Beam } from "@gleam/ui/src/primitives/beam.tsx";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { errorText } from "@gleam/app/src/i18n/errors.ts";
 import { t, useT } from "@gleam/app/src/i18n/index.tsx";
 
 /** Rewrites the background's refusals into copy for the connect page. */
@@ -9,7 +10,7 @@ export function backgroundErrorText(error: unknown): string {
   if (/unlock/i.test(message)) {
     return t("extension.lockedHelp");
   }
-  return message;
+  return errorText(error);
 }
 
 export function ConnectShell({ title, children }: { title: string; children: ReactNode }) {

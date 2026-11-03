@@ -4,6 +4,7 @@ import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet
 import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useT, type TFunction } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Per-origin grant list with scope + expiry inline (never hidden behind
@@ -59,7 +60,7 @@ export function ConnectedAppsView({ runtime, onBack, highlightOrigin }: Connecte
       const result = await runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined });
       setGrants(result);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(errorText(loadError));
     }
   }, [runtime]);
 

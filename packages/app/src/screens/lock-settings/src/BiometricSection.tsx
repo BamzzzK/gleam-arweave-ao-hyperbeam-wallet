@@ -7,6 +7,7 @@ import type { BiometricAvailability, BiometricUnlockPort } from "../../../app-pl
 import { BiometricError, biometryLabel, biometryTitle } from "../../../biometrics/biometrics";
 import { BiometricIcon, Spinner } from "../../unlock/src/UnlockScreen";
 import { useT, type MessageKey } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 type Notice = { text: string; tone: "muted" | "error" };
 
@@ -67,7 +68,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
     try {
       await runtime.send<{ password: string }, void>({ type: "checkVaultPassword", payload: { password } });
     } catch (error) {
-      setState({ ...ready, phase: "idle", passwordError: error instanceof Error ? error.message : String(error) });
+      setState({ ...ready, phase: "idle", passwordError: errorText(error) });
       return;
     }
     setState({ ...ready, phase: "enrolling", passwordError: undefined, notice: undefined });
@@ -96,7 +97,7 @@ export function BiometricSection({ runtime, biometrics }: { runtime: RuntimePort
       await biometrics.remove();
       setState({ ...ready, enrolled: false, phase: "idle" });
     } catch (error) {
-      setState({ ...ready, phase: "idle", notice: { text: error instanceof Error ? error.message : String(error), tone: "error" } });
+      setState({ ...ready, phase: "idle", notice: { text: errorText(error), tone: "error" } });
     }
   };
 

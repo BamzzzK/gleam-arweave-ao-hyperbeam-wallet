@@ -1,3 +1,5 @@
+import { userErrorMessage } from "./user-errors";
+
 /** An AO NFT (a unique, non-fungible asset process) the wallet holds. */
 export interface Collectible {
   /** The asset's process id. */
@@ -38,11 +40,11 @@ const ARWEAVE_ID = /^[A-Za-z0-9_-]{43}$/;
  * again before any network call.
  */
 export function collectibleSendRefusal(req: { sender: string; recipient: string; assetId: string }): string | null {
-  if (!ARWEAVE_ID.test(req.assetId)) return "This collectible's process id isn't a valid Arweave id.";
+  if (!ARWEAVE_ID.test(req.assetId)) return userErrorMessage("collectibleIdInvalid");
   if (!ARWEAVE_ID.test(req.recipient)) {
-    return "That doesn't look like a full Arweave address: check for a missing character.";
+    return userErrorMessage("collectibleRecipientInvalid");
   }
-  if (req.recipient === req.sender) return "That's this wallet's own address. Send to a different address.";
-  if (req.recipient === req.assetId) return "That's the collectible's own address. Enter the recipient's wallet address.";
+  if (req.recipient === req.sender) return userErrorMessage("collectibleSendToSelf");
+  if (req.recipient === req.assetId) return userErrorMessage("collectibleSendToAsset");
   return null;
 }

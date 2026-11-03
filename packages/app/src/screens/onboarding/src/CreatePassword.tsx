@@ -9,6 +9,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validatePassword } from "@gleam/core/src/vault/password-policy.ts";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Create wallet — password, reused for both the create and import flows.
@@ -48,7 +49,7 @@ export function CreatePassword({
   const validation = validatePassword(password);
   const confirmMismatch = touched && confirm.length > 0 && confirm !== password;
 
-  const passwordError = touched && !validation.valid ? validation.reason : serverError;
+  const passwordError = touched && !validation.valid ? errorText(validation.reason) : serverError;
   const confirmError = confirmMismatch ? t("onboarding.passwordsMismatch") : undefined;
 
   const canSubmit = validation.valid && password === confirm && !submitting;

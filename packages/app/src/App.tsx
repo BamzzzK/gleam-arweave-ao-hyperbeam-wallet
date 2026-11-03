@@ -36,6 +36,7 @@ import { ApprovalSheet } from "./approval/ApprovalSheet";
 import { QueryCachePersistence } from "./query-cache/persistence";
 import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
+import { errorText } from "./i18n/errors";
 
 /**
  * The one shared shell mounted from the popup and the side panel (the
@@ -227,7 +228,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         // context available, or the background service worker
         // unreachable) is surfaced as a named state rather than an
         // unhandled rejection: never fail silently or crash uncaught.
-        setInitError(error instanceof Error ? error.message : String(error));
+        setInitError(errorText(error));
       }
     }
 

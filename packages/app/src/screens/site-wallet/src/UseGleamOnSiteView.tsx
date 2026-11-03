@@ -7,6 +7,7 @@ import { PERMISSION_GROUPS, hostnameOf, initialGroupIds, permissionsFor } from "
 import { useUseGleamOnSite } from "./useActiveSite";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 export interface UseGleamOnSiteViewProps {
   runtime: RuntimePort;
@@ -97,7 +98,7 @@ export function UseGleamOnSiteView({
           </p>
           {useGleam.isError ? (
             <p role="alert" className="text-center text-caption text-warning">
-              {useGleam.error instanceof Error ? useGleam.error.message : t("siteWallet.switchFailed")}
+              {useGleam.error instanceof Error ? errorText(useGleam.error) : t("siteWallet.switchFailed")}
             </p>
           ) : null}
           <Button type="button" disabled={useGleam.isPending} onClick={submit}>

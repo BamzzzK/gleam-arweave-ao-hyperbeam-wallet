@@ -109,7 +109,14 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   missing from any language fails `tsc`, and `catalog.i18n.test.ts` checks
   placeholders match. Without a stored choice the language follows the
   device and falls back to English. Never translate decoded transaction
-  data, addresses, tag values or errors thrown by `core`/`runtime`.
+  data, addresses or tag values.
+- **User-facing errors.** `core` and `runtime` throw English. An error a
+  person can reach is declared in `core/models/user-errors.ts` and thrown
+  with `userErrorMessage`. Only `message` crosses every transport, so the
+  app matches the text back to its code and translates it at display with
+  `errorText` (`app/src/i18n/errors.ts`). dApps get the English. A new
+  one-off string outside the table stays English. Compare raw `.message`,
+  never `errorText`'s output.
 - **Amounts** are atomic-integer strings (Winston, or the token's smallest
   unit). Never floats.
 - **Activity** merges the local optimistic log with gateway GraphQL. A

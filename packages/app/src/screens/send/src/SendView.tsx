@@ -27,6 +27,7 @@ import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
+import { errorText } from "../../../i18n/errors";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -316,7 +317,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         setStep({
           ...step,
           submitting: false,
-          amountError: error instanceof Error ? error.message : String(error),
+          amountError: errorText(error),
         });
       }
     };
@@ -449,7 +450,7 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         setStep({ kind: "success", txId: result.txId, recipient: step.recipient, amountAtomic: step.amountAtomic });
       } catch (error) {
         console.error("submitTransfer failed:", error);
-        setStep({ ...step, submitting: false, error: error instanceof Error ? error.message : String(error) });
+        setStep({ ...step, submitting: false, error: errorText(error) });
       }
     };
 
@@ -732,7 +733,7 @@ function ComposeStep({
 
         {unsupported ? (
           <p role="status" className="rounded-md border border-l-[3px] border-line border-l-warning bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
-            {unsupported}
+            {errorText(unsupported)}
           </p>
         ) : null}
 
@@ -1210,11 +1211,7 @@ function TokenPickerStep({
 }) {
   const t = useT();
   const loading = balancesQuery.isLoading;
-  const errorMessage = balancesQuery.error
-    ? balancesQuery.error instanceof Error
-      ? balancesQuery.error.message
-      : String(balancesQuery.error)
-    : null;
+  const errorMessage = balancesQuery.error ? errorText(balancesQuery.error) : null;
 
   const aoBalance = balancesQuery.data?.tokenBalances.find(
     (candidate) => candidate.processId === DEFAULT_AO_TOKEN.processId,
@@ -1367,7 +1364,7 @@ export function SavedAddressesStep({
       <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {activityQuery.isError ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
-            {activityQuery.error instanceof Error ? activityQuery.error.message : String(activityQuery.error)}
+            {errorText(activityQuery.error)}
           </div>
         ) : loading ? (
           <>

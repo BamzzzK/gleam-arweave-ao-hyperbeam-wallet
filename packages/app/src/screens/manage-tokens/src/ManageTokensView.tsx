@@ -8,6 +8,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useT } from "../../../i18n";
 import { displayTicker, formatAtomicAsDisplay } from "../../main-screen/src/formatWinston";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Reached from Settings. AR and AO aren't listed: they can't be removed,
@@ -64,7 +65,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime, address]);
@@ -97,7 +98,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       });
       if (currentIdRef.current === processId) setPreview(balance);
     } catch (error) {
-      if (currentIdRef.current === processId) setAddError(error instanceof Error ? error.message : String(error));
+      if (currentIdRef.current === processId) setAddError(errorText(error));
     } finally {
       if (currentIdRef.current === processId) setPreviewing(false);
     }
@@ -120,7 +121,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       setPreview(null);
       setNewProcessId("");
     } catch (error) {
-      setAddError(error instanceof Error ? error.message : String(error));
+      setAddError(errorText(error));
     } finally {
       setAdding(false);
     }
@@ -141,7 +142,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
       invalidateBalances();
       if (preview?.processId === processId) setPreview(null);
     } catch (error) {
-      setState((prev) => ({ ...prev, error: error instanceof Error ? error.message : String(error) }));
+      setState((prev) => ({ ...prev, error: errorText(error) }));
     } finally {
       setRemovingId(null);
     }
@@ -181,7 +182,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                     {balance ? (
                       <span
                         className="flex-shrink-0 font-mono text-label text-muted"
-                        title={balance.available === false ? balance.unavailableReason : undefined}
+                        title={balance.available === false && balance.unavailableReason ? errorText(balance.unavailableReason) : undefined}
                       >
                         {balance.available === false ? t("manageTokens.unavailable") : formatAtomicAsDisplay(balance.quantity, balance.denomination)}
                       </span>
@@ -280,7 +281,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                   </span>
                 </div>
                 {preview.available === false ? (
-                  <div className="flex flex-col gap-2 text-caption leading-snug text-muted" title={preview.unavailableReason}>
+                  <div className="flex flex-col gap-2 text-caption leading-snug text-muted" title={preview.unavailableReason ? errorText(preview.unavailableReason) : undefined}>
                     <p>{t("manageTokens.unreadable")}</p>
                     <p>{t("manageTokens.unreadableAdd")}</p>
                   </div>

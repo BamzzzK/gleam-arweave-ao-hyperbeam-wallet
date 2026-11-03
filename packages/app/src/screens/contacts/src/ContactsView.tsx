@@ -9,6 +9,7 @@ import { useT } from "../../../i18n";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Settings' Contacts screen — "Address book, part 2" per `todo.md`. A flat
@@ -93,7 +94,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
           setNewName("");
           setNewAddress("");
         },
-        onError: (error) => setAddError(error instanceof Error ? error.message : String(error)),
+        onError: (error) => setAddError(errorText(error)),
       },
     );
   };

@@ -1,5 +1,6 @@
 import type { ActivityEntry } from "../models/activity";
 import { COLLECTIBLE_TRANSFER_QUANTITY } from "../ao/collectible-transfer";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * Minimal shape of the gateway's GraphQL transaction connection response
@@ -90,7 +91,7 @@ export async function postGraphQLWithFailover<T>(
     }
   }
 
-  throw lastError ?? new Error("Gateway GraphQL query failed against every candidate gateway.");
+  throw lastError ?? new Error(userErrorMessage("gatewayAllFailed"));
 }
 
 const TRANSACTION_FIELDS = `
@@ -123,7 +124,7 @@ export async function queryActivityTransactions(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ActivityEntry[]> {
   const describe = (gw: string, detail: string) =>
-    `Gateway GraphQL query for "${address}" against "${gw}" failed: ${detail}`;
+    userErrorMessage("gatewayQueryFailed", { address, gateway: gw, detail });
   const run = async (query: string) => {
     const body = await postGraphQLWithFailover<GraphQLTransactionsResponse>(
       gatewayUrl,
@@ -274,7 +275,7 @@ export async function queryL1TokenReceipts(
     }`,
     { address: [address], first: limit },
     fetchImpl,
-    (gw, detail) => `Gateway token-receipt GraphQL query for "${address}" against "${gw}" failed: ${detail}`,
+    (gw, detail) => userErrorMessage("gatewayReceiptQueryFailed", { address, gateway: gw, detail }),
   );
   const byId = new Map<string, ActivityEntry>();
   for (const { node } of body.data?.transactions?.edges ?? []) {
@@ -315,7 +316,7 @@ export async function queryBlockHeights(
     `query ($ids: [ID!]!, $first: Int!) { transactions(ids: $ids, first: $first) { edges { node { id block { height } } } } }`,
     { ids: lookup, first: lookup.length * 2 },
     fetchImpl,
-    (gw, detail) => `Gateway block-height GraphQL query against "${gw}" failed: ${detail}`,
+    (gw, detail) => userErrorMessage("gatewayBlockQueryFailed", { gateway: gw, detail }),
   );
   for (const { node } of body.data?.transactions?.edges ?? []) {
     if (node.block) heights.set(node.id, node.block.height);

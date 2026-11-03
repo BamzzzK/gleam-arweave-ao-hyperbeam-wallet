@@ -57,12 +57,12 @@ interface LedgerDetails {
 }
 
 function addWalletErrorText(error: unknown): string {
-  const text = backgroundErrorText(error);
+  const message = error instanceof Error ? error.message : String(error);
   const duplicate =
-    /already in Gleam as (?:the hardware wallet )?"([^"]+)"/.exec(text);
+    /already in Gleam as (?:the hardware wallet )?"([^"]+)"/.exec(message);
   return duplicate
     ? t("extension.ledgerDuplicate", { name: duplicate[1]! })
-    : text;
+    : backgroundErrorText(error);
 }
 
 export function LedgerConnectView({

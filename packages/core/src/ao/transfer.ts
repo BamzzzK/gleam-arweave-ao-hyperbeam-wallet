@@ -1,5 +1,6 @@
 import type { Signer } from "../vault/signer";
 import { applyDataItemSignature, buildUnsignedDataItem, signDataItemWithSigner } from "../arweave/data-item";
+import { userErrorMessage } from "../models/user-errors";
 
 export { createSignedDataItem } from "../arweave/data-item";
 
@@ -104,7 +105,11 @@ export async function finishTransfer(
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`AO message submission to ${AO_LEGACY_MU_URL} failed (${response.status})${detail ? `: ${detail}` : ""}.`);
+    throw new Error(
+      detail
+        ? userErrorMessage("aoSubmitFailedDetail", { url: AO_LEGACY_MU_URL, status: response.status, detail })
+        : userErrorMessage("aoSubmitFailed", { url: AO_LEGACY_MU_URL, status: response.status }),
+    );
   }
 
   return { messageId: id };

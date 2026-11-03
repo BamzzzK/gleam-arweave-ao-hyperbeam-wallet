@@ -8,6 +8,7 @@ import { common } from "./common";
 import { connectedApps } from "./connected-apps";
 import { contacts } from "./contacts";
 import { displayCurrency } from "./display-currency";
+import { errors } from "./errors";
 import { extension } from "./extension";
 import { language } from "./language";
 import { lockSettings } from "./lock-settings";
@@ -35,6 +36,7 @@ export const NAMESPACES = {
   connectedApps,
   contacts,
   displayCurrency,
+  errors,
   extension,
   language,
   lockSettings,

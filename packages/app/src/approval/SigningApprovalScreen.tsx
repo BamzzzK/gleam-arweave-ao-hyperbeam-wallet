@@ -6,6 +6,7 @@ import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning
 import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
+import { errorText } from "../i18n/errors";
 
 /**
  * The highest-stakes screen in the product: recipient, amount, fee, a
@@ -168,7 +169,7 @@ export function SigningApprovalScreen({
     try {
       await onSign();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : String(submitError));
+      setError(errorText(submitError));
       setSubmitting(false);
     }
   };

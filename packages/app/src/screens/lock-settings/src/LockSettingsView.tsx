@@ -16,6 +16,7 @@ import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
 import { useLocale, useT, type MessageKey } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 const TIMEOUT_OPTIONS = [
   { value: "never", key: "lockSettings.timeoutNever" },
@@ -83,7 +84,7 @@ export function LockSettingsView({
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     }
   }, [runtime]);
@@ -103,7 +104,7 @@ export function LockSettingsView({
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
       setLocking(false);
     }
@@ -121,7 +122,7 @@ export function LockSettingsView({
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       }));
     } finally {
       setSavingTimeout(null);
@@ -271,7 +272,7 @@ function PasskeySection({
         kind: "ready",
         status: { enrolled: false },
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   }, [runtime]);
@@ -292,7 +293,7 @@ function PasskeySection({
       setPasskey({
         ...passkey,
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
       return;
     }
@@ -314,7 +315,7 @@ function PasskeySection({
       setPasskey({
         ...passkey,
         busy: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorText(error),
       });
     }
   };

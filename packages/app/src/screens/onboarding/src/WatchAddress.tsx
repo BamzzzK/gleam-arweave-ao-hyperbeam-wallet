@@ -8,6 +8,7 @@ import { usePlatform } from "../../../app-platform/context";
 import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { QrScanIcon } from "../../send/src/SendView";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Adds a watch-only wallet: an address Gleam shows balances and activity
@@ -65,7 +66,7 @@ export function WatchAddress({ runtime, onBack, onAdded }: WatchAddressProps) {
         }),
       );
     } catch (error) {
-      setAddressError(error instanceof Error ? error.message : String(error));
+      setAddressError(errorText(error));
       setSubmitting(false);
     }
   }

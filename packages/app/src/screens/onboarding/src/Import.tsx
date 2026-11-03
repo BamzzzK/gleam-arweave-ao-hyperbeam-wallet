@@ -5,6 +5,7 @@ import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { validateJWKShape } from "@gleam/core/src/keys/jwk.ts";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useT } from "../../../i18n";
+import { errorText } from "../../../i18n/errors";
 
 /**
  * Import wallet — file drop + paste-JSON fallback, validates JWK shape
@@ -39,7 +40,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
 
     const result = validateJWKShape(parsed);
     if (!result.valid) {
-      setErrorMessage(result.reason);
+      setErrorMessage(errorText(result.reason));
       setPendingJWK(null);
       if (sourceName) setFileName(sourceName);
       return;

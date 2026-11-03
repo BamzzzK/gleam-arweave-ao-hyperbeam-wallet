@@ -10,6 +10,7 @@
  */
 
 import { ATTESTATION_ID_PATTERN, RELEASE_PATTERN } from "../scan/format";
+import { userErrorMessage } from "../models/user-errors";
 
 export const POINTS_MESSAGE_PREFIX = "gleam-points:";
 
@@ -56,7 +57,7 @@ export function buildRegisterMessage(message: RegisterMessage): string {
     throw new Error("Device key thumbprint must be a 43-character base64url SHA-256 digest.");
   }
   if (message.inviteCode !== null && !isValidInviteCode(message.inviteCode)) {
-    throw new Error(`"${message.inviteCode}" isn't a valid invite code.`);
+    throw new Error(userErrorMessage("inviteCodeRejected", { code: message.inviteCode }));
   }
   assertUnixSeconds(message.issuedAt);
   return [
@@ -118,7 +119,7 @@ export function parseLeaveMessage(text: string): { address: string; issuedAt: nu
  * before any wallet exists.
  */
 export function buildRedeemMessage(code: string, issuedAt: number): string {
-  if (!isValidInviteCode(code)) throw new Error(`"${code}" isn't a valid invite code.`);
+  if (!isValidInviteCode(code)) throw new Error(userErrorMessage("inviteCodeRejected", { code }));
   assertUnixSeconds(issuedAt);
   return `gleam-points:redeem:v1:${code}:${issuedAt}`;
 }

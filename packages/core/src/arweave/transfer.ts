@@ -9,6 +9,7 @@ import {
 import type { Signer } from "../vault/signer";
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
+import { userErrorMessage } from "../models/user-errors";
 
 /**
  * This module's public functions accept an unlocked wallet's `Signer`
@@ -69,7 +70,7 @@ export async function prepareTransfer(
   // arweave-js decodes `target` with strict base64 and would otherwise
   // throw a bare "Invalid character" DOMException.
   if (!/^[A-Za-z0-9_-]{43}$/.test(recipient)) {
-    throw new Error(`Transfer recipient must be an Arweave address (43 base64url characters), got "${recipient}".`);
+    throw new Error(userErrorMessage("transferRecipientInvalid", { recipient }));
   }
   return buildUnsignedTransaction(gatewayUrl, ownerB64Url, { target: recipient, quantity: amount }, tags);
 }
@@ -85,7 +86,7 @@ export async function finishTransfer(
   const response = await broadcastTransaction(gatewayUrl, transaction);
   if (response.status < 200 || response.status >= 300) {
     throw new Error(
-      `Failed to submit transfer to ${gatewayUrl} (HTTP ${response.status}: ${response.statusText}).`,
+      userErrorMessage("transferSubmitFailed", { gateway: gatewayUrl, status: response.status, statusText: response.statusText }),
     );
   }
   return { txId: id };
