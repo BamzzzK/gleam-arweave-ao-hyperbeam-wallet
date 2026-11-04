@@ -195,7 +195,10 @@ The tests take a few minutes. osv-scanner may print `Starting filesystem
 walk for root: /`; that is harmless. Done when both have finished and you
 have noted the results. A test failure is not a finding by itself: the
 report says only that tests failed. If a failure points at a security
-issue, treat it as a finding under the severity rules. A vulnerable dependency
+issue, treat it as a finding under the severity rules. If you can trace a
+failure to the test code rather than to your environment, for example a
+fixture that only a lenient runtime accepts, draft a test PR for it in
+Step 7. A vulnerable dependency
 is a finding only if Gleam uses the affected code in a way an attacker from
 the threat model can reach; otherwise note it in the report.
 `osv-scanner.toml` lists the advisories Gleam already knows about, each
@@ -387,9 +390,12 @@ its own worktree like a fix PR. For example:
 - a reason to refute, or a severity example, that `VERIFY.md` should
   give;
 - a command in this skill that failed or misled you, or a `✗` message
-  that didn't say what to do.
+  that didn't say what to do;
+- a test that failed because of the test code (Step 3). Fix the test,
+  not the code under it, and title the PR `test(<scope>): <what it
+  fixes>`.
 
-Title it `docs(scan): <what it improves>`, and fill the template's **Why**
+Title any other one `docs(scan): <what it improves>`, and fill the template's **Why**
 with what happened in your scan. Keep it general: a skill PR never
 describes a vulnerability, not even a low one. If it comes from a medium
 or higher finding (a surface entry alone points at the bug), don't file it

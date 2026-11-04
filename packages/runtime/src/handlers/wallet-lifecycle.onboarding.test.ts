@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { beforeAll, describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as hashWasm from "hash-wasm";
 import {
   bytesToBase64,
@@ -136,18 +136,29 @@ function createFakeStorage(): StoragePort {
   };
 }
 
-function validJWK() {
-  return {
-    kty: "RSA",
-    e: "AQAB",
-    n: "n".repeat(10),
-    d: "d".repeat(10),
-    p: "p".repeat(10),
-    q: "q".repeat(10),
-    dp: "d".repeat(10),
-    dq: "d".repeat(10),
-    qi: "q".repeat(10),
-  };
+/**
+ * A real RSA key: the keyring imports it through WebCrypto, and a stricter
+ * OpenSSL build rejects a placeholder modulus that Node's default one lets
+ * through. 2048 bits rather than 4096 keeps generation fast.
+ */
+async function generateTestJwk(): Promise<JWKInterface> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "RSA-PSS", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const { kty, e, n, d, p, q, dp, dq, qi } = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  return { kty: kty!, e: e!, n: n!, d, p, q, dp, dq, qi };
+}
+
+let testJwk: JWKInterface;
+
+beforeAll(async () => {
+  testJwk = await generateTestJwk();
+});
+
+function validJWK(): JWKInterface {
+  return { ...testJwk };
 }
 
 describe("WalletLifecycleHandler: createWallet", () => {
@@ -234,7 +245,7 @@ describe("WalletLifecycleHandler: importWallet", () => {
 
   it("rejects a keyfile missing a required field with a reason naming the field", async () => {
     const broken = validJWK();
-    delete (broken as Record<string, unknown>).d;
+    delete (broken as unknown as Record<string, unknown>).d;
     await expect(
       handler.importWallet({ jwk: broken, name: "Imported", password: GOOD_PASSWORD }),
     ).rejects.toThrow(/"d"/);
