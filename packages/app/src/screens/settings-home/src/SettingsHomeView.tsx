@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type {
   AutoLockTimeout,
-  HeaderStyle,
   LockSettings,
   NetworkSettings,
   RuntimePort,
@@ -25,12 +24,6 @@ const TIMEOUT_KEYS = {
   "4hr": "settingsHome.timeout4hr",
 } as const satisfies Record<AutoLockTimeout, MessageKey>;
 
-// The Home screen row shows its most visible choice, the header style.
-const HEADER_KEYS = {
-  full: "homeScreen.headerFull",
-  compact: "homeScreen.headerCompact",
-  minimal: "homeScreen.headerMinimal",
-} as const satisfies Record<HeaderStyle, MessageKey>;
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -42,10 +35,12 @@ function gatewayHostname(gatewayUrl: string): string {
 
 /**
  * The settings screen the gear icon opens: WALLET and DISPLAY sections of
- * rows that open a screen and show their current value, with Help &
- * About pinned below. Kept short on purpose: a row gets a description
- * only when its title could mislead, and fine-tuning that most people
- * set once (the home screen's layout) sits a level down.
+ * rows that open a screen, with Help & About pinned below. Kept short on
+ * purpose: a row gets a description only when its title could mislead,
+ * and a value only when it opens a single choice (Currency, Language).
+ * Lock & unlock is the one exception: its auto-lock time is security
+ * state worth seeing at a glance. Fine-tuning that most people set once
+ * (the home screen's layout) sits a level down.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -174,12 +169,8 @@ export function SettingsHomeView({
             value={LANGUAGES.find((entry) => entry.code === language)?.name}
             onClick={onOpenLanguage}
           />
-          <OptionRow
-            divided={false}
-            title={t("homeScreen.title")}
-            value={display ? t(HEADER_KEYS[display.header]) : undefined}
-            onClick={onOpenHomeScreen}
-          />
+          {/* No value: it opens several settings, and naming one would imply it's the only one. */}
+          <OptionRow divided={false} title={t("homeScreen.title")} onClick={onOpenHomeScreen} />
           <ToggleRow
             title={t("settingsHome.darkMode")}
             checked={theme === "dark"}

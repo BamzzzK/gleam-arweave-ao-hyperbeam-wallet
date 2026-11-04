@@ -5,7 +5,17 @@ import { cn } from "./cn";
  * Rows for a list of settings that change in place, without opening
  * another screen: `SelectRow` picks one of a few values, `ToggleRow` turns
  * a setting on or off. They line up with `OptionRow`, which opens one.
+ *
+ * Give a `SelectRow` option a `description` when its label alone doesn't
+ * say what it changes ("Compact"); the row shows the selected option's,
+ * so it updates as the choice does. Leave it out when the label says it.
  */
+export interface SelectRowOption<T extends string> {
+  value: T;
+  label: string;
+  description?: string;
+}
+
 export function SelectRow<T extends string>({
   title,
   value,
@@ -15,21 +25,31 @@ export function SelectRow<T extends string>({
 }: {
   title: string;
   value: T;
-  options: { value: T; label: string }[];
+  options: SelectRowOption<T>[];
   disabled: boolean;
   onChange: (value: T) => void;
 }) {
   const id = useId();
+  const descriptionId = useId();
+  const description = options.find((option) => option.value === value)?.description;
   return (
     <div className="flex w-full items-center justify-between gap-3 py-3.5">
-      <label htmlFor={id} className="text-label font-semibold text-foreground">
-        {title}
-      </label>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <label htmlFor={id} className="text-label font-semibold text-foreground">
+          {title}
+        </label>
+        {description ? (
+          <span id={descriptionId} className="text-caption text-muted">
+            {description}
+          </span>
+        ) : null}
+      </span>
       {/* Reads like the value on an option row: no box, just the choice and a chevron. The native
           arrow ignores padding, so it's hidden and drawn here with room on the right. */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <select
           id={id}
+          aria-describedby={description ? descriptionId : undefined}
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}

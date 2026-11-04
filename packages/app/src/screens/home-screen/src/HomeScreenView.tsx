@@ -10,16 +10,18 @@ const HEADLINE_KEYS = [
   { value: "AO", key: "homeScreen.headlineAo" },
 ] as const satisfies readonly { value: HeadlineBalance; key: MessageKey }[];
 
+// Header and token-row option names don't say what they change, so each
+// carries a hint, shown under the row for the selected one.
 const HEADER_KEYS = [
-  { value: "full", key: "homeScreen.headerFull" },
-  { value: "compact", key: "homeScreen.headerCompact" },
-  { value: "minimal", key: "homeScreen.headerMinimal" },
-] as const satisfies readonly { value: HeaderStyle; key: MessageKey }[];
+  { value: "full", key: "homeScreen.headerFull", hint: "homeScreen.headerFullHint" },
+  { value: "compact", key: "homeScreen.headerCompact", hint: "homeScreen.headerCompactHint" },
+  { value: "minimal", key: "homeScreen.headerMinimal", hint: "homeScreen.headerMinimalHint" },
+] as const satisfies readonly { value: HeaderStyle; key: MessageKey; hint: MessageKey }[];
 
 const TOKEN_ROW_KEYS = [
-  { value: "detailed", key: "homeScreen.tokenRowsDetailed" },
-  { value: "simple", key: "homeScreen.tokenRowsSimple" },
-] as const satisfies readonly { value: TokenRowDetail; key: MessageKey }[];
+  { value: "detailed", key: "homeScreen.tokenRowsDetailed", hint: "homeScreen.tokenRowsDetailedHint" },
+  { value: "simple", key: "homeScreen.tokenRowsSimple", hint: "homeScreen.tokenRowsSimpleHint" },
+] as const satisfies readonly { value: TokenRowDetail; key: MessageKey; hint: MessageKey }[];
 
 /**
  * How the home screen looks: which balance leads, how much header, how
@@ -35,8 +37,12 @@ export interface HomeScreenViewProps {
 export function HomeScreenView({ runtime, onBack }: HomeScreenViewProps) {
   const t = useT();
   const { settings: display, update } = useDisplaySettings(runtime);
-  const options = <T extends string>(keys: readonly { value: T; key: MessageKey }[]) =>
-    keys.map((option) => ({ value: option.value, label: t(option.key) }));
+  const options = <T extends string>(keys: readonly { value: T; key: MessageKey; hint?: MessageKey }[]) =>
+    keys.map((option) => ({
+      value: option.value,
+      label: t(option.key),
+      ...(option.hint ? { description: t(option.hint) } : {}),
+    }));
 
   return (
     <div className="flex min-h-full flex-col">

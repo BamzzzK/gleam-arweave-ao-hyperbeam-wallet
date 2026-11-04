@@ -212,12 +212,13 @@ describe("SettingsHomeView", () => {
     expect(onOpenDisplayCurrency).toHaveBeenCalled();
   });
 
-  it("opens Home screen from a row that shows the header style", async () => {
+  it("opens Home screen from a row with no value, since it holds several settings", async () => {
     const onOpenHomeScreen = vi.fn();
     renderSettingsHome({ onOpenHomeScreen });
 
-    const row = await screen.findByRole("button", { name: "Home screen" });
-    await waitFor(() => expect(row.textContent).toContain("Full chart"));
+    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
+    const row = screen.getByRole("button", { name: "Home screen" });
+    expect(row.textContent).toBe("Home screen");
     fireEvent.click(row);
 
     expect(onOpenHomeScreen).toHaveBeenCalled();
