@@ -1,4 +1,4 @@
-import { mnemonicToSeed } from "@gleam/core/src/keys/mnemonic.ts";
+import { MNEMONIC_WORD_COUNTS, mnemonicToSeed } from "@gleam/core/src/keys/mnemonic.ts";
 import { jwkFromSeed } from "@gleam/core/src/keys/mnemonic-jwk.ts";
 
 /**
@@ -14,7 +14,30 @@ const scope = self as unknown as { Worker?: unknown };
 delete scope.Worker;
 if (typeof scope.Worker !== "undefined") scope.Worker = undefined;
 
-self.onmessage = async (event: MessageEvent<string[]>) => {
+/**
+ * Only the page that created a dedicated worker can message it, and the
+ * browser delivers those messages with an empty origin (some engines may
+ * use the worker's own). Anything else didn't come from that page.
+ */
+export function isFromOwner(event: MessageEvent): boolean {
+  return event.origin === "" || event.origin === self.location.origin;
+}
+
+/** BIP-39 English words are 3 to 8 lowercase letters, in a phrase of 12 to 24. */
+export function isPhraseWords(data: unknown): data is string[] {
+  return (
+    Array.isArray(data) &&
+    (MNEMONIC_WORD_COUNTS as readonly number[]).includes(data.length) &&
+    data.every((word) => typeof word === "string" && /^[a-z]{3,8}$/u.test(word))
+  );
+}
+
+self.onmessage = async (event: MessageEvent<unknown>) => {
+  if (!isFromOwner(event)) return;
+  if (!isPhraseWords(event.data)) {
+    self.postMessage({ ok: false, error: "That isn't a recovery phrase." });
+    return;
+  }
   let seed: Uint8Array | undefined;
   try {
     seed = await mnemonicToSeed(event.data);
