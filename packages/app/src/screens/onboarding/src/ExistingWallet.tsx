@@ -5,9 +5,12 @@ import { hasHardwareWallet } from "../../../app-platform/hardware";
 import { useT } from "../../../i18n";
 
 /**
- * The ways to bring in a wallet the user already has, grouped by what
- * they need on hand. Shown after Welcome's "I already have a wallet", and
- * as part of `AddWalletStart`.
+ * The ways to bring in a wallet the user already has, grouped by where it
+ * comes from rather than by format: another wallet's phrase, keyfile or
+ * address under one heading, devices under another. A heading over a
+ * single self-explanatory row only adds reading, so don't add one.
+ * Shown after Welcome's "I already have a wallet", and as part of
+ * `AddWalletStart`.
  */
 export interface ExistingWalletOptionsProps {
   onImport: () => void;
@@ -23,15 +26,10 @@ export function ExistingWalletOptions({ onImport, onImportPhrase, onConnectKeyst
   const { ledger, keystone } = capabilities.hardwareWallets;
   return (
     <>
-      <OptionSection title={t("onboarding.fromPhrase")}>
-        <OptionRow
-          title={t("onboarding.importPhrase")}
-          description={t("onboarding.importPhraseHint")}
-          onClick={onImportPhrase}
-        />
-      </OptionSection>
-      <OptionSection title={t("onboarding.fromFile")}>
-        <OptionRow title={t("onboarding.importKeyfile")} description={t("onboarding.importKeyfileHint")} onClick={onImport} />
+      <OptionSection title={t("onboarding.fromAnotherWallet")}>
+        <OptionRow title={t("onboarding.phraseOption")} description={t("onboarding.phraseOptionHint")} onClick={onImportPhrase} />
+        <OptionRow title={t("onboarding.keyfileOption")} description={t("onboarding.keyfileOptionHint")} onClick={onImport} />
+        <OptionRow title={t("onboarding.watchAddress")} description={t("onboarding.watchOptionHint")} onClick={onWatch} />
       </OptionSection>
       {hasHardwareWallet(capabilities) ? (
         <OptionSection title={t("onboarding.hardwareWallet")}>
@@ -41,9 +39,6 @@ export function ExistingWalletOptions({ onImport, onImportPhrase, onConnectKeyst
           ) : null}
         </OptionSection>
       ) : null}
-      <OptionSection title={t("onboarding.addressOnly")}>
-        <OptionRow title={t("onboarding.watchAddress")} description={t("onboarding.watchOptionHint")} onClick={onWatch} />
-      </OptionSection>
     </>
   );
 }

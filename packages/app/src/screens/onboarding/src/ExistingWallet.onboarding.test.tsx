@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { fakeAppPlatform, renderWithPlatform } from "../../../app-platform/testing";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
@@ -44,19 +44,33 @@ describe.each(Object.entries(screens))("%s hardware wallets", (_name, Screen) =>
     );
     expect(screen.queryByRole("region", { name: "Hardware wallet" })).toBeNull();
     expect(screen.queryByText("Hardware wallet")).toBeNull();
-    expect(screen.getByRole("button", { name: /Import a keyfile/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Keyfile/ })).toBeTruthy();
   });
 });
 
 describe.each(Object.entries(screens))("%s recovery phrase", (_name, Screen) => {
-  it("offers a recovery phrase import ahead of the keyfile", () => {
+  it("offers the recovery phrase ahead of the keyfile", () => {
     renderWithPlatform(<Screen />, fakeAppPlatform());
     const buttons = screen.getAllByRole("button").map((button) => button.textContent ?? "");
-    const phrase = buttons.findIndex((text) => text.includes("Enter a recovery phrase"));
-    const keyfile = buttons.findIndex((text) => text.includes("Import a keyfile"));
+    const phrase = buttons.findIndex((text) => text.includes("Recovery phrase"));
+    const keyfile = buttons.findIndex((text) => text.includes("Keyfile"));
     expect(phrase).toBeGreaterThanOrEqual(0);
     expect(phrase).toBeLessThan(keyfile);
     screen.getAllByRole("button")[phrase]!.click();
     expect(handlers.onImportPhrase).toHaveBeenCalled();
+  });
+});
+
+describe.each(Object.entries(screens))("%s grouping", (_name, Screen) => {
+  it("puts everything from another wallet under one heading", () => {
+    renderWithPlatform(<Screen />, fakeAppPlatform());
+    const section = screen.getByRole("region", { name: "From another wallet" });
+    const rows = within(section).getAllByRole("button").map((button) => button.textContent ?? "");
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatch(/Recovery phrase/);
+    expect(rows[1]).toMatch(/Keyfile/);
+    expect(rows[2]).toMatch(/Watch an address/);
+    expect(screen.queryByText("From a file")).toBeNull();
+    expect(screen.queryByText("Address only")).toBeNull();
   });
 });

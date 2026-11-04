@@ -21,7 +21,7 @@ const GOOD_PASSWORD = "correct horse battery staple";
 
 function openKeyfileImport() {
   fireEvent.click(screen.getByRole("button", { name: "I already have a wallet" }));
-  fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keyfile" }));
 }
 
 describe("OnboardingView: create flow", () => {
@@ -325,7 +325,7 @@ describe("OnboardingView: add-wallet mode", () => {
       <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" onComplete={onComplete} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keyfile" }));
     fireEvent.change(screen.getByPlaceholderText(/kty/), {
       target: { value: JSON.stringify(VALID_JWK) },
     });
@@ -353,7 +353,7 @@ describe("OnboardingView: add-wallet mode", () => {
       <OnboardingView runtime={fakeRuntime({ send })} mode="add-wallet" vaultHasPassword={false} onComplete={onComplete} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keyfile" }));
     fireEvent.change(screen.getByPlaceholderText(/kty/), {
       target: { value: JSON.stringify(VALID_JWK) },
     });
@@ -400,7 +400,7 @@ describe("OnboardingView: start screens", () => {
   it("returns from import straight to the add-wallet list in add-wallet mode", () => {
     render(<OnboardingView runtime={fakeRuntime()} onComplete={vi.fn()} mode="add-wallet" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Import a keyfile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keyfile" }));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("Add a wallet")).toBeTruthy();
   });
