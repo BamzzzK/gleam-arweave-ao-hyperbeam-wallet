@@ -26,6 +26,7 @@ import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
 import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
 import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
+import { HomeScreenView } from "./screens/home-screen/index.tsx";
 import { LanguageView } from "./screens/language/index.tsx";
 import { useT } from "./i18n";
 import { LocalizedRoot } from "./i18n/LocalizedRoot";
@@ -102,6 +103,7 @@ type MainSubView =
   | { kind: "manage-tokens" }
   | { kind: "contacts" }
   | { kind: "display-currency" }
+  | { kind: "home-screen" }
   | { kind: "language" }
   | { kind: "collectible"; collectible: Collectible }
   | { kind: "send-collectible"; collectible: Collectible }
@@ -395,6 +397,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         onOpenContacts={() => setSubView({ kind: "contacts" })}
         onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
         onOpenLanguage={() => setSubView({ kind: "language" })}
+        onOpenHomeScreen={() => setSubView({ kind: "home-screen" })}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
@@ -444,6 +447,8 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "display-currency") {
     content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+  } else if (subView.kind === "home-screen") {
+    content = <HomeScreenView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "language") {
     content = <LanguageView onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "use-gleam-on-site") {

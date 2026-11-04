@@ -23,13 +23,14 @@ export function OptionSection({ title, children }: OptionSectionProps) {
 }
 
 /**
- * One choice in an `OptionSection`: a title, a line saying what it takes
- * or does, an optional current value, and a chevron that marks it as a
- * step forward. A disabled row drops the chevron.
+ * One choice in an `OptionSection`: a title, an optional line saying what
+ * it takes or does, an optional current value, and a chevron that marks it
+ * as a step forward. A disabled row drops the chevron. Leave the
+ * description out when the title already says it ("Contacts").
  */
 export interface OptionRowProps {
   title: string;
-  description: string;
+  description?: string;
   /** The setting's current value, shown before the chevron. */
   value?: string;
   onClick?: () => void;
@@ -55,7 +56,7 @@ export function OptionRow({
       aria-disabled={disabled}
       onClick={onClick}
       aria-labelledby={titleId}
-      aria-describedby={descriptionId}
+      aria-describedby={description ? descriptionId : undefined}
       className={cn(
         "flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50",
         divided && "border-b border-line last:border-b-0 phone:border-b-0",
@@ -65,9 +66,11 @@ export function OptionRow({
         <span id={titleId} className="text-label font-semibold text-foreground">
           {title}
         </span>
-        <span id={descriptionId} className="text-caption text-muted">
-          {description}
-        </span>
+        {description ? (
+          <span id={descriptionId} className="text-caption text-muted">
+            {description}
+          </span>
+        ) : null}
       </span>
       {value ? <span className="flex-shrink-0 text-label text-muted">{value}</span> : null}
       {disabled ? null : (

@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type {
   AutoLockTimeout,
   HeaderStyle,
-  HeadlineBalance,
   LockSettings,
   NetworkSettings,
   RuntimePort,
   ThemePreference,
   ThemeSettings,
-  TokenRowDetail,
 } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
+import { ToggleRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { REPO_URL } from "@gleam/core";
 import { AboutBuild } from "./AboutBuild";
@@ -26,22 +25,12 @@ const TIMEOUT_KEYS = {
   "4hr": "settingsHome.timeout4hr",
 } as const satisfies Record<AutoLockTimeout, MessageKey>;
 
-const HEADLINE_KEYS = [
-  { value: "total", key: "settingsHome.headlineTotal" },
-  { value: "AR", key: "settingsHome.headlineAr" },
-  { value: "AO", key: "settingsHome.headlineAo" },
-] as const satisfies readonly { value: HeadlineBalance; key: MessageKey }[];
-
-const HEADER_KEYS = [
-  { value: "full", key: "settingsHome.headerFull" },
-  { value: "compact", key: "settingsHome.headerCompact" },
-  { value: "minimal", key: "settingsHome.headerMinimal" },
-] as const satisfies readonly { value: HeaderStyle; key: MessageKey }[];
-
-const TOKEN_ROW_KEYS = [
-  { value: "detailed", key: "settingsHome.tokenRowsDetailed" },
-  { value: "simple", key: "settingsHome.tokenRowsSimple" },
-] as const satisfies readonly { value: TokenRowDetail; key: MessageKey }[];
+// The Home screen row shows its most visible choice, the header style.
+const HEADER_KEYS = {
+  full: "homeScreen.headerFull",
+  compact: "homeScreen.headerCompact",
+  minimal: "homeScreen.headerMinimal",
+} as const satisfies Record<HeaderStyle, MessageKey>;
 
 function gatewayHostname(gatewayUrl: string): string {
   try {
@@ -52,10 +41,11 @@ function gatewayHostname(gatewayUrl: string): string {
 }
 
 /**
- * The dedicated settings screen the gear icon opens: grouped
- * WALLET/NETWORK/DISPLAY sections of navigable rows, each showing
- * its current value on the right, with a Help & About section (feedback
- * card and source link) pinned below them.
+ * The settings screen the gear icon opens: WALLET and DISPLAY sections of
+ * rows that open a screen and show their current value, with Help &
+ * About pinned below. Kept short on purpose: a row gets a description
+ * only when its title could mislead, and fine-tuning that most people
+ * set once (the home screen's layout) sits a level down.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
@@ -68,6 +58,7 @@ export interface SettingsHomeViewProps {
   onOpenContacts: () => void;
   onOpenDisplayCurrency: () => void;
   onOpenLanguage: () => void;
+  onOpenHomeScreen: () => void;
   onOpenFeedback: () => void;
 }
 
@@ -87,6 +78,7 @@ export function SettingsHomeView({
   onOpenContacts,
   onOpenDisplayCurrency,
   onOpenLanguage,
+  onOpenHomeScreen,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
   const platform = usePlatform();
@@ -96,10 +88,7 @@ export function SettingsHomeView({
   const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
-  const { settings: display, update: updateDisplay } = useDisplaySettings(runtime);
-  const headlineOptions = HEADLINE_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
-  const headerOptions = HEADER_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
-  const tokenRowOptions = TOKEN_ROW_KEYS.map((option) => ({ value: option.value, label: t(option.key) }));
+  const { settings: display } = useDisplaySettings(runtime);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
@@ -158,77 +147,9 @@ export function SettingsHomeView({
               onClick={onOpenLockSettings}
             />
           ) : null}
-          <OptionRow
-            divided={false}
-            title={t("settingsHome.connectedAppsTitle")}
-            description={t("settingsHome.connectedAppsDescription")}
-            onClick={onOpenConnectedApps}
-          />
-          <OptionRow
-            divided={false}
-            title={t("settingsHome.manageTokensTitle")}
-            description={t("settingsHome.manageTokensDescription")}
-            onClick={onOpenManageTokens}
-          />
-          <OptionRow
-            divided={false}
-            title={t("settingsHome.contactsTitle")}
-            description={t("settingsHome.contactsDescription")}
-            onClick={onOpenContacts}
-          />
-        </OptionSection>
-
-        <OptionSection title={t("settingsHome.sectionDisplay")}>
-          <OptionRow
-            divided={false}
-            title={t("settingsHome.currencyTitle")}
-            description={t("settingsHome.currencyDescription")}
-            value={display?.currency}
-            onClick={onOpenDisplayCurrency}
-          />
-          <OptionRow
-            divided={false}
-            title={t("language.title")}
-            description={t("language.description")}
-            value={LANGUAGES.find((entry) => entry.code === language)?.name}
-            onClick={onOpenLanguage}
-          />
-          <SelectRow
-            title={t("settingsHome.mainBalance")}
-            value={display?.headline ?? "total"}
-            options={headlineOptions}
-            disabled={!display}
-            onChange={(headline) => void updateDisplay({ headline })}
-          />
-          <SelectRow
-            title={t("settingsHome.header")}
-            value={display?.header ?? "full"}
-            options={headerOptions}
-            disabled={!display}
-            onChange={(header) => void updateDisplay({ header })}
-          />
-          <SelectRow
-            title={t("settingsHome.tokenRows")}
-            value={display?.tokenRows ?? "detailed"}
-            options={tokenRowOptions}
-            disabled={!display}
-            onChange={(tokenRows) => void updateDisplay({ tokenRows })}
-          />
-          <ToggleRow
-            title={t("settingsHome.tokenLogos")}
-            checked={display?.tokenLogos ?? true}
-            disabled={!display}
-            onToggle={() => void updateDisplay({ tokenLogos: !(display?.tokenLogos ?? true) })}
-          />
-          <ToggleRow
-            title={t("settingsHome.darkMode")}
-            checked={theme === "dark"}
-            disabled={savingTheme}
-            onToggle={() => void handleToggleTheme()}
-          />
-        </OptionSection>
-
-        <OptionSection title={t("settingsHome.sectionNetwork")}>
+          <OptionRow divided={false} title={t("settingsHome.connectedAppsTitle")} onClick={onOpenConnectedApps} />
+          <OptionRow divided={false} title={t("settingsHome.manageTokensTitle")} onClick={onOpenManageTokens} />
+          <OptionRow divided={false} title={t("settingsHome.contactsTitle")} onClick={onOpenContacts} />
           <OptionRow
             divided={false}
             title={t("settingsHome.networkTitle")}
@@ -237,6 +158,33 @@ export function SettingsHomeView({
               state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
             }
             onClick={onOpenNetworkPeers}
+          />
+        </OptionSection>
+
+        <OptionSection title={t("settingsHome.sectionDisplay")}>
+          <OptionRow
+            divided={false}
+            title={t("settingsHome.currencyTitle")}
+            value={display?.currency}
+            onClick={onOpenDisplayCurrency}
+          />
+          <OptionRow
+            divided={false}
+            title={t("language.title")}
+            value={LANGUAGES.find((entry) => entry.code === language)?.name}
+            onClick={onOpenLanguage}
+          />
+          <OptionRow
+            divided={false}
+            title={t("homeScreen.title")}
+            value={display ? t(HEADER_KEYS[display.header]) : undefined}
+            onClick={onOpenHomeScreen}
+          />
+          <ToggleRow
+            title={t("settingsHome.darkMode")}
+            checked={theme === "dark"}
+            disabled={savingTheme}
+            onToggle={() => void handleToggleTheme()}
           />
         </OptionSection>
 
@@ -249,93 +197,6 @@ export function SettingsHomeView({
         </div>
       </div>
     </div>
-  );
-}
-
-function SelectRow<T extends string>({
-  title,
-  value,
-  options,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  value: T;
-  options: { value: T; label: string }[];
-  disabled: boolean;
-  onChange: (value: T) => void;
-}) {
-  const id = useId();
-  return (
-    <div className="flex w-full items-center justify-between gap-3 py-3.5">
-      <label htmlFor={id} className="text-label font-semibold text-foreground">
-        {title}
-      </label>
-      {/* Reads like the value on an option row: no box, just the choice and a chevron. The native
-          arrow ignores padding, so it's hidden and drawn here with room on the right. */}
-      <div className="relative">
-        <select
-          id={id}
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.value as T)}
-          className="cursor-pointer appearance-none rounded-md bg-transparent py-1 pl-2 pr-6 text-right text-label text-muted hover:enabled:bg-mist hover:enabled:text-foreground focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-60"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
-          className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-faint"
-        >
-          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function ToggleRow({
-  title,
-  checked,
-  disabled,
-  onToggle,
-}: {
-  title: string;
-  checked: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={onToggle}
-      className="flex w-full items-center justify-between py-3.5 text-left disabled:opacity-60"
-    >
-      <span className="text-label font-semibold text-foreground">{title}</span>
-      <span
-        aria-hidden="true"
-        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-foreground" : "bg-line"
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
-            checked ? "translate-x-[18px]" : "translate-x-[2px]"
-          }`}
-        />
-      </span>
-    </button>
   );
 }
 

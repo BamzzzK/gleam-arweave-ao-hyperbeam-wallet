@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { renderWithPlatform as render } from "../../../app-platform/testing";
 import type { DisplaySettings, LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -48,6 +48,7 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
       onOpenContacts={vi.fn()}
       onOpenDisplayCurrency={vi.fn()}
       onOpenLanguage={vi.fn()}
+      onOpenHomeScreen={vi.fn()}
       onOpenFeedback={vi.fn()}
       {...overrides}
     />
@@ -211,48 +212,44 @@ describe("SettingsHomeView", () => {
     expect(onOpenDisplayCurrency).toHaveBeenCalled();
   });
 
-  it("saves the main balance, header and token row choices", async () => {
-    const send = successfulSend();
-    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+  it("opens Home screen from a row that shows the header style", async () => {
+    const onOpenHomeScreen = vi.fn();
+    renderSettingsHome({ onOpenHomeScreen });
 
-    const select = await screen.findByLabelText("Main balance");
-    await waitFor(() => expect((select as HTMLSelectElement).disabled).toBe(false));
-    fireEvent.change(select, { target: { value: "AO" } });
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, headline: "AO" } }),
-    );
+    const row = await screen.findByRole("button", { name: "Home screen" });
+    await waitFor(() => expect(row.textContent).toContain("Full chart"));
+    fireEvent.click(row);
 
-    const header = screen.getByLabelText("Header") as HTMLSelectElement;
-    expect(header.value).toBe("full");
-    fireEvent.change(header, { target: { value: "minimal" } });
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({
-        type: "setDisplaySettings",
-        payload: { ...DISPLAY_SETTINGS, headline: "AO", header: "minimal" },
-      }),
-    );
-    expect((screen.getByLabelText("Header") as HTMLSelectElement).value).toBe("minimal");
-
-    fireEvent.change(screen.getByLabelText("Token rows"), { target: { value: "simple" } });
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({
-        type: "setDisplaySettings",
-        payload: { ...DISPLAY_SETTINGS, headline: "AO", header: "minimal", tokenRows: "simple" },
-      }),
-    );
+    expect(onOpenHomeScreen).toHaveBeenCalled();
   });
 
-  it("starts with token logos on and saves turning them off", async () => {
-    const send = successfulSend();
-    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+  it("keeps the home screen's layout controls off the settings screen", async () => {
+    renderSettingsHome();
 
-    const toggle = await screen.findByRole("menuitemcheckbox", { name: /Token logos/i });
-    await waitFor(() => expect(toggle.getAttribute("aria-disabled")).not.toBe("true"));
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
+    expect(screen.queryByLabelText("Main balance")).toBeNull();
+    expect(screen.queryByLabelText("Header")).toBeNull();
+    expect(screen.queryByLabelText("Token rows")).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: /Token logos/i })).toBeNull();
+  });
 
-    fireEvent.click(toggle);
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "setDisplaySettings", payload: { ...DISPLAY_SETTINGS, tokenLogos: false } }),
-    );
+  it("lists network under Wallet with no section of its own", async () => {
+    renderSettingsHome();
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    expect(screen.queryByRole("region", { name: "Network" })).toBeNull();
+    const wallet = screen.getByRole("region", { name: "Wallet" });
+    expect(within(wallet).getByRole("button", { name: "Network & peers" })).toBeTruthy();
+  });
+
+  it("describes only the rows whose titles need it", async () => {
+    renderSettingsHome();
+
+    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
+    expect(screen.getByText("Auto-lock and passkey")).toBeTruthy();
+    expect(screen.getByText("Gateway and AO nodes")).toBeTruthy();
+    for (const name of ["Connected apps", "Manage tokens", "Contacts", "Currency", "Language", "Home screen"]) {
+      expect(screen.getByRole("button", { name }).getAttribute("aria-describedby")).toBeNull();
+    }
   });
 });
