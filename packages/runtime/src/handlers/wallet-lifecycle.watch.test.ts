@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { deriveAddress, type StoragePort, type Wallet } from "@gleam/core";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { deriveAddress, type JWKInterface, type StoragePort, type Wallet } from "@gleam/core";
 import { Keyring } from "@gleam/core/signer";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
 import { createKeySession, WatchWalletSigningError } from "./key-session";
@@ -32,18 +32,29 @@ const PASSWORD = "correct horse battery staple";
 const TEST_KDF = { kdfParams: { memoryKiB: 64, iterations: 1, parallelism: 1 } };
 const ADDRESS = "a".repeat(43);
 
-function validJWK() {
-  return {
-    kty: "RSA",
-    e: "AQAB",
-    n: "n".repeat(10),
-    d: "d".repeat(10),
-    p: "p".repeat(10),
-    q: "q".repeat(10),
-    dp: "d".repeat(10),
-    dq: "d".repeat(10),
-    qi: "q".repeat(10),
-  };
+/**
+ * A real RSA key: the keyring imports it through WebCrypto, and a stricter
+ * OpenSSL build rejects a placeholder modulus that Node's default one lets
+ * through. 2048 bits rather than 4096 keeps generation fast.
+ */
+async function generateTestJwk(): Promise<JWKInterface> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "RSA-PSS", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const { kty, e, n, d, p, q, dp, dq, qi } = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  return { kty: kty!, e: e!, n: n!, d, p, q, dp, dq, qi };
+}
+
+let testJwk: JWKInterface;
+
+beforeAll(async () => {
+  testJwk = await generateTestJwk();
+});
+
+function validJWK(): JWKInterface {
+  return { ...testJwk };
 }
 
 let handler: WalletLifecycleHandler;
