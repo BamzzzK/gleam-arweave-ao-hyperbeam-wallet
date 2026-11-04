@@ -11,17 +11,25 @@ import { useT } from "../../../i18n";
  */
 export interface ExistingWalletOptionsProps {
   onImport: () => void;
+  onImportPhrase: () => void;
   onConnectKeystone: () => void;
   onConnectLedger: () => void;
   onWatch: () => void;
 }
 
-export function ExistingWalletOptions({ onImport, onConnectKeystone, onConnectLedger, onWatch }: ExistingWalletOptionsProps) {
+export function ExistingWalletOptions({ onImport, onImportPhrase, onConnectKeystone, onConnectLedger, onWatch }: ExistingWalletOptionsProps) {
   const t = useT();
   const { capabilities } = usePlatform();
   const { ledger, keystone } = capabilities.hardwareWallets;
   return (
     <>
+      <OptionSection title={t("onboarding.fromPhrase")}>
+        <OptionRow
+          title={t("onboarding.importPhrase")}
+          description={t("onboarding.importPhraseHint")}
+          onClick={onImportPhrase}
+        />
+      </OptionSection>
       <OptionSection title={t("onboarding.fromFile")}>
         <OptionRow title={t("onboarding.importKeyfile")} description={t("onboarding.importKeyfileHint")} onClick={onImport} />
       </OptionSection>

@@ -6,7 +6,12 @@ import { ExistingWallet } from "./ExistingWallet";
 
 afterEach(cleanup);
 
-const handlers = { onImport: vi.fn(), onConnectKeystone: vi.fn(), onConnectLedger: vi.fn(), onWatch: vi.fn() };
+const handlers = {
+  onImport: vi.fn(),
+  onImportPhrase: vi.fn(),
+  onConnectKeystone: vi.fn(), onConnectLedger: vi.fn(),
+  onWatch: vi.fn(),
+};
 
 const screens = {
   ExistingWallet: () => <ExistingWallet onBack={vi.fn()} {...handlers} />,
@@ -40,5 +45,18 @@ describe.each(Object.entries(screens))("%s hardware wallets", (_name, Screen) =>
     expect(screen.queryByRole("region", { name: "Hardware wallet" })).toBeNull();
     expect(screen.queryByText("Hardware wallet")).toBeNull();
     expect(screen.getByRole("button", { name: /Import a keyfile/ })).toBeTruthy();
+  });
+});
+
+describe.each(Object.entries(screens))("%s recovery phrase", (_name, Screen) => {
+  it("offers a recovery phrase import ahead of the keyfile", () => {
+    renderWithPlatform(<Screen />, fakeAppPlatform());
+    const buttons = screen.getAllByRole("button").map((button) => button.textContent ?? "");
+    const phrase = buttons.findIndex((text) => text.includes("Enter a recovery phrase"));
+    const keyfile = buttons.findIndex((text) => text.includes("Import a keyfile"));
+    expect(phrase).toBeGreaterThanOrEqual(0);
+    expect(phrase).toBeLessThan(keyfile);
+    screen.getAllByRole("button")[phrase]!.click();
+    expect(handlers.onImportPhrase).toHaveBeenCalled();
   });
 });
