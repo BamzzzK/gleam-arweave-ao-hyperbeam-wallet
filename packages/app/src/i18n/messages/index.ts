@@ -10,6 +10,7 @@ import { contacts } from "./contacts";
 import { displayCurrency } from "./display-currency";
 import { errors } from "./errors";
 import { extension } from "./extension";
+import { homeScreen } from "./home-screen";
 import { language } from "./language";
 import { lockSettings } from "./lock-settings";
 import { mainScreen } from "./main-screen";
@@ -38,6 +39,7 @@ export const NAMESPACES = {
   displayCurrency,
   errors,
   extension,
+  homeScreen,
   language,
   lockSettings,
   mainScreen,

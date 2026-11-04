@@ -205,6 +205,8 @@ export default tseslint.config(
       "packages/core/src/signer/**",
       // Validates and addresses keyfiles.
       "packages/core/src/keys/jwk.ts",
+      // Derives a keyfile from a recovery phrase for import.
+      "packages/core/src/keys/mnemonic-jwk.ts",
       // Where `JWKInterface` is defined and re-exported.
       "packages/core/src/models/wallet.ts",
       "packages/core/src/models/index.ts",

@@ -9,6 +9,7 @@ import { Welcome } from "./Welcome";
 import { CreatePassword } from "./CreatePassword";
 import { Backup } from "./Backup";
 import { Import } from "./Import";
+import { ImportPhrase } from "./ImportPhrase";
 import { AddWalletStart } from "./AddWalletStart";
 import { ExistingWallet } from "./ExistingWallet";
 import { ConnectDevice } from "./ConnectDevice";
@@ -38,7 +39,9 @@ type Step =
   // so the background can decrypt the keyfile when the user saves it.
   | { kind: "backup"; password: string | null; wallet: WalletSummary }
   | { kind: "import" }
-  | { kind: "import-password"; jwk: unknown }
+  | { kind: "import-phrase" }
+  // `from` is the screen Back returns to.
+  | { kind: "import-password"; jwk: unknown; from: "import" | "import-phrase" }
   | { kind: "connect-device"; device: HardwareWalletMethod }
   | { kind: "watch" }
   | { kind: "security-phrase"; wallet: WalletSummary }
@@ -234,6 +237,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
             onBack={() => onCancel?.()}
             onCreate={() => setStep({ kind: "create-password" })}
             onImport={() => setStep({ kind: "import" })}
+            onImportPhrase={() => setStep({ kind: "import-phrase" })}
             onConnectKeystone={connectKeystone}
             onConnectLedger={connectLedger}
             onWatch={() => setStep({ kind: "watch" })}
@@ -252,6 +256,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
         <ExistingWallet
           onBack={() => setStep({ kind: "welcome" })}
           onImport={() => setStep({ kind: "import" })}
+          onImportPhrase={() => setStep({ kind: "import-phrase" })}
           onConnectKeystone={connectKeystone}
           onConnectLedger={connectLedger}
           onWatch={() => setStep({ kind: "watch" })}
@@ -313,7 +318,15 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
           // Add-wallet mode lists the keyfile option on its first screen;
           // first run reaches it through "I already have a wallet".
           onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
-          onValidJWK={(jwk) => setStep({ kind: "import-password", jwk })}
+          onValidJWK={(jwk) => setStep({ kind: "import-password", jwk, from: "import" })}
+        />
+      );
+
+    case "import-phrase":
+      return (
+        <ImportPhrase
+          onBack={() => setStep({ kind: addingWallet ? "welcome" : "existing" })}
+          onValidJWK={(jwk) => setStep({ kind: "import-password", jwk, from: "import-phrase" })}
         />
       );
 
@@ -334,7 +347,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
         return (
           <VaultPassword
             title={t("onboarding.importWallet")}
-            onBack={() => setStep({ kind: "import" })}
+            onBack={() => setStep({ kind: step.from })}
             onSubmit={(password) => void handleImportPassword(step.jwk, password)}
             submitting={submitting}
             serverError={serverError}
@@ -344,7 +357,7 @@ export function OnboardingView({ runtime, onComplete, mode = "first-run", vaultH
       return (
         <CreatePassword
           title={t("onboarding.importWallet")}
-          onBack={() => setStep({ kind: "import" })}
+          onBack={() => setStep({ kind: step.from })}
           onSubmit={(password) => handleImportPassword(step.jwk, password)}
           submitting={submitting}
           serverError={serverError}
