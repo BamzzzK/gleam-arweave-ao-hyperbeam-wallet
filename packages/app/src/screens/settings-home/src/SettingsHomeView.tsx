@@ -271,14 +271,15 @@ function SelectRow<T extends string>({
       <label htmlFor={id} className="text-label font-semibold text-foreground">
         {title}
       </label>
-      {/* The native arrow ignores padding, so it's hidden and drawn here with room on the right. */}
+      {/* Reads like the value on an option row: no box, just the choice and a chevron. The native
+          arrow ignores padding, so it's hidden and drawn here with room on the right. */}
       <div className="relative">
         <select
           id={id}
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}
-          className="appearance-none rounded-md border border-line bg-background py-1.5 pl-2.5 pr-8 text-label text-foreground focus:outline-none focus-visible:border-foreground disabled:opacity-60"
+          className="cursor-pointer appearance-none rounded-md bg-transparent py-1 pl-2 pr-6 text-right text-label text-muted hover:enabled:bg-mist hover:enabled:text-foreground focus:outline-none focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-60"
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -292,7 +293,7 @@ function SelectRow<T extends string>({
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+          className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-faint"
         >
           <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
