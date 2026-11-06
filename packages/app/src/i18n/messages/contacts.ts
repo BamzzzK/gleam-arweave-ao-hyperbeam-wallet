@@ -4,6 +4,7 @@ export const contacts = defineMessages({
   en: {
     title: "Contacts",
     add: "Add contact",
+    addFirst: "Add your first contact",
     name: "Name",
     addressPlaceholder: "Arweave address (43 characters)",
     invalidAddress: "Enter a valid Arweave address.",
@@ -19,6 +20,7 @@ export const contacts = defineMessages({
   "zh-CN": {
     title: "联系人",
     add: "添加联系人",
+    addFirst: "添加第一个联系人",
     name: "名称",
     addressPlaceholder: "Arweave 地址（43 个字符）",
     invalidAddress: "请输入有效的 Arweave 地址。",
@@ -34,6 +36,7 @@ export const contacts = defineMessages({
   "zh-TW": {
     title: "聯絡人",
     add: "新增聯絡人",
+    addFirst: "新增第一位聯絡人",
     name: "名稱",
     addressPlaceholder: "Arweave 地址（43 個字元）",
     invalidAddress: "請輸入有效的 Arweave 地址。",

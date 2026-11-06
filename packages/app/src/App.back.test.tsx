@@ -90,7 +90,7 @@ describe("system back button", () => {
     await act(async () => {
       fireEvent.click(await screen.findByText("Contacts"));
     });
-    expect(await screen.findByText("No contacts yet.")).toBeTruthy();
+    expect(await screen.findByText(/No contacts yet\./)).toBeTruthy();
 
     expect(await pressBack(back)).toBe(true);
     expect(await screen.findByText("Help & About")).toBeTruthy();

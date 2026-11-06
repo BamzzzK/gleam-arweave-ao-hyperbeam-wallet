@@ -4,7 +4,8 @@ import { isValidArweaveAddress } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
-import { EmptyState, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { EmptyState } from "@gleam/ui/src/primitives/empty-state.tsx";
 import { useT } from "../../../i18n";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useContacts, useDeleteContact, useSaveContact } from "../../activity/src/useContacts";
@@ -190,7 +191,16 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
             <SkeletonRow />
           </>
         ) : contacts.length === 0 ? (
-          <EmptyState message={t("contacts.empty")} />
+          <EmptyState
+            message={t("contacts.empty")}
+            action={
+              adding ? null : (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setAdding(true)}>
+                  {t("contacts.addFirst")}
+                </Button>
+              )
+            }
+          />
         ) : (
           contacts.map((contact) =>
             editingAddress === contact.address ? (
