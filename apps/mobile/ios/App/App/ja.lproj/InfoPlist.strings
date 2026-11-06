@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam は、送金先アドレスや Keystone のアカウントと署名の QR コードをスキャンするためにカメラを使用します。";
+NSFaceIDUsageDescription = "Gleam は、ウォレットのロックを解除するために Face ID を使用します。";

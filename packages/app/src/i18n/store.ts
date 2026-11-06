@@ -16,10 +16,16 @@ function isLanguage(value: unknown): value is Language {
 export function matchLanguage(tag: string | undefined): Language {
   if (!tag) return "en";
   const lower = tag.toLowerCase();
-  if (!lower.startsWith("zh")) return "en";
-  // Traditional script or the regions that write it; a bare `zh` is Simplified.
-  if (/hant|[-_](tw|hk|mo)\b/.test(lower)) return "zh-TW";
-  return "zh-CN";
+  const base = lower.split(/[-_]/)[0];
+  if (base === "zh") {
+    // Traditional script or the regions that write it; a bare `zh` is Simplified.
+    return /hant|[-_](tw|hk|mo)\b/.test(lower) ? "zh-TW" : "zh-CN";
+  }
+  // European Portuguese readers get Brazilian rather than English.
+  if (base === "pt") return "pt-BR";
+  // `in` is the legacy code Android still reports for Indonesian.
+  if (base === "in") return "id";
+  return LANGUAGES.find((language) => language.code === base)?.code ?? "en";
 }
 
 function systemLanguage(): Language {

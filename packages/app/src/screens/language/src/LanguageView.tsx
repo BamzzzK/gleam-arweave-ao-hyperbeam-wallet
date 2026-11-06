@@ -3,9 +3,29 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import gbFlag from "flag-icons/flags/4x3/gb.svg?url";
 import cnFlag from "flag-icons/flags/4x3/cn.svg?url";
 import twFlag from "flag-icons/flags/4x3/tw.svg?url";
+import esFlag from "flag-icons/flags/4x3/es.svg?url";
+import idFlag from "flag-icons/flags/4x3/id.svg?url";
+import brFlag from "flag-icons/flags/4x3/br.svg?url";
+import vnFlag from "flag-icons/flags/4x3/vn.svg?url";
+import trFlag from "flag-icons/flags/4x3/tr.svg?url";
+import ruFlag from "flag-icons/flags/4x3/ru.svg?url";
+import jpFlag from "flag-icons/flags/4x3/jp.svg?url";
+import krFlag from "flag-icons/flags/4x3/kr.svg?url";
 import { LANGUAGES, setLanguagePreference, useLanguagePreference, useT, type Language, type LanguagePreference } from "../../../i18n";
 
-const FLAGS: Record<Language, string> = { en: gbFlag, "zh-CN": cnFlag, "zh-TW": twFlag };
+const FLAGS: Record<Language, string> = {
+  en: gbFlag,
+  es: esFlag,
+  id: idFlag,
+  "pt-BR": brFlag,
+  vi: vnFlag,
+  tr: trFlag,
+  ru: ruFlag,
+  ja: jpFlag,
+  ko: krFlag,
+  "zh-CN": cnFlag,
+  "zh-TW": twFlag,
+};
 
 /** Picks the language the wallet is shown in; the choice applies at once and stays on this device. */
 export interface LanguageViewProps {

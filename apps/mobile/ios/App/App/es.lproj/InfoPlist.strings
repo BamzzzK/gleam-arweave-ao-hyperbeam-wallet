@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam usa la cámara para escanear códigos QR de direcciones de destinatarios o de cuentas y firmas de Keystone.";
+NSFaceIDUsageDescription = "Gleam usa Face ID para desbloquear tu billetera.";

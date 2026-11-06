@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam menggunakan kamera untuk memindai kode QR alamat penerima atau akun dan tanda tangan Keystone.";
+NSFaceIDUsageDescription = "Gleam menggunakan Face ID untuk membuka dompet Anda.";
