@@ -669,9 +669,8 @@ function ComposeStep({
             onClick={() => onShowInfo(true)}
             className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground phone:hit-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
           >
-            <span aria-hidden="true">[</span>
             <span className="truncate">{ticker}</span>
-            <span aria-hidden="true">]</span>
+            <InfoIcon />
           </button>
         }
       />
@@ -1603,5 +1602,15 @@ export function SuccessStep({
         </Button>
       </ScreenFooter>
     </div>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0">
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.6v.01" strokeWidth="2.6" />
+    </svg>
   );
 }
