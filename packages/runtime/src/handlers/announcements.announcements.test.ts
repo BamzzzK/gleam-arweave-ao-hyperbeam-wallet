@@ -97,7 +97,7 @@ describe("parseAnnouncements", () => {
 describe("AnnouncementsHandler", () => {
   it("fetches and validates the file with a credential-free GET", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify([OK, { id: "bad" }])));
-    const handler = new AnnouncementsHandler({ target: TARGET, storage: createFakeStorage(), url: "https://site.example/a.json", fetchImpl });
+    const handler = new AnnouncementsHandler({ target: () => TARGET, storage: createFakeStorage(), url: "https://site.example/a.json", fetchImpl });
 
     expect(await handler.fetchAnnouncements()).toEqual([OK]);
     expect(fetchImpl).toHaveBeenCalledWith("https://site.example/a.json", expect.objectContaining({ credentials: "omit" }));
@@ -112,14 +112,14 @@ describe("AnnouncementsHandler", () => {
         throw new Error("offline");
       }),
     ]) {
-      const handler = new AnnouncementsHandler({ storage, target: TARGET, fetchImpl: fetchImpl as unknown as typeof fetch });
+      const handler = new AnnouncementsHandler({ storage, target: () => TARGET, fetchImpl: fetchImpl as unknown as typeof fetch });
       expect(await handler.fetchAnnouncements()).toEqual([]);
     }
   });
 
   it("persists dismissed ids without duplicating them", async () => {
     const storage = createFakeStorage();
-    const handler = new AnnouncementsHandler({ storage, target: TARGET });
+    const handler = new AnnouncementsHandler({ storage, target: () => TARGET });
 
     await handler.dismiss({ id: "a" });
     await handler.dismiss({ id: "b" });
@@ -130,7 +130,7 @@ describe("AnnouncementsHandler", () => {
   });
 
   it("ignores a corrupt stored value", async () => {
-    const handler = new AnnouncementsHandler({ target: TARGET, storage: createFakeStorage({ [ANNOUNCEMENTS_DISMISSED_KEY]: "oops" }) });
+    const handler = new AnnouncementsHandler({ target: () => TARGET, storage: createFakeStorage({ [ANNOUNCEMENTS_DISMISSED_KEY]: "oops" }) });
     expect(await handler.getDismissed()).toEqual([]);
   });
 });

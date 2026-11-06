@@ -96,7 +96,8 @@ export function parseAnnouncements(raw: unknown, target: AnnouncementTarget): An
 
 export interface AnnouncementsHandlerDeps {
   storage: StoragePort;
-  target: AnnouncementTarget;
+  /** Read per fetch, not at startup, when the shell may not be ready to say. */
+  target: () => AnnouncementTarget;
   url?: string;
   fetchImpl?: typeof fetch;
 }
@@ -121,7 +122,7 @@ export class AnnouncementsHandler {
         cache: "no-cache",
       });
       if (!response.ok) return [];
-      return parseAnnouncements(await response.json(), this.deps.target);
+      return parseAnnouncements(await response.json(), this.deps.target());
     } catch {
       return [];
     }
