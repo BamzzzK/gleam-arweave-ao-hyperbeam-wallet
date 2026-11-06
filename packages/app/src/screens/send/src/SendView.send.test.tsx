@@ -132,6 +132,18 @@ function routedSend(handlers: {
   }) as RuntimePort["send"];
 }
 
+describe("SendView with nothing to send", () => {
+  it("says so on the disabled button, without a Max to press", async () => {
+    const send = routedSend({ getBalance: () => "0" });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const button = await screen.findByRole("button", { name: "No AR to send" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Balance: 0 AR")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Max/ })).toBeNull();
+  });
+});
+
 describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   it("opening the picker lists AR plus every getTokenBalances token, all selectable", async () => {
     const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });

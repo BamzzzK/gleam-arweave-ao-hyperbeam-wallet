@@ -583,11 +583,18 @@ function ComposeStep({
   const unsupported = token === null ? null : capabilityRefusal(wallet.method, "signDataItem", `send ${ticker}`);
   const recipientValid = recipientSchema.safeParse(step.recipient).success;
   const amountValid = amountSchema(denomination).safeParse(step.amountDisplay).success;
-  const canContinue = !step.submitting && unsupported === null && recipientValid && amountValid;
+  const rawMaxAtomic =
+    token === null
+      ? balancesQuery.data?.arBalance
+      : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
+  const holdsNone = rawMaxAtomic !== undefined && BigInt(rawMaxAtomic) === 0n;
+  const canContinue = !step.submitting && unsupported === null && !holdsNone && recipientValid && amountValid;
   // A disabled button names what's missing rather than leaving it to guesswork.
   const continueLabel = step.submitting
     ? t("send.estimatingFee")
-    : !recipientValid
+    : holdsNone
+      ? t("send.nothingToSend", { ticker })
+      : !recipientValid
       ? t("send.enterAddress")
       : !amountValid
         ? t("send.enterAmount")
@@ -596,10 +603,6 @@ function ComposeStep({
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
   // is the one that's actually enforced.
-  const rawMaxAtomic =
-    token === null
-      ? balancesQuery.data?.arBalance
-      : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
   const maxAtomic =
     token === null
       ? rawMaxAtomic !== undefined && arFeeAtomic !== undefined
@@ -709,10 +712,10 @@ function ComposeStep({
             <span className="flex items-center gap-1 text-label">
               {balanceDisplay !== undefined ? (
                 <span className="tabular-nums text-muted">
-                  {balanceDisplay} {ticker}
+                  {t("send.balance", { amount: `${balanceDisplay} ${ticker}` })}
                 </span>
               ) : null}
-              {maxDisplay !== undefined ? (
+              {maxDisplay !== undefined && !holdsNone ? (
                 <button
                   type="button"
                   aria-label={t("send.maxAria", { amount: maxDisplay })}
