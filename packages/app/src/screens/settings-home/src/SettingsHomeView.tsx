@@ -108,8 +108,8 @@ export function SettingsHomeView({
     setState({
       lockSettings: lockSettings.status === "fulfilled" ? lockSettings.value : null,
       networkSettings: networkSettings.status === "fulfilled" ? networkSettings.value : null,
-      connectedApps: connectedApps.status === "fulfilled" ? connectedApps.value.length : null,
-      contacts: contacts.status === "fulfilled" ? contacts.value.length : null,
+      connectedApps: connectedApps.status === "fulfilled" ? (connectedApps.value?.length ?? null) : null,
+      contacts: contacts.status === "fulfilled" ? (contacts.value?.length ?? null) : null,
       loading: false,
     });
     if (themeSettings.status === "fulfilled") {
