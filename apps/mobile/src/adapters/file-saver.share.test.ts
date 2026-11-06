@@ -35,11 +35,11 @@ describe("createFileSaver", () => {
     expect(calls).toEqual(["write", "share", "delete"]);
     const write = vi.mocked(plugins.writeFile).mock.calls[0]![0];
     expect(write.directory).toBe(Directory.Cache);
-    expect(write.path).toMatch(/^gleam-export-[\w-]+\/wallet\.json$/);
+    expect(write.path).toMatch(/^gleam-exports\/gleam-export-[\w-]+\/wallet\.json$/);
     expect(atob(write.data)).toBe('{"kty":"RSA"}');
     expect(vi.mocked(plugins.share).mock.calls[0]![0].files).toEqual([`file:///cache/${write.path}`]);
     const rm = vi.mocked(plugins.rmdir).mock.calls[0]![0];
-    expect(rm).toMatchObject({ path: write.path.split("/")[0], recursive: true });
+    expect(rm).toMatchObject({ path: write.path.split("/").slice(0, 2).join("/"), recursive: true });
   });
 
   it("deletes the file and reports cancelled when the sheet is dismissed", async () => {
@@ -87,7 +87,8 @@ describe("sweepExports", () => {
       files: [{ name: "gleam-export-a" }, { name: "image_cache" }, { name: "gleam-export-b" }],
     });
     await sweepExports(plugins);
-    expect(vi.mocked(plugins.rmdir).mock.calls.map(([o]) => o.path)).toEqual(["gleam-export-a", "gleam-export-b"]);
+    expect(vi.mocked(plugins.readdir).mock.calls[0]![0].path).toBe("gleam-exports");
+    expect(vi.mocked(plugins.rmdir).mock.calls.map(([o]) => o.path)).toEqual(["gleam-exports/gleam-export-a", "gleam-exports/gleam-export-b"]);
   });
 
   it("swallows a readdir failure", async () => {
@@ -103,10 +104,10 @@ describe("sweepExports", () => {
     vi.mocked(plugins.share).mockImplementationOnce(() => new Promise((resolve) => (release = () => resolve({}))));
     const saving = createFileSaver(plugins).save(file());
     await vi.waitFor(() => expect(plugins.share).toHaveBeenCalled());
-    const folder = vi.mocked(plugins.writeFile).mock.calls[0]![0].path.split("/")[0]!;
+    const folder = vi.mocked(plugins.writeFile).mock.calls[0]![0].path.split("/")[1]!;
     vi.mocked(plugins.readdir).mockResolvedValueOnce({ files: [{ name: folder }, { name: "gleam-export-old" }] });
     await sweepExports(plugins);
-    expect(vi.mocked(plugins.rmdir).mock.calls.map(([o]) => o.path)).toEqual(["gleam-export-old"]);
+    expect(vi.mocked(plugins.rmdir).mock.calls.map(([o]) => o.path)).toEqual(["gleam-exports/gleam-export-old"]);
     release();
     await saving;
   });
