@@ -155,7 +155,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div>
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
             {t("manageTokens.watched")}
           </div>
           <div>
@@ -205,7 +205,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
 
         {state.discovered.length > 0 ? (
           <div className="pt-10">
-            <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+            <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
               {t("manageTokens.found")}
             </div>
             {state.discovered.map((token) => (
@@ -232,7 +232,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
         ) : null}
 
         <div className="pt-10">
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
             {t("manageTokens.add")}
           </div>
           <div className="flex flex-col gap-2 py-3.5">

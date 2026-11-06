@@ -57,7 +57,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
 
   return (
     <div className="pb-10 phone:pb-8">
-      <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
         {t("lockSettings.phraseTitle")}
       </div>
       {state.kind === "loading" ? (
