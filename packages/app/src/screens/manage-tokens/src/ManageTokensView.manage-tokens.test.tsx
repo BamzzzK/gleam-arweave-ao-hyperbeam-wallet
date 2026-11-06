@@ -70,8 +70,8 @@ describe("ManageTokensView", () => {
 
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: PROC_1 } });
 
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
@@ -98,8 +98,8 @@ describe("ManageTokensView", () => {
     );
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: PROC_1 } });
 
     await waitFor(() => expect(screen.getByText(`Add ${BALANCE_1.ticker}`)).toBeTruthy());
     fireEvent.click(screen.getByText(`Add ${BALANCE_1.ticker}`));
@@ -123,8 +123,8 @@ describe("ManageTokensView", () => {
 
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: PROC_1 } });
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/No process with that id/));
   });
@@ -138,10 +138,10 @@ describe("ManageTokensView", () => {
 
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: "bad-id" } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: "bad-id" } });
     expect(screen.queryByRole("alert")).toBeNull();
-    fireEvent.blur(screen.getByPlaceholderText("AO process id"));
+    fireEvent.blur(screen.getByPlaceholderText("Paste a token's process ID"));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/43 letters.*this is 6/));
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "previewWatchedToken" }));
@@ -158,8 +158,8 @@ describe("ManageTokensView", () => {
 
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: PROC_1 } });
 
     await waitFor(() => expect(screen.getByText(/can't read this token right now/)).toBeTruthy());
     expect(screen.getByText(/You can still add it/)).toBeTruthy();
@@ -178,8 +178,8 @@ describe("ManageTokensView", () => {
 
     renderWithClient(<ManageTokensView runtime={fakeRuntime({ send })} address="addr1" onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByPlaceholderText("AO process id")).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText("AO process id"), { target: { value: PROC_1 } });
+    await waitFor(() => expect(screen.getByPlaceholderText("Paste a token's process ID")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Paste a token's process ID"), { target: { value: PROC_1 } });
 
     await waitFor(() => expect(screen.getByText("Add token")).toBeTruthy());
     expect(screen.queryByText(PROC_1)).toBeNull();
