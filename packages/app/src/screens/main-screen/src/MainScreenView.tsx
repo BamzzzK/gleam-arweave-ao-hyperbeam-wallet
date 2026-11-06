@@ -1175,15 +1175,17 @@ export function MainScreenView({
                 ))
               )}
             </div>
-            <div className="pt-2.5 text-center phone:pt-1">
-              <button
-                type="button"
-                onClick={() => openInExplorer(wallet.address)}
-                className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
-              >
-                {t("mainScreen.viewAll")}
-              </button>
-            </div>
+            {activityQuery.data && activityQuery.data.entries.length > 0 ? (
+              <div className="pt-2.5 text-center phone:pt-1">
+                <button
+                  type="button"
+                  onClick={() => openInExplorer(wallet.address)}
+                  className="text-label font-medium text-muted hover:text-foreground hover:underline phone:min-h-11 phone:px-4"
+                >
+                  {t("mainScreen.viewAll")}
+                </button>
+              </div>
+            ) : null}
           </>
         )}
       </div>
