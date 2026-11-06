@@ -43,13 +43,13 @@ const STATE: WalletState = {
 };
 
 describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
-  it("badges only a watch-only wallet", async () => {
+  it("labels only a watch-only wallet", async () => {
     const [first, second] = STATE.wallets;
     const send = vi.fn().mockResolvedValue({ ...STATE, wallets: [first, { ...second!, method: "watch", publicKey: "" }] });
     render(<WalletSwitcherView runtime={fakeRuntime({ send })} onSwitched={vi.fn()} onBack={vi.fn()} onAddWallet={vi.fn()} onManage={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByText("Trading")).toBeTruthy());
-    expect(screen.getAllByText("Watch only")).toHaveLength(1);
+    expect(screen.getAllByText(/Watch only/)).toHaveLength(1);
     expect(screen.getByText("Trading").closest("button")?.textContent).toContain("Watch only");
   });
 
