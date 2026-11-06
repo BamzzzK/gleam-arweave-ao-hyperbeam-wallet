@@ -22,6 +22,18 @@ const BASE: PortfolioChartProps = {
 
 const figures = (container: HTMLElement) => container.querySelector("div.gap-0\\.5") as HTMLElement;
 
+describe("PortfolioChart empty wallet", () => {
+  it("drops the change and range tabs while the wallet holds nothing, and brings them back once it does", () => {
+    const empty = { ...BASE, points: [{ timestamp: 1, value: 0 }, { timestamp: 2, value: 0 }], currentValue: 0, change: 0 };
+    const { rerender } = render(<PortfolioChart {...empty} />);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByText("0.00%")).toBeNull();
+
+    rerender(<PortfolioChart {...BASE} />);
+    expect(screen.getByRole("tablist")).toBeTruthy();
+  });
+});
+
 describe("PortfolioChart cached", () => {
   it("renders faded from the first frame, with no delay", () => {
     const { container } = render(<PortfolioChart {...BASE} cached />);

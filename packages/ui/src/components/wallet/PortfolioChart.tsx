@@ -226,6 +226,8 @@ export function PortfolioChart({
   if (flash) lastFlashRef.current = flash;
   const isPositive = change >= 0;
   const isEmpty = currentValue === 0 && points.every((point) => point.value === 0);
+  // A wallet holding nothing over this range has no change to show, so the % and range tabs give way to the placeholder.
+  const showsHistory = loading || !isEmpty;
   const linePoints = buildLinePath(downsample(points, compact ? SPARKLINE_POINTS : CHART_POINTS));
   const areaPoints = linePoints ? `0,${CHART_HEIGHT} ${linePoints} ${CHART_WIDTH},${CHART_HEIGHT}` : "";
   const lineColorVar = isPositive ? "var(--color-positive)" : "var(--color-negative)";
@@ -299,14 +301,14 @@ export function PortfolioChart({
     <div className={cn("flex min-w-0 flex-col gap-0.5 transition-opacity duration-500 ease-out", loading && "opacity-50", faded && (cachedFetching ? "gleam-cached-pulse" : "opacity-70"))}>
       <div className="flex items-baseline gap-2.5">
         <Headline parts={headlineParts} trend={headlineTrend} masked={masked} onToggle={onToggleMasked} />
-        {headline === undefined ? changeNote : null}
+        {headline === undefined && showsHistory ? changeNote : null}
       </div>
       {headline !== undefined ? (
         <div className="flex items-baseline gap-2.5">
           <span className="text-label tabular-nums text-muted" style={animatedNumberTintStyle(masked ? null : total.trend)}>
             {totalLabel}
           </span>
-          {changeNote}
+          {showsHistory ? changeNote : null}
         </div>
       ) : null}
     </div>
@@ -378,7 +380,7 @@ export function PortfolioChart({
         </>
       )}
 
-      {minimal ? null : (
+      {minimal || !showsHistory ? null : (
         <div role="tablist" aria-label={labels.chart.rangeTabs} className="flex items-center gap-1 phone:-mx-2.5">
           {RANGE_TABS.map((range) => (
             <button

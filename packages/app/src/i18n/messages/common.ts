@@ -53,7 +53,7 @@ export const common = defineMessages({
     showBalances: "Show balances",
     hideBalances: "Hide balances",
     chartNoHistory: "No portfolio history yet",
-    chartWillAppear: "Your portfolio value will appear here.",
+    chartWillAppear: "Receive AR or AO to start tracking your portfolio.",
     chartRange: "Chart range",
   },
   "zh-CN": {
@@ -108,7 +108,7 @@ export const common = defineMessages({
     showBalances: "显示余额",
     hideBalances: "隐藏余额",
     chartNoHistory: "暂无资产历史",
-    chartWillAppear: "你的资产总值将显示在这里。",
+    chartWillAppear: "接收 AR 或 AO 后即可在这里查看你的资产走势。",
     chartRange: "图表时间范围",
   },
   "zh-TW": {
@@ -163,7 +163,7 @@ export const common = defineMessages({
     showBalances: "顯示餘額",
     hideBalances: "隱藏餘額",
     chartNoHistory: "暫無資產歷史",
-    chartWillAppear: "你的資產總值將顯示在這裡。",
+    chartWillAppear: "接收 AR 或 AO 後即可在這裡查看你的資產走勢。",
     chartRange: "圖表時間範圍",
   },
 });
