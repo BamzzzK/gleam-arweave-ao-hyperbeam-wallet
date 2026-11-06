@@ -337,9 +337,10 @@ These are true of the current release.
   None of these changes what is signed, and a send above the real
   balance is refused by the network or the token. The worst case is a
   send that reads pending, then failed after 2 hours, with nothing moved.
-- **Prices from a node are display only.** A lying node can post a
-  collectible listing at any price above 0.1 AR. The price never feeds a
-  signature or a send.
+- **Prices are display only.** A lying node can post a collectible
+  listing at any price above 0.1 AR, and a wrong FX rate from the Points
+  API misstates a fiat figure. Neither feeds a signature or a send, which
+  are typed and checked in token units.
 - **A dApp's L1 token transfer can lose its quote.** If the token host
   hangs past 10 seconds, the transfer is refused after approval. No
   funds are at risk.
@@ -356,6 +357,37 @@ These are true of the current release.
   signed with the upload key and Play installs with the Play signing
   key, so moving over means uninstalling, which deletes a vault that
   isn't backed up.
+- **Mobile link and dApp-view gaps.**
+  - A `target=_blank` or `window.open` from a cross-origin iframe takes
+    the main-frame path for an external-app link, so the "Open in another
+    app?" prompt can carry page-chosen text. The user still has to tap
+    Open, and the prompt names the site.
+  - An attest link opened while the app is locked is held, and shows as
+    an approval sheet after the next unlock, with the usual decoded
+    preview.
+  - The approval sheet doesn't wait for the native dApp view to hide.
+    The view sits above the sheet, so it would take the tap, not approve.
+  - An invite link redeems its code with no tap. It signs nothing; the
+    desktop site message works the same way.
+- **Android and CI hardening gaps.** Android release builds don't
+  minify, and `file_paths.xml` shares the whole cache directory through
+  a non-exported `FileProvider`. The `analyze-swift` CodeQL job has no
+  `harden-runner` step, because it doesn't support macOS runners on the
+  community tier.
+- **Points and scans.**
+  - `GET /scan/challenge` writes one row per call, bounded by 30 per
+    hour per IP and a purge 24 hours after expiry.
+  - Rate limits key on the first `X-Forwarded-For` entry, which holds
+    only while the API sits behind Railway's edge.
+  - One wallet attests a release once and 100 scans per release are
+    paid, so many registered wallets can still take the paid places.
+  - `GET /attestations` publishes each attestation's owner key,
+    signature, report and answers, so anyone can verify without trusting
+    Gleam.
+  - The scan CLI prints server-supplied error text into an agent's
+    context, constrained by the parser's patterns.
+  - `gleam-points:attest-status` tells `gleamwallet.app` whether a wallet
+    is set up and has joined Points on this install, without an address.
 - **No independent audit has been completed.**
 
 ## Out of scope
