@@ -422,6 +422,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
       <ConnectedAppsView
         runtime={runtime}
         highlightOrigin={origin}
+        wallets={wallets}
         onBack={() => setSubView(returnToUrl ? { kind: "browser", url: returnToUrl } : { kind: "settings-home" })}
       />
     );

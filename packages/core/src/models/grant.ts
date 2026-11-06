@@ -15,4 +15,14 @@ export interface Grant {
   createdAt: number;
   expiresAt: number | null;
   budget: null;
+  /**
+   * The site's icon as an https or inline image URL, saved when the grant
+   * was made. Absent on grants from before icons were kept.
+   */
+  icon?: string | null;
+  /**
+   * The name the dApp gave for itself at connect. Its own claim, so it is
+   * always shown with the origin, never in place of it.
+   */
+  name?: string | null;
 }

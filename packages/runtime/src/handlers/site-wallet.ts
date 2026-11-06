@@ -56,9 +56,12 @@ function webOrigin(url: string | undefined): string | null {
   }
 }
 
-/** The page sets its favicon, so only a URL the popup can show as a plain image passes. */
-function safeFavIconUrl(raw: string | undefined): string | null {
-  if (!raw) return null;
+/** Grants keep the icon, so an inline image past this size isn't worth storing. */
+const SITE_ICON_MAX_LENGTH = 32_000;
+
+/** The page sets its icon, so only a URL the wallet can show as a plain image passes. */
+export function safeSiteIconUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > SITE_ICON_MAX_LENGTH) return null;
   if (/^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp|svg\+xml);/i.test(raw)) return raw;
   try {
     return new URL(raw).protocol === "https:" ? raw : null;
@@ -153,7 +156,7 @@ export class SiteWalletHandler {
     const current = seen?.origin === origin ? seen : null;
     return {
       origin,
-      favIconUrl: safeFavIconUrl(tab?.favIconUrl),
+      favIconUrl: safeSiteIconUrl(tab?.favIconUrl),
       otherWallet: current?.walletName ?? null,
       otherWalletUsedAt: current?.usedAt ?? null,
       otherWalletPermissions: knownPermissions(current?.permissions),

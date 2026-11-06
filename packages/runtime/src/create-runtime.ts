@@ -286,6 +286,23 @@ export function createRuntime(platform: Platform): Runtime {
     return ids;
   }
 
+  /** The favicon of an open tab on `origin`, to keep on its grant. */
+  async function favIconFor(origin: string): Promise<string | null> {
+    try {
+      for (const tab of await tabs.webTabs()) {
+        if (!tab.url || !tab.favIconUrl) continue;
+        try {
+          if (new URL(tab.url).origin === origin) return tab.favIconUrl;
+        } catch {
+          // Not a parseable URL — never a candidate.
+        }
+      }
+    } catch {
+      // A missing icon only means the letter fallback.
+    }
+    return null;
+  }
+
   /**
    * Sends a `providerEvent` push to every tab currently showing `origin` —
    * never a broadcast to every open tab. Each send targets one `tabId`; a
@@ -445,6 +462,7 @@ export function createRuntime(platform: Platform): Runtime {
         walletId: state.activeWalletId,
         requestedPermissions: newPermissions,
         appInfo,
+        favIconUrl: await favIconFor(origin),
       });
 
       // Reached only once the user approved: a rejected or timed-out request
@@ -859,7 +877,7 @@ export function createRuntime(platform: Platform): Runtime {
     getActiveSite: async () => siteWallet.activeSite(await tabs.activeTab()),
     useGleamOnSite: async (data) => {
       const origin = requireWebOrigin(data.origin);
-      await approval.grantSite({ origin, permissions: data.permissions });
+      await approval.grantSite({ origin, permissions: data.permissions, favIconUrl: await favIconFor(origin) });
       await siteWallet.setUseGleam(origin, true);
       await pushSiteWalletMode(origin, true);
       await reloadActiveTabFor(origin);
