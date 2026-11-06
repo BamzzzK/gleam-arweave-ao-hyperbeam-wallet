@@ -835,6 +835,46 @@ describe("SendView address book: save this address (AO-SEND-UI-WALLET-CORE)", ()
 });
 
 describe("SendView with a hardware wallet", () => {
+  it("re-quotes after a failed send and shows the new fee instead of retrying the stale one", async () => {
+    const fees = ["100000000", "300000000"];
+    const routed = routedSend({ estimateTransfer: () => ({ fee: fees.shift() ?? "300000000", firstSeenRecipient: false }) });
+    const submitted: unknown[] = [];
+    const send = vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type !== "submitTransfer") return routed(message as never);
+      submitted.push(message.payload);
+      if (submitted.length === 1) throw new Error("Transaction verification failed");
+      return { txId: "tx-123" };
+    }) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("The network fee changed to 0.0003 AR. Check it and sign again.");
+    expect(submitted).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Send 0.1 AR" }));
+    await waitFor(() => expect(submitted).toHaveLength(2));
+    expect(submitted[1]).toMatchObject({ fee: "300000000" });
+  });
+
+  it("keeps the send's own error when the fee hasn't changed", async () => {
+    const routed = routedSend({});
+    const send = vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "submitTransfer") throw new Error("Gateway unavailable");
+      return routed(message as never);
+    }) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Gateway unavailable");
+  });
+
   it("points to the approval window while the device send is pending", async () => {
     const hardware: WalletSummary = { ...WALLET, method: "ledger", device: { kind: "ledger" } };
     const routed = routedSend({ getState: () => ({ wallets: [hardware], activeWalletId: hardware.id, session: null }) });

@@ -436,6 +436,26 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     );
   }
 
+  const requote = async (recipient: string, amountAtomic: string): Promise<FeeEstimate | null> => {
+    try {
+      return await runtime.send<
+        { walletId: string; recipient: string; token: string | null; amount: string; fee: null },
+        FeeEstimate
+      >({
+        type: "estimateTransfer",
+        payload: {
+          walletId: wallet.id,
+          recipient,
+          token: selectedToken === null ? null : selectedToken.processId,
+          amount: amountAtomic,
+          fee: null,
+        },
+      });
+    } catch {
+      return null;
+    }
+  };
+
   if (step.kind === "review") {
     const handleSign = async () => {
       setStep({ ...step, submitting: true, error: undefined });
@@ -450,7 +470,22 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         setStep({ kind: "success", txId: result.txId, recipient: step.recipient, amountAtomic: step.amountAtomic });
       } catch (error) {
         console.error("submitTransfer failed:", error);
-        setStep({ ...step, submitting: false, error: errorText(error) });
+        const failed = errorText(error);
+        // The fee is pinned at review, so a quote the network has since
+        // outgrown fails every retry. Re-quote, and if the fee moved, show
+        // the new one and wait for another tap: it is never signed unseen.
+        const estimate = step.estimate.fee === null ? null : await requote(step.recipient, step.amountAtomic);
+        if (estimate === null || estimate.fee === null || estimate.fee === step.estimate.fee) {
+          setStep({ ...step, submitting: false, error: failed });
+          return;
+        }
+        const balanceError = validateSendAmount(step.amountAtomic, selectedToken, balancesQuery.data, estimate.fee);
+        setStep({
+          ...step,
+          estimate,
+          submitting: false,
+          error: balanceError ?? t("send.feeChanged", { fee: `${formatWinstonAsAr(estimate.fee, 12)} AR` }),
+        });
       }
     };
 
