@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type {
   AutoLockTimeout,
+  Contact,
+  Grant,
   LockSettings,
   NetworkSettings,
   RuntimePort,
@@ -60,8 +62,11 @@ export interface SettingsHomeViewProps {
 interface LoadState {
   lockSettings: LockSettings | null;
   networkSettings: NetworkSettings | null;
+  connectedApps: number | null;
+  contacts: number | null;
   loading: boolean;
 }
+
 
 export function SettingsHomeView({
   runtime,
@@ -80,21 +85,31 @@ export function SettingsHomeView({
   const t = useT();
   const language = useLanguage();
   const { version } = platform.buildInfo;
-  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
+  const [state, setState] = useState<LoadState>({
+    lockSettings: null,
+    networkSettings: null,
+    connectedApps: null,
+    contacts: null,
+    loading: true,
+  });
   const [theme, setTheme] = useState<ThemePreference>("light");
   const [savingTheme, setSavingTheme] = useState(false);
   const { settings: display } = useDisplaySettings(runtime);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
-    const [lockSettings, networkSettings, themeSettings] = await Promise.allSettled([
+    const [lockSettings, networkSettings, themeSettings, connectedApps, contacts] = await Promise.allSettled([
       runtime.send<void, LockSettings>({ type: "getLockSettings", payload: undefined }),
       runtime.send<void, NetworkSettings>({ type: "getNetworkSettings", payload: undefined }),
       runtime.send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined }),
+      runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined }),
+      runtime.send<void, Contact[]>({ type: "listContacts", payload: undefined }),
     ]);
     setState({
       lockSettings: lockSettings.status === "fulfilled" ? lockSettings.value : null,
       networkSettings: networkSettings.status === "fulfilled" ? networkSettings.value : null,
+      connectedApps: connectedApps.status === "fulfilled" ? connectedApps.value.length : null,
+      contacts: contacts.status === "fulfilled" ? contacts.value.length : null,
       loading: false,
     });
     if (themeSettings.status === "fulfilled") {
@@ -142,9 +157,19 @@ export function SettingsHomeView({
               onClick={onOpenLockSettings}
             />
           ) : null}
-          <OptionRow divided={false} title={t("settingsHome.connectedAppsTitle")} onClick={onOpenConnectedApps} />
+          <OptionRow
+            divided={false}
+            title={t("settingsHome.connectedAppsTitle")}
+            count={state.connectedApps ?? undefined}
+            onClick={onOpenConnectedApps}
+          />
           <OptionRow divided={false} title={t("settingsHome.manageTokensTitle")} onClick={onOpenManageTokens} />
-          <OptionRow divided={false} title={t("settingsHome.contactsTitle")} onClick={onOpenContacts} />
+          <OptionRow
+            divided={false}
+            title={t("settingsHome.contactsTitle")}
+            count={state.contacts ?? undefined}
+            onClick={onOpenContacts}
+          />
           <OptionRow
             divided={false}
             title={t("settingsHome.networkTitle")}

@@ -31,6 +31,8 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): Run
     if (type === "getScanStats") return null;
     if (type === "getDisplaySettings") return DISPLAY_SETTINGS;
     if (type === "setDisplaySettings") return undefined;
+    if (type === "getConnectedApps") return [{}, {}, {}];
+    if (type === "listContacts") return [];
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }
@@ -62,6 +64,14 @@ describe("SettingsHomeView", () => {
 
     await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
     expect(screen.getByText("arweave.net")).toBeTruthy();
+  });
+
+  it("counts connected apps beside their row, and leaves an empty contact list uncounted", async () => {
+    renderSettingsHome();
+
+    const apps = await screen.findByRole("button", { name: "Connected apps" });
+    await waitFor(() => expect(within(apps).getByText("3")).toBeTruthy());
+    expect(within(screen.getByRole("button", { name: "Contacts" })).queryByText("0")).toBeNull();
   });
 
   it("calls onOpenFeedback when the feedback card is pressed", async () => {
