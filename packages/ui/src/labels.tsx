@@ -29,6 +29,9 @@ export interface UiLabels {
   browseHint: string;
   tryAnotherFile: string;
   watchOnly: string;
+  send: string;
+  receive: string;
+  securityPhrasePicker: { word: string; suggestAnother: string };
   chart: {
     showAllWallets: string;
     showThisWallet: string;
@@ -93,6 +96,9 @@ export const DEFAULT_UI_LABELS: UiLabels = {
   browseHint: "or click to browse",
   tryAnotherFile: "Click to try another file",
   watchOnly: "Watch only",
+  send: "Send",
+  receive: "Receive",
+  securityPhrasePicker: { word: "Word", suggestAnother: "Suggest another" },
   chart: {
     showAllWallets: "Show all wallets",
     showThisWallet: "Show this wallet",

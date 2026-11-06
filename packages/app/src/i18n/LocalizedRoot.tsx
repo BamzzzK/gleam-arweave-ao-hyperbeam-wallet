@@ -60,6 +60,9 @@ export function LocalizedRoot({ children }: { children: ReactNode }) {
       browseHint: t("common.browseHint"),
       tryAnotherFile: t("common.tryAnotherFile"),
       watchOnly: t("common.watchOnly"),
+      send: t("common.send"),
+      receive: t("common.receive"),
+      securityPhrasePicker: { word: t("common.securityPhraseWord"), suggestAnother: t("common.suggestAnotherPhrase") },
       chart: {
         showAllWallets: t("common.chartShowAll"),
         showThisWallet: t("common.chartShowThis"),

@@ -1,3 +1,4 @@
+import { useUiLabels } from "../../labels";
 import { Button } from "../../primitives/button";
 
 /**
@@ -17,6 +18,7 @@ const STACKED_CLASS = "h-14 flex-col gap-1 py-2 text-label phone:h-16 phone:gap-
 const COMPACT_CLASS = "h-12 gap-2 text-label phone:h-14";
 
 export function SendReceiveActions({ onSend, onReceive, sendDisabled = false, compact = false }: SendReceiveActionsProps) {
+  const labels = useUiLabels();
   const className = compact ? COMPACT_CLASS : STACKED_CLASS;
   const iconSize = compact ? 18 : 20;
   return (
@@ -30,7 +32,7 @@ export function SendReceiveActions({ onSend, onReceive, sendDisabled = false, co
         <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 19V5M12 5l-6 6M12 5l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Send
+        {labels.send}
       </Button>
       <Button
         type="button"
@@ -41,7 +43,7 @@ export function SendReceiveActions({ onSend, onReceive, sendDisabled = false, co
         <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 5v14M12 19l-6-6M12 19l6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Receive
+        {labels.receive}
       </Button>
     </div>
   );
