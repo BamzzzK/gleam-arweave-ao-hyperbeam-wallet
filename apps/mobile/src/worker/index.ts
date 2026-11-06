@@ -3,7 +3,7 @@ import { createRuntime } from "@gleam/runtime/src/create-runtime.ts";
 import { WorkerTimer } from "../adapters/timer";
 import { exposeRuntimeHost } from "./host";
 import { LINK_NOTICE } from "./link-notice";
-import { createWorkerPlatform } from "./platform";
+import { createWorkerPlatform, shellFromWorkerName } from "./platform";
 
 /**
  * The app's background: `createRuntime` and every key it unlocks live in
@@ -13,7 +13,7 @@ import { createWorkerPlatform } from "./platform";
 // The app compiles against DOM types; here `self` is the worker's global scope.
 const scope = self as unknown as Endpoint;
 const timer = new WorkerTimer();
-const runtime = createRuntime(createWorkerPlatform(scope, timer));
+const runtime = createRuntime(createWorkerPlatform(scope, timer, shellFromWorkerName((self as unknown as { name: string }).name)));
 exposeRuntimeHost(
   runtime,
   { onResume: () => timer.catchUp(), onLinkNotice: (message) => scope.postMessage({ type: LINK_NOTICE, message }) },

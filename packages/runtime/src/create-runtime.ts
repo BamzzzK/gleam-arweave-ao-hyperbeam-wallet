@@ -254,7 +254,7 @@ export function createRuntime(platform: Platform): Runtime {
   });
   registerPointsHeartbeatAlarm(points, platform.timer);
 
-  const announcements = new AnnouncementsHandler({ storage });
+  const announcements = new AnnouncementsHandler({ storage, target: { shell: platform.shell, version: platform.version() } });
   const reviewPrompt = new ReviewPromptHandler({ storage });
   const scans = new ScansHandler({ apiUrl: POINTS_API_URL, version: () => platform.version() });
   const securityPhrase = new SecurityPhraseHandler(storage);

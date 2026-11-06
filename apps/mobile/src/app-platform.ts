@@ -41,7 +41,11 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
   // The app has one long-lived surface, so state that must outlive a
   // closed popup in the extension only needs to outlive a re-render here.
   const ephemeral = new Map<string, unknown>();
-  const worker = new Worker(new URL("./worker/index.ts", import.meta.url), { type: "module" });
+  const worker = new Worker(new URL("./worker/index.ts", import.meta.url), {
+    type: "module",
+    // The worker can't reach Capacitor, so its name carries the platform.
+    name: Capacitor.getPlatform(),
+  });
   serveSqliteStore(worker, preview?.store ?? createSqliteStore(openCapacitorDb));
   if (!preview) void sweepCapacitorExports();
   serveFileSaver(worker, preview?.fileSaver ?? createCapacitorFileSaver());

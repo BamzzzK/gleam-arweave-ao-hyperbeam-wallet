@@ -199,6 +199,7 @@ export function createInMemoryPlatform(overrides: Partial<Platform> = {}): InMem
     downloads: new InMemoryDownloads(),
     tabs: new InMemoryTabs(),
     version: () => "0.0.0-test",
+    shell: "extension",
     dev: true,
     ...overrides,
     badgeDots,
