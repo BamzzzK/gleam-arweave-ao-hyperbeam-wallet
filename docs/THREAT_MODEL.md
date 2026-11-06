@@ -369,11 +369,8 @@ These are true of the current release.
     The view sits above the sheet, so it would take the tap, not approve.
   - An invite link redeems its code with no tap. It signs nothing; the
     desktop site message works the same way.
-- **Android and CI hardening gaps.** Android release builds don't
-  minify, and `file_paths.xml` shares the whole cache directory through
-  a non-exported `FileProvider`. The `analyze-swift` CodeQL job has no
-  `harden-runner` step, because it doesn't support macOS runners on the
-  community tier.
+- **The Swift CodeQL job runs without `harden-runner`.** It doesn't
+  support macOS runners on the community tier.
 - **Points and scans.**
   - `GET /scan/challenge` writes one row per call, bounded by 30 per
     hour per IP and a purge 24 hours after expiry.
