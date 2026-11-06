@@ -367,7 +367,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
 
       <div className="flex flex-1 flex-col px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
         <div className="pb-10">
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
             {t("networkPeers.gateway")}
           </div>
           <div>
@@ -428,14 +428,16 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.gatewayHint")}</span>
                 </span>
-                <span aria-hidden="true" className="h-2 w-2 flex-shrink-0 rounded-full bg-beam-green" />
+                <span aria-hidden="true" className="flex-shrink-0 text-label font-medium text-muted">
+                  {t("networkPeers.changeGateway")}
+                </span>
               </button>
             )}
           </div>
         </div>
 
         <div>
-          <div className="border-b border-line pb-3.5 text-label font-semibold uppercase phone:border-b-0 phone:pb-1 tracking-[0.04em] text-muted">
+          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
             {t("networkPeers.aoPeers")}
           </div>
           <div>
@@ -463,7 +465,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         >
                           {peerHostname(peer.url)}
                         </span>
-                        <span className={`text-caption ${isActive ? "text-beam-green" : "text-muted"}`}>
+                        <span className={`text-caption ${isActive ? "text-positive" : "text-muted"}`}>
                           {isActive ? t("networkPeers.active") : peer.enabled ? t("networkPeers.enabled") : t("networkPeers.disabled")}
                         </span>
                       </button>
