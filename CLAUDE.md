@@ -126,8 +126,11 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   package boundary.
 - **Announcements** for the main-screen notice card live in
   `apps/site/announcements.json`: `[{ id, level: "info" | "critical",
-  title?, text, url? }]`. They go live when the site deploys, and popups pick
-  them up within an hour. Dismissals are stored by `id`, so a changed
+  title?, text, url?, platforms?, below? }]`. They go live when the site
+  deploys, and popups pick them up within an hour. `platforms` (any of
+  `extension`, `android`, `ios`) and `below` (`x.y.z`) limit an entry to
+  those shells on older versions, which is how an APK update notice is
+  sent. Dismissals are stored by `id`, so a changed
   notice needs a new `id`. A `url` must be https on the Gleam site or
   `x.com` (`handlers/announcements.ts`), or the entry is dropped.
 - **Comments** explain the non-obvious *why*. Don't narrate the change

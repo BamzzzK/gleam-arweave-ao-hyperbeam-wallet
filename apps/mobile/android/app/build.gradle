@@ -43,7 +43,8 @@ android {
             if (System.getenv("GLEAM_UPLOAD_KEYSTORE")) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

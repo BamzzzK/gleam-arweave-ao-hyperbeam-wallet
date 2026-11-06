@@ -23,9 +23,11 @@ Surface paths changed:
 | F-1 | low      | One-line description.    | fixed  |
 
 Severity: critical, high, medium, low, info. Status: fixed, accepted, open.
-An open critical or high finding blocks the release.
+An open critical or high finding blocks the release. List only this
+release's findings, and fixes of earlier ones (README § Handling findings).
 
 ## Notes
 
 Anything a reader needs: why an accepted finding is acceptable, what was
-out of scope, follow-ups.
+out of scope, follow-ups, and every Known limitations entry added or
+removed.

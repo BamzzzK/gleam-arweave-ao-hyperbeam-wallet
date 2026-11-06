@@ -12,13 +12,18 @@ export interface SaverPlugins {
   share(options: { files: string[] }): Promise<unknown>;
 }
 
-// Both platforms reject with this exact message when the user closes the
-// sheet without choosing a target (SharePlugin.swift, SharePlugin.java).
+/**
+ * The one cache folder Android's `FileProvider` shares
+ * (`res/xml/file_paths.xml`), so a share can't reach the rest of the cache.
+ */
+export const EXPORTS_DIR = "gleam-exports";
 const FOLDER_PREFIX = "gleam-export-";
 
 // Folders this page session has made, which a sweep must not delete under a save.
 const live = new Set<string>();
 
+// Both platforms reject with this exact message when the user closes the
+// sheet without choosing a target (SharePlugin.swift, SharePlugin.java).
 const SHARE_CANCELLED = "Share canceled";
 
 function toBase64(bytes: Uint8Array): string {
@@ -35,8 +40,9 @@ function toBase64(bytes: Uint8Array): string {
 export function createFileSaver(plugins: SaverPlugins): FileSaver {
   return {
     async save({ filename, bytes }): Promise<FileDownloadResult> {
-      const folder = `${FOLDER_PREFIX}${crypto.randomUUID()}`;
-      live.add(folder);
+      const name = `${FOLDER_PREFIX}${crypto.randomUUID()}`;
+      const folder = `${EXPORTS_DIR}/${name}`;
+      live.add(name);
       const directory = Directory.Cache;
       try {
         const { uri } = await plugins.writeFile({
@@ -53,7 +59,7 @@ export function createFileSaver(plugins: SaverPlugins): FileSaver {
       } finally {
         bytes.fill(0);
         await plugins.rmdir({ path: folder, directory, recursive: true }).catch(() => {});
-        live.delete(folder);
+        live.delete(name);
       }
     },
   };
@@ -65,12 +71,12 @@ export function createFileSaver(plugins: SaverPlugins): FileSaver {
  */
 export async function sweepExports(plugins: SaverPlugins): Promise<void> {
   try {
-    const { files } = await plugins.readdir({ path: "", directory: Directory.Cache });
+    const { files } = await plugins.readdir({ path: EXPORTS_DIR, directory: Directory.Cache });
     await Promise.all(
       files
         .filter(({ name }) => name.startsWith(FOLDER_PREFIX) && !live.has(name))
         .map(({ name }) =>
-          plugins.rmdir({ path: name, directory: Directory.Cache, recursive: true }).catch(() => {}),
+          plugins.rmdir({ path: `${EXPORTS_DIR}/${name}`, directory: Directory.Cache, recursive: true }).catch(() => {}),
         ),
     );
   } catch {

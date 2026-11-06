@@ -39,6 +39,34 @@ or Known limitations entry the release made untrue, and list the removals in
 **Notes**. Scan agents read that file in full, so stale entries cost every
 scan.
 
+## Handling findings
+
+An audit file is a record of one release and never changes after that
+release is tagged. The current accepted risk lives in one place:
+[Known limitations](../../docs/THREAT_MODEL.md#known-limitations).
+
+Each audit lists only what it found. It doesn't restate findings from
+earlier audits.
+
+| Severity      | At the audit                                                                 |
+| ------------- | ---------------------------------------------------------------------------- |
+| critical/high | Fixed before the release. An `open` one blocks the tag.                      |
+| medium        | Fixed in this release or the next, or `accepted` with the reason in Notes.   |
+| low           | A `todo.md` item, or `accepted` with the reason in Notes.                    |
+| info          | Recorded in the audit only.                                                  |
+
+- **Accepting** a medium or low finding adds an entry to Known
+  limitations. That includes one tracked in `todo.md` that won't be fixed
+  in this release. An info finding goes there too when a user or a
+  scanner needs to know it.
+- **Fixing** a finding from an earlier audit adds a `fixed` row to the
+  audit of the release that ships the fix, naming the original, such as
+  "v1.36.0 F-1: Retry re-quotes the fee." Its Known limitations entry is
+  deleted, and the removal is listed in Notes.
+- **Every fifth release** (v1.40.0, v1.45.0, …), the audit re-reads Known
+  limitations. It deletes entries that are no longer true and moves the
+  ones that have become cheap to fix into `todo.md`, and says so in Notes.
+
 ## Commands
 
 ```bash

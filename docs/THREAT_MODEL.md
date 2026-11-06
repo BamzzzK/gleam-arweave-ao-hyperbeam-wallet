@@ -328,6 +328,63 @@ These are true of the current release.
   the dApp view could therefore reach the memory of the wallet WebView.
   Isolating them would need the dApp view in its own process, for example
   a separate Activity with `android:process`. Accepted for now.
+- **Pending figures trust the nodes Gleam ships with.** A token node's
+  2xx is taken as accepted with no gateway confirmation. The first node
+  to answer sets `swap-height`, so a lying node can clear a pending
+  deduction early. A `+N arriving` note shows the amount the sender
+  chose until the token applies or drops it. Pending AR sends leave out
+  the fee and can count twice between mining and the next activity read.
+  None of these changes what is signed, and a send above the real
+  balance is refused by the network or the token. The worst case is a
+  send that reads pending, then failed after 2 hours, with nothing moved.
+- **Prices are display only.** A lying node can post a collectible
+  listing at any price above 0.1 AR, and a wrong FX rate from the Points
+  API misstates a fiat figure. Neither feeds a signature or a send, which
+  are typed and checked in token units.
+- **A dApp's L1 token transfer can lose its quote.** If the token host
+  hangs past 10 seconds, the transfer is refused after approval. No
+  funds are at risk.
+- **Translated errors match whole messages.** `matchUserError` shows the
+  translated sentence for any message equal to a template. AO process
+  errors never reach `errorText`, and a placeholder can't change the
+  sentence around it.
+- **Chinese translations are machine-written.** Approval and recovery
+  text has been spot-checked but not reviewed by a native speaker.
+- **The stored query cache is plaintext.** Anyone with access to the
+  browser profile or the app's storage can read balances and activity
+  without unlocking. It holds no key material.
+- **An APK install can't update to the Play Store build.** The APK is
+  signed with the upload key and Play installs with the Play signing
+  key, so moving over means uninstalling, which deletes a vault that
+  isn't backed up.
+- **Mobile link and dApp-view gaps.**
+  - A `target=_blank` or `window.open` from a cross-origin iframe takes
+    the main-frame path for an external-app link, so the "Open in another
+    app?" prompt can carry page-chosen text. The user still has to tap
+    Open, and the prompt names the site.
+  - An attest link opened while the app is locked is held, and shows as
+    an approval sheet after the next unlock, with the usual decoded
+    preview.
+  - The approval sheet doesn't wait for the native dApp view to hide.
+    The view sits above the sheet, so it would take the tap, not approve.
+  - An invite link redeems its code with no tap. It signs nothing; the
+    desktop site message works the same way.
+- **The Swift CodeQL job runs without `harden-runner`.** It doesn't
+  support macOS runners on the community tier.
+- **Points and scans.**
+  - `GET /scan/challenge` writes one row per call, bounded by 30 per
+    hour per IP and a purge 24 hours after expiry.
+  - Rate limits key on the first `X-Forwarded-For` entry, which holds
+    only while the API sits behind Railway's edge.
+  - One wallet attests a release once and 100 scans per release are
+    paid, so many registered wallets can still take the paid places.
+  - `GET /attestations` publishes each attestation's owner key,
+    signature, report and answers, so anyone can verify without trusting
+    Gleam.
+  - The scan CLI prints server-supplied error text into an agent's
+    context, constrained by the parser's patterns.
+  - `gleam-points:attest-status` tells `gleamwallet.app` whether a wallet
+    is set up and has joined Points on this install, without an address.
 - **No independent audit has been completed.**
 
 ## Out of scope

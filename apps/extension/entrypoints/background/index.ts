@@ -40,6 +40,7 @@ const platform: Platform = {
   downloads: browserDownloads,
   tabs: createBrowserTabs(messenger),
   version: () => browser.runtime.getManifest().version,
+  shell: "extension",
   dev: import.meta.env.DEV,
 };
 // Synchronous at the top level: it adds the alarm and window listeners that

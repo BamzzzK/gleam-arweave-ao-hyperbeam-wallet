@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
-import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow, WatchOnlyBadge } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, MemorableAddress, NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
@@ -8,13 +8,13 @@ import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
-const WALLET_METHOD_LABEL: Record<WalletSummary["method"], string | null> = {
+// The label sits inside the name's truncating span, so a narrow row cuts
+// the label before the name. Hardware brands stay untranslated.
+const WALLET_METHOD_LABEL: Record<Exclude<WalletSummary["method"], "watch">, string | null> = {
   jwk: null,
   ethereum: "Ethereum",
   ledger: "Ledger",
   keystone: "Keystone",
-  // Marked with the watch-only badge instead.
-  watch: null,
 };
 
 /**
@@ -155,7 +155,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const t = useT();
   const identity = useAddressIdentity();
   const avatarSvg = identity.avatarSvg(wallet.address);
-  const methodLabel = WALLET_METHOD_LABEL[wallet.method];
+  const methodLabel = wallet.method === "watch" ? t("common.watchOnly") : WALLET_METHOD_LABEL[wallet.method];
   const { copied, copy } = useCopy(wallet.address);
 
   return (
@@ -181,14 +181,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               {wallet.name}
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
-            {wallet.method === "watch" ? <WatchOnlyBadge /> : null}
             {active ? (
               <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
                 <CheckIcon size={12} />
                 {t("walletSwitcher.active")}
               </span>
             ) : (
-              <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:opacity-100">
+              // Hidden on phone: tapping the row is the expected way to switch,
+              // and the text would take the width the name needs.
+              <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:hidden">
                 {t("walletSwitcher.makeActive")}
               </span>
             )}

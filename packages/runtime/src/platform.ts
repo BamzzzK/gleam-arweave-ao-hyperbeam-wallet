@@ -8,6 +8,7 @@ import type {
   TimerPort,
 } from "@gleam/core";
 import type { ProtocolMap } from "@gleam/messaging/src/protocol.ts";
+import type { AnnouncementTarget } from "./handlers/announcements";
 import type { SiteTab } from "./handlers/site-wallet";
 
 /** `ProtocolMap` messages the runtime pushes to a site's open pages. */
@@ -50,6 +51,8 @@ export interface Platform {
   tabs: TabsPort;
   /** The wallet's release version, as reported to the scans API. */
   version(): string;
+  /** Which shell this is, so an announcement can target the ones that don't update themselves. */
+  shell: AnnouncementTarget["shell"];
   /** True in a development build, which also takes site messages from localhost. */
   dev: boolean;
 }
