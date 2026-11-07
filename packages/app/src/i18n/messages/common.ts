@@ -265,7 +265,7 @@ export const common = defineMessages({
     keyfileSkip: "Tôi sẽ sao lưu sau",
     irreversible: "Không thể hoàn tác.",
     lookalikeTitle: "Địa chỉ này trông quen nhưng khác.",
-    lookalikeScammers: "Kẻ lừa đảo tạo địa chỉ giống hệt để đánh lừa bạn.",
+    lookalikeScammers: "Kẻ lừa đảo tạo địa chỉ trông na ná để đánh lừa bạn.",
     lookalikeCompare: "Hãy so từng ký tự trước khi gửi.",
     firstTimeRecipient: "Bạn chưa từng gửi đến địa chỉ này.",
     doubleCheckRecipient: "Hãy kiểm tra lại người nhận trước khi ký.",
