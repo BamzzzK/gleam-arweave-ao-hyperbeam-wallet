@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { bytesToBase64, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
+import { bytesToBase64, WALLET_APPROVAL_ORIGIN, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
 import { generateJWK, Keyring } from "@gleam/core/signer";
 import { ApprovalHandler } from "./approval";
 import { createKeySession } from "./key-session";
@@ -128,6 +128,26 @@ describe("ApprovalHandler: pending requests stay within session storage", () => 
 
     void signDataItem(handler, SITE_B, 400_000);
     await vi.waitFor(() => expect(presenter.presented).toHaveLength(2));
+  });
+
+  it("still opens Gleam's own request when sites have filled the pool", async () => {
+    const { handler, presenter } = setup();
+    let refused = 0;
+    let attempts = 0;
+    for (const name of ["a", "b", "c", "d", "e", "f"]) {
+      for (let i = 0; i < 4; i += 1) {
+        attempts += 1;
+        signDataItem(handler, `https://${name}.example`, 400_000).catch(() => {
+          refused += 1;
+        });
+        await vi.waitFor(() => expect(presenter.presented.length + refused).toBe(attempts));
+      }
+    }
+    await expect(signDataItem(handler, "https://g.example", 400_000)).rejects.toThrow(/waiting for approval/);
+
+    const opened = presenter.presented.length;
+    void signDataItem(handler, WALLET_APPROVAL_ORIGIN, 400_000);
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(opened + 1));
   });
 
   it("approves a large waiting data item and frees its space", async () => {

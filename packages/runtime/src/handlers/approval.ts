@@ -1026,12 +1026,16 @@ export class ApprovalHandler {
         ? { siteIcon: safeSiteIconUrl(input.appInfo?.logo) ?? safeSiteIconUrl(input.favIconUrl) }
         : {}),
     };
-    const size = storedSize(record);
+    // Gleam's own requests sit outside the dApp pool, so sites filling it
+    // can't block a hardware send or a scan attestation.
+    const fromSite = input.origin !== WALLET_APPROVAL_ORIGIN;
+    const size = fromSite ? storedSize(record) : 0;
     if (size > PENDING_BYTES_PER_ORIGIN) {
       throw new Error("Gleam refused this request because it is too large to hold for approval.");
     }
     await this.updatePending((pending) => {
-      const live = pending.filter((entry) => !this.isStale(entry));
+      if (!fromSite) return [...pending, record];
+      const live = pending.filter((entry) => !this.isStale(entry) && entry.request.origin !== WALLET_APPROVAL_ORIGIN);
       const total = live.reduce((sum, entry) => sum + storedSize(entry), size);
       const fromOrigin = live
         .filter((entry) => entry.request.origin === input.origin)
