@@ -171,7 +171,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const review = within(await screen.findByRole("region", { name: "Review" }));
-    expect(review.getByRole("heading", { name: "Review a release" })).toBeTruthy();
+    expect(review.getByRole("heading", { name: "Scan Gleam with your agent" })).toBeTruthy();
     const link = review.getByRole("link", { name: /Start a review/ });
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
