@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { attestationId, decodeAttestationPayload } from "../../packages/core/src/scan/index.ts";
 import { main, render, renderJson } from "./cli.ts";
@@ -239,8 +240,12 @@ describe("pnpm scan finish: real run", () => {
 
   it("--json from an empty directory is one JSON line", () => {
     const empty = mkdtempSync(join(tmpdir(), "gleam-scan-empty-"));
-    const tsx = join(repo, "node_modules/.bin/tsx");
-    const run = spawnSync(tsx, [join(repo, "scripts/scan/cli.ts"), "finish", "--json"], { cwd: empty, encoding: "utf8" });
+    // `node --import tsx` rather than the tsx binary: its IPC socket is blocked in sandboxed scan environments.
+    const tsx = pathToFileURL(join(repo, "node_modules/tsx/dist/loader.mjs")).href;
+    const run = spawnSync(process.execPath, ["--import", tsx, join(repo, "scripts/scan/cli.ts"), "finish", "--json"], {
+      cwd: empty,
+      encoding: "utf8",
+    });
     expect(run.status).toBe(1);
     expect(JSON.parse(run.stdout)).toMatchObject({ ok: false, command: "finish" });
   });
