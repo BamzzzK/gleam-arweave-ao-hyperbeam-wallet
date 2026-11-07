@@ -239,6 +239,8 @@ export interface ApprovalRequest {
   origin: string;
   createdAt: number;
   preview: ApprovalPreview;
+  /** The site's icon from its grant, saved and checked when it connected; absent for Gleam's own requests. */
+  siteIcon?: string | null;
   /** Set once a hardware wallet's request is approved and waits for the device's signatures. */
   device?: DeviceSigningRequest;
 }

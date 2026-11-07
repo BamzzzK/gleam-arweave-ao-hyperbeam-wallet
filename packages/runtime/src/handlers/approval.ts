@@ -1207,11 +1207,15 @@ export class ApprovalHandler {
 
   /** The request as the approval UI sees it: with the device's payloads once it waits on one. */
   private async requestView(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
-    if (!entry.device || !entry.walletId) return entry.request;
+    const { origin, kind } = entry.request;
+    const siteIcon =
+      origin === WALLET_APPROVAL_ORIGIN || kind === "connect" ? null : ((await this.findActiveGrant(origin))?.icon ?? null);
+    const request = siteIcon ? { ...entry.request, siteIcon } : entry.request;
+    if (!entry.device || !entry.walletId) return request;
     const wallet = await this.hardwareWallet(entry.walletId);
     const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
     return {
-      ...entry.request,
+      ...request,
       device: {
         ...wallet,
         payloads: payloads.map(toWirePayload),

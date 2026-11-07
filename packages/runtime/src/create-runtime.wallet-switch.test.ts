@@ -67,6 +67,31 @@ describe("switching wallets with a dApp signing request pending", () => {
   });
 });
 
+describe("a dApp signing request's view", () => {
+  it("carries the icon saved on the site's grant", async () => {
+    const { platform, runtime, present, a } = await setupTwoWallets();
+    await platform.storage.set("local:grants", [
+      {
+        origin: ORIGIN,
+        walletId: a.id,
+        permissions: ["ACCESS_ADDRESS", "SIGN_TRANSACTION"],
+        createdAt: Date.now(),
+        expiresAt: null,
+        budget: null,
+        icon: "https://dapp.example/icon.png",
+      },
+    ]);
+
+    const pending = runtime.dispatch("providerCall", { method: "sign", params: { transaction: TRANSACTION } }, CONTENT_SCRIPT) as Promise<unknown>;
+    void pending.catch(() => {});
+    await vi.waitFor(() => expect(present).toHaveBeenCalledTimes(1));
+    const requestId = present.mock.calls[0]![0];
+
+    await expect(runtime.dispatch("getApproval", { requestId }, EXTENSION)).resolves.toMatchObject({ siteIcon: "https://dapp.example/icon.png" });
+    await runtime.dispatch("resolveApproval", { requestId, approved: false }, EXTENSION);
+  });
+});
+
 describe("adding a wallet with a dApp signing request pending", () => {
   it("rejects the request, since the new wallet becomes active", async () => {
     const { runtime, present } = await setupTwoWallets();
