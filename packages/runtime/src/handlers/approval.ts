@@ -770,7 +770,12 @@ async function buildDataItemPreviews(
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
   if (input.kind === "scanAttestation") throw new Error("A scan attestation has its own preview.");
   const payloadHash = await sha256Hex(input.payload);
-  const isBatch = input.kind === "batchSignDataItem";
+  const signedItems =
+    input.kind === "signDataItem"
+      ? input.dataItems?.slice(0, 1)
+      : input.kind === "batchSignDataItem"
+        ? input.dataItems
+        : undefined;
   return {
     kind: input.kind,
     recipient: input.recipient ?? null,
@@ -783,7 +788,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
-    items: isBatch && input.dataItems ? await buildDataItemPreviews(input.dataItems) : null,
+    items: signedItems ? await buildDataItemPreviews(signedItems) : null,
   };
 }
 

@@ -243,6 +243,23 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
   });
 
+  it("signDataItem shows its one item's target, and labels the hash as the data's alone", () => {
+    const item = BATCH_PREVIEW.items![1]!;
+    render(
+      <SigningApprovalScreen
+        origin="https://bazar.arweave.net"
+        preview={{ ...MESSAGE_PREVIEW, items: [item] }}
+        onReject={vi.fn()}
+        onSign={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(addressText(item.target!))).toBeTruthy();
+    expect(screen.getByText("Payload (SHA-256)")).toBeTruthy();
+    expect(screen.queryByText("Signing payload (SHA-256)")).toBeNull();
+    expect(screen.getByRole("button", { name: /^sign message$/i })).toBeTruthy();
+  });
+
   it("a sign/dispatch preview with no token shows no token-identity line", () => {
     render(
       <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,

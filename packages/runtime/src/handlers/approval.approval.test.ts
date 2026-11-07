@@ -1117,14 +1117,15 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await expect(pending).rejects.toThrow();
     });
 
-    it("signDataItem's preview has no items list, and keeps the single-item preview fields", async () => {
+    it("signDataItem's preview lists its one item with the target it signs", async () => {
+      const target = "Z".repeat(43);
       const pending = handler.requestApproval({
         kind: "signDataItem",
         origin: "https://bazar.arweave.net",
         walletId: WALLET_ID,
         payload: new TextEncoder().encode("hello"),
         tags: [{ name: "Action", value: "Eval" }],
-        dataItems: [{ data: toBase64("hello"), tags: [{ name: "Action", value: "Eval" }] }],
+        dataItems: [{ data: toBase64("hello"), tags: [{ name: "Action", value: "Eval" }], target }],
       });
       await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
       const requestId = presenter.presented[0]!;
@@ -1133,8 +1134,14 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
         throw new Error("expected a signing preview");
       }
-      expect(request.preview.items).toBeNull();
-      expect(request.preview.decodedData).toBe("hello");
+      expect(request.preview.items).toEqual([
+        {
+          decodedData: "hello",
+          tags: [{ name: "Action", value: "Eval" }],
+          target,
+          payloadHash: request.preview.payloadHash,
+        },
+      ]);
 
       await handler.resolveApproval({ requestId, approved: false });
       await expect(pending).rejects.toThrow();
