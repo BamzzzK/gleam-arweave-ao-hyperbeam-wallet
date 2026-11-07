@@ -96,7 +96,7 @@ describe("system back button", () => {
     expect(await screen.findByText("Currency")).toBeTruthy();
 
     expect(await pressBack(back)).toBe(true);
-    expect(await screen.findByText("Send feedback")).toBeTruthy();
+    expect(await screen.findByText("Send us feedback")).toBeTruthy();
 
     expect(await pressBack(back)).toBe(true);
     expect(await screen.findByRole("button", { name: "Settings" })).toBeTruthy();
