@@ -1,31 +1,34 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
-import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
-import { CollectibleThumbnail, MemorableAddress, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
-import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey, type TFunction } from "../i18n";
-import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
+import { formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { errorText } from "../i18n/errors";
 import { UntrustedText } from "./UntrustedText";
+import { DataItemCard } from "../transfer-review/DataItemCard";
+import { RequestHeader } from "../transfer-review/RequestHeader";
+import { ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
+import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
 
 /**
- * The highest-stakes screen in the product: recipient, amount, fee, a
- * decoded-data preview, tags, and a SHA-256 hash of the exact signing
- * payload with its own copy affordance, all shown before signing is
- * possible. Full addresses only, never truncated: addresses render in
- * `MemorableAddress`'s chunked form with their avatar. Never uses the beam as anything
- * but the small identity mark, and never uses humor here — maximum
- * clarity, zero cleverness. The irreversible-tier `RecipientWarning`/
- * `destructive` Button pairing is the same one `RiskNotice`'s own doc
- * comment names as this screen's reason for existing as a single shared
- * component.
+ * The highest-stakes screen in the product. A request that moves value
+ * shows `TransferReview`, the one layout every send shares; any other
+ * signing request shows its decoded data, tags and the SHA-256 hash of
+ * the exact signing payload with its own copy affordance, under the same
+ * header. Never uses the beam as anything but the small identity mark,
+ * and never uses humor here: maximum clarity, zero cleverness.
  */
 export interface SigningApprovalScreenProps {
   origin: string;
+  /** The site's icon from its grant, if any. */
+  siteIcon?: string | null;
   preview: SigningApprovalPreview;
-  /** Recipient checks for a transfer; omitted or null shows none. */
+  /** Recipient checks for a transfer; omitted or null means the lookup failed, and the warning still shows. */
   assessment?: RecipientAssessment | null;
+  /** The signing wallet, shown as From. */
+  from?: { name: string | null; address: string } | null;
+  /** Balances, prices and display settings for the fiat line and the balance after. */
+  context?: TransferContext;
   onReject: () => void;
   /** Rejects (surfacing its message inline) if signing fails — e.g. the wallet's unlocked session has since expired. */
   onSign: () => Promise<void>;
@@ -51,90 +54,8 @@ function actionCopy(preview: SigningApprovalPreview, t: TFunction): string {
   return t(REQUEST_KIND_COPY[preview.kind]);
 }
 
-/**
- * Token identity shown alongside the amount for a `transferAoTokens`
- * preview. No token-symbol lookup exists in this layer's scope, so this
- * renders the raw AO processId truncated to a short recognizable form
- * rather than fabricating a symbol.
- */
-function shortenProcessId(processId: string): string {
-  return truncateAddress(processId, 6);
-}
-
-/**
- * `preview.amount`/`preview.fee` are atomic-integer strings (Winston for
- * the native AR token, `preview.token`'s own smallest unit otherwise —
- * see `SigningApprovalPreview.token`'s doc comment). `fee` is always AR
- * (an MU token transfer has no sender-side fee — `core/ao/transfer.ts`'s
- * `AO_TRANSFER_HAS_NO_FEE` — and an L1 one pays AR), so it's formatted with `formatWinstonAsAr`
- * regardless of what `token` the amount itself is denominated in.
- *
- * An AO amount's `tokenDenomination` comes from the same balance-metadata
- * read the token list uses (`ReadsHandler.previewWatchedToken`). That read
- * is best-effort and unauthenticated, so a scaled amount always shows the
- * raw quantity that gets signed under it. When it's `null` the raw atomic
- * integer is shown as-is; `formatAmountUnit` below labels it "smallest
- * units" so it doesn't read as a scaled amount.
- */
-function formatAmount(atomic: string | null, token: string | null, tokenDenomination: number | null): string {
-  if (atomic === null) return "—";
-  if (token === null) return formatWinstonAsAr(atomic, 12);
-  return tokenDenomination === null ? atomic : formatAtomicAsDisplay(atomic, tokenDenomination, tokenDenomination);
-}
-
-/**
- * Companion to `formatAmount`: the unit label shown under an AO transfer's
- * amount. Prefers the resolved ticker; falls back to a shortened process id
- * when no ticker resolved, or when the "ticker" is just the process id
- * echoed back (`TokenBalance.ticker` defaults to `processId` when unresolved
- * — see `withRegisteredTicker`/`withUnregisteredMetadata` in `reads.ts`).
- * Falls back further to "smallest units" whenever the denomination itself
- * is unknown, since a ticker with no confirmed scale is misleading on its
- * own (is this 1000 units, or 0.000001?).
- */
-function formatAmountUnit(
-  token: string | null,
-  tokenDenomination: number | null,
-  tokenTicker: string | null,
-  t: TFunction,
-): string | null {
-  if (token === null) return null;
-  if (tokenDenomination === null) return t("approval.smallestUnits");
-  if (tokenTicker !== null && tokenTicker !== token) return tokenTicker;
-  return shortenProcessId(token);
-}
-
-function formatFee(fee: string | null): string {
-  return fee === null ? "—" : `${formatWinstonAsAr(fee, 12)} AR`;
-}
-
-/**
- * AR-denominated Total (amount + fee), shown next to the raw amount for a
- * `sign`/`dispatch` preview so the review screen never implies the fee is
- * separate from what leaves the wallet. `null` for anything not
- * AR-denominated (a token's fee is AR, so it stays out of the total).
- */
-function formatTotal(
-  amount: string | null,
-  fee: string | null,
-  token: string | null,
-  tokenDenomination: number | null,
-): string {
-  if (token !== null || amount === null || fee === null) return formatAmount(amount, token, tokenDenomination);
-  try {
-    return `${formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString(), 12)} AR`;
-  } catch {
-    return "—";
-  }
-}
-
-function hostnameOf(origin: string): string {
-  if (origin === WALLET_APPROVAL_ORIGIN) return "Gleam";
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
+function formatFee(fee: string): string {
+  return `${formatWinstonAsAr(fee, 12)} AR`;
 }
 
 async function copyToClipboard(value: string): Promise<void> {
@@ -148,20 +69,18 @@ async function copyToClipboard(value: string): Promise<void> {
 
 export function SigningApprovalScreen({
   origin,
+  siteIcon,
   preview,
   assessment,
+  from = null,
+  context = {},
   onReject,
   onSign,
 }: SigningApprovalScreenProps) {
   const t = useT();
-  const lookalikeOf = assessment?.lookalikeOf ?? null;
-  const identity = useAddressIdentity();
-  const { emphasisPick } = identity;
-  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
-  const isTransfer = preview.recipient !== null;
-  const irreversible = isTransfer; // first-seen/unlimited tiering happens upstream in the dispatcher's preview construction.
+  const transfer = transferRequestFromPreview(preview);
 
   const handleSign = async () => {
     setSubmitting(true);
@@ -174,93 +93,51 @@ export function SigningApprovalScreen({
     }
   };
 
+  const errorLine = error ? (
+    <div role="alert" className="text-caption leading-snug text-warning">
+      {error}
+    </div>
+  ) : null;
+
+  if (transfer) {
+    const own = origin === WALLET_APPROVAL_ORIGIN;
+    const signLabel = transfer.itemCount > 1 ? t("transferReview.signCount", { count: transfer.itemCount }) : t("transferReview.sign");
+    return (
+      <TransferReview
+        header={<RequestHeader origin={origin} icon={siteIcon} requestType={requestTypeText(origin, transfer, t)} />}
+        request={transfer}
+        from={from}
+        context={context}
+        risk={assessment ?? { firstTime: false, lookalikeOf: null, unchecked: true }}
+        footer={(warned) => (
+          <ReviewButtons
+            secondaryLabel={own ? t("transferReview.cancel") : t("transferReview.reject")}
+            onSecondary={onReject}
+            primaryLabel={submitting ? t("approval.signing") : own ? t("transferReview.send") : signLabel}
+            onPrimary={() => void handleSign()}
+            warned={warned}
+            busy={submitting}
+          />
+        )}
+      >
+        {errorLine}
+      </TransferReview>
+    );
+  }
+
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
-        <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md border border-line bg-mist text-[10px] font-bold text-muted">
-          {hostnameOf(origin).charAt(0).toUpperCase()}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-caption font-semibold text-foreground">{hostnameOf(origin)}</span>
-        </div>
-      </div>
+      <RequestHeader origin={origin} icon={siteIcon} requestType={actionCopy(preview, t)} />
 
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">{actionCopy(preview, t)}</div>
-
+      <div className="flex flex-1 flex-col gap-4 px-6 pb-6 pt-6 phone:px-5">
         {preview.kind === "pointsProof" ? (
-          <p className="text-center text-label leading-relaxed text-muted">
-            {t("approval.pointsProofIntro")}
-          </p>
+          <p className="text-label leading-relaxed text-muted">{t("approval.pointsProofIntro")}</p>
         ) : null}
 
-        {isTransfer && preview.collectible ? (
-          <>
-            <div className="flex flex-col items-center gap-2 py-1 text-center">
-              <CollectibleThumbnail
-                name={preview.collectible.name ?? t("approval.collectible")}
-                imageUrl={preview.collectible.imageUrl}
-                className="w-24"
-              />
-              <span className="break-words text-body font-semibold text-foreground">
-                {preview.collectible.name ?? truncateAddress(preview.collectible.id, 6)}
-              </span>
-            </div>
-
-            <RecipientWarning
-              firstTime={assessment?.firstTime ?? false}
-              lookalikeOf={lookalikeOf}
-              lookalikeAvatarSvg={lookalikeAvatarSvg}
-              emphasisPick={emphasisPick}
-            />
-
-            <RecipientBlock address={preview.recipient ?? ""} />
-
-            <div className="flex flex-col">
-              <ReviewRow label={t("approval.networkFee")} value={formatFee(preview.fee)} />
-            </div>
-          </>
-        ) : isTransfer ? (
-          <>
-            <div className="flex flex-col items-center gap-1 py-1 text-center">
-              <span className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-                {formatAmount(preview.amount, preview.token, preview.tokenDenomination)}
-              </span>
-              {preview.token != null ? (
-                <span className="text-caption font-semibold uppercase tracking-wide text-muted">
-                  {formatAmountUnit(preview.token, preview.tokenDenomination, preview.tokenTicker, t)}
-                </span>
-              ) : null}
-              {preview.token != null && preview.tokenDenomination !== null && preview.amount !== null ? (
-                <span dir="ltr" className="break-all font-mono text-caption tabular-nums text-muted">
-                  {preview.amount}
-                </span>
-              ) : null}
-            </div>
-
-            <RecipientWarning
-              firstTime={assessment?.firstTime ?? false}
-              lookalikeOf={lookalikeOf}
-              lookalikeAvatarSvg={lookalikeAvatarSvg}
-              emphasisPick={emphasisPick}
-            />
-
-            <RecipientBlock address={preview.recipient ?? ""} />
-
-            {preview.token != null ? <TokenProcessBlock processId={preview.token} /> : null}
-
-            <div className="flex flex-col">
-              <ReviewRow label={t("approval.fee")} value={formatFee(preview.fee)} />
-              <ReviewRow
-                label={t("approval.total")}
-                value={formatTotal(preview.amount, preview.fee, preview.token, preview.tokenDenomination)}
-                strong
-              />
-            </div>
-          </>
-        ) : preview.fee !== null ? (
-          <div className="flex flex-col">
-            <ReviewRow label={t("approval.networkFee")} value={formatFee(preview.fee)} />
+        {preview.fee !== null ? (
+          <div className="flex items-center justify-between gap-4 text-label">
+            <span className="text-muted">{t("approval.networkFee")}</span>
+            <span className="text-right font-semibold tabular-nums text-foreground">{formatFee(preview.fee)}</span>
           </div>
         ) : null}
 
@@ -272,7 +149,7 @@ export function SigningApprovalScreen({
                 : t("approval.manyItemsToSign", { count: preview.items.length })}
             </span>
             {preview.items.map((item, index) => (
-              <DataItemPreview key={index} index={index} item={item} />
+              <DataItemCard key={index} index={index} item={item} />
             ))}
           </div>
         ) : (
@@ -280,7 +157,7 @@ export function SigningApprovalScreen({
             {preview.decodedData !== null && preview.decodedData !== "" ? (
               <div className="flex flex-col gap-1.5">
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
-                <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
+                <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
                   <UntrustedText text={preview.decodedData} />
                 </div>
               </div>
@@ -299,22 +176,15 @@ export function SigningApprovalScreen({
               </div>
             ) : null}
 
-            {/* A wallet send has no payload of its own; its device step shows what is signed. */}
-            {preview.kind !== "transfer" ? (
-              <AddrBlock
-                label={t("approval.signingPayloadHash")}
-                copyLabel={t("approval.copySigningPayloadHash")}
-                value={preview.payloadHash}
-              />
-            ) : null}
+            <AddrBlock
+              label={t("approval.signingPayloadHash")}
+              copyLabel={t("approval.copySigningPayloadHash")}
+              value={preview.payloadHash}
+            />
           </>
         )}
 
-        {error ? (
-          <div role="alert" className="text-caption leading-snug text-warning">
-            {error}
-          </div>
-        ) : null}
+        {errorLine}
 
         <div className="mt-auto flex gap-2.5 pt-1">
           <Button type="button" variant="secondary" onClick={onReject} className="flex-1">
@@ -322,7 +192,7 @@ export function SigningApprovalScreen({
           </Button>
           <Button
             type="button"
-            variant={irreversible ? "destructive" : "primary"}
+            variant="primary"
             disabled={submitting}
             aria-busy={submitting}
             onClick={() => void handleSign()}
@@ -332,93 +202,6 @@ export function SigningApprovalScreen({
           </Button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function DataItemPreview({
-  index,
-  item,
-}: {
-  index: number;
-  item: NonNullable<SigningApprovalPreview["items"]>[number];
-}) {
-  const t = useT();
-  const identity = useAddressIdentity();
-  const { emphasisPick } = identity;
-  const targetAvatarSvg = item.target ? identity.avatarSvg(item.target) : undefined;
-  return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
-      <span className="text-caption font-semibold text-foreground">{t("approval.itemNumber", { number: index + 1 })}</span>
-
-      {item.target !== null ? (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.target")}</span>
-          <MemorableAddress address={item.target} emphasisPick={emphasisPick} avatarSvg={targetAvatarSvg} />
-        </div>
-      ) : null}
-
-      {item.decodedData !== null && item.decodedData !== "" ? (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
-          <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-[11px] leading-relaxed text-foreground">
-            <UntrustedText text={item.decodedData} />
-          </div>
-        </div>
-      ) : null}
-
-      {item.tags.length > 0 ? (
-        <div className="flex flex-col gap-0.5">
-          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {item.tags.map((tag, tagIndex) => (
-              <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
-                <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-0.5">
-        <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.payloadHash")}</span>
-        <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
-      </div>
-    </div>
-  );
-}
-
-function RecipientBlock({ address }: { address: string }) {
-  const t = useT();
-  const identity = useAddressIdentity();
-  const { emphasisPick } = identity;
-  const avatarSvg = identity.avatarSvg(address);
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.recipient")}</span>
-        <button
-          type="button"
-          aria-label={t("approval.copyRecipient")}
-          onClick={() => void copyToClipboard(address)}
-          className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-muted"
-        >
-          <CopyIcon />
-        </button>
-      </div>
-      <RecipientCard address={address} avatarSvg={avatarSvg} emphasisPick={emphasisPick} tone="confirm" />
-    </div>
-  );
-}
-
-/** The token is named by the process id the message targets; its ticker is whatever its creator chose. */
-function TokenProcessBlock({ processId }: { processId: string }) {
-  const t = useT();
-  const identity = useAddressIdentity();
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tokenProcess")}</span>
-      <MemorableAddress address={processId} emphasisPick={identity.emphasisPick} avatarSvg={identity.avatarSvg(processId)} />
     </div>
   );
 }
@@ -438,17 +221,6 @@ function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: stri
           <CopyIcon />
         </button>
       </div>
-    </div>
-  );
-}
-
-function ReviewRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 last:border-t last:pt-3">
-      <span className="text-muted">{label}</span>
-      <span className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"}`}>
-        {value}
-      </span>
     </div>
   );
 }

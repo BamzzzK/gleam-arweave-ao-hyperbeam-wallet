@@ -18,6 +18,7 @@ import { formatPoints } from "../screens/points/src/formatPoints";
 import { useJoinPoints, usePendingInvite } from "../screens/points/src/usePoints";
 import { useT, type MessageKey } from "../i18n";
 import { errorText } from "../i18n/errors";
+import { RequestHeader } from "../transfer-review/RequestHeader";
 
 /**
  * A community scan attestation from the Gleam site (SCANS.md). Every
@@ -80,7 +81,16 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
 
   return (
     <div className="flex min-h-full flex-col">
-      <OriginHeader origin={origin} />
+      <RequestHeader
+        origin={origin}
+        requestType={
+          membership.status === "joined"
+            ? t("approval.signAttestation")
+            : membership.status === "not-joined"
+              ? t("approval.joinToSign")
+              : t("approval.approvalRequest")
+        }
+      />
       {membership.status === "loading" ? (
         <p className="p-6 text-center text-sm text-muted">{t("approval.loading")}</p>
       ) : membership.status === "error" ? (
@@ -97,26 +107,6 @@ function ScanAttestationFlow({ runtime, origin, preview, onReject, onCheck, onSi
       ) : (
         <AttestationReview preview={preview} wallet={membership.wallet} onReject={onReject} onCheck={onCheck} onSign={onSign} />
       )}
-    </div>
-  );
-}
-
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
-
-function OriginHeader({ origin }: { origin: string }) {
-  const host = hostnameOf(origin);
-  return (
-    <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
-      <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md border border-line bg-mist text-[10px] font-bold text-muted">
-        {host.charAt(0).toUpperCase()}
-      </div>
-      <span className="min-w-0 flex-1 truncate text-caption font-semibold text-foreground">{host}</span>
     </div>
   );
 }
@@ -149,7 +139,6 @@ function JoinFirst({
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-6 pb-6 pt-6">
-      <h1 className="text-center text-body font-bold text-foreground">{t("approval.joinToSign")}</h1>
       <p className="text-center text-label leading-relaxed text-muted">
         {t("approval.joinExplain")}
       </p>
@@ -220,7 +209,6 @@ function AttestationReview({
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4.5">
-      <div className="text-center text-body font-bold text-foreground">{t("approval.signAttestation")}</div>
       <p className="text-center text-label leading-relaxed text-muted">
         {t(
           wallet && isHardwareWalletMethod(wallet.method) ? "approval.attestIntroDevice" : "approval.attestIntroMessage",

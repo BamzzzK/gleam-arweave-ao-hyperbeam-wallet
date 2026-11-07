@@ -9,6 +9,7 @@ import type {
   SecurityPhrase,
   ThemeSettings,
   WalletState,
+  WalletSummary,
 } from "@gleam/core";
 import type { ApprovalShown, AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
@@ -32,6 +33,8 @@ import { ConnectionRequestScreen } from "./ConnectionRequestScreen";
 import { ScanAttestationResult, ScanAttestationScreen } from "./ScanAttestationScreen";
 import { SigningApprovalScreen } from "./SigningApprovalScreen";
 import { errorText } from "../i18n/errors";
+import { recipientsOf, transferRequestFromPreview } from "../transfer-review/model";
+import { useApprovalTransferContext } from "../transfer-review/useApprovalTransferContext";
 
 /**
  * The approval UI's top-level state machine, in a window or a sheet: loads the pending
@@ -71,8 +74,20 @@ type LoadState =
   | { kind: "loading" }
   | { kind: "no-wallet"; runtime: RuntimePort; request: ApprovalRequest }
   | { kind: "locked"; runtime: RuntimePort; request: ApprovalRequest }
-  | { kind: "ready"; runtime: RuntimePort; request: ApprovalRequest; assessment: RecipientAssessment | null }
-  | { kind: "awaiting-device"; runtime: RuntimePort; request: ApprovalRequest; device: DeviceSigningRequest }
+  | {
+      kind: "ready";
+      runtime: RuntimePort;
+      request: ApprovalRequest;
+      assessment: RecipientAssessment | null;
+      wallet: WalletSummary | null;
+    }
+  | {
+      kind: "awaiting-device";
+      runtime: RuntimePort;
+      request: ApprovalRequest;
+      device: DeviceSigningRequest;
+      wallet: WalletSummary | null;
+    }
   | { kind: "error"; message: string }
   | { kind: "done"; message: string }
   | { kind: "attested"; result: SiteAttestResponse }
@@ -95,7 +110,12 @@ function needsUnlock(state: WalletState, request: ApprovalRequest): boolean {
   return !unlocked.includes(walletId);
 }
 
-/** Best effort: a failed lookup shows no recipient warning, and the generic one still shows. */
+/**
+ * Checks every recipient the request pays, a data item's transfer
+ * included, and folds them into one: a batch warns if any recipient is
+ * new or a lookalike. Best effort: a failed lookup returns `null`, and the
+ * screen then warns without naming a reason.
+ */
 async function assessRecipientFor(
   runtime: RuntimePort,
   request: ApprovalRequest,
@@ -103,16 +123,34 @@ async function assessRecipientFor(
 ): Promise<RecipientAssessment | null> {
   const preview = request.preview;
   if (preview.kind === "connect" || preview.kind === "addToken" || preview.kind === "scanAttestation") return null;
-  if (!preview.recipient || !walletId) return null;
+  const transfer = transferRequestFromPreview(preview);
+  if (!transfer || !walletId) return null;
   try {
-    const assessment = await runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
-      type: "assessRecipient",
-      payload: { walletId, recipient: preview.recipient },
-    });
-    return assessment ?? null;
+    const assessments = await Promise.all(
+      recipientsOf(transfer).map((recipient) =>
+        runtime.send<{ walletId: string; recipient: string }, RecipientAssessment | undefined>({
+          type: "assessRecipient",
+          payload: { walletId, recipient },
+        }),
+      ),
+    );
+    if (assessments.some((assessment) => !assessment)) return null;
+    return {
+      firstTime: assessments.some((assessment) => assessment!.firstTime),
+      lookalikeOf: assessments.find((assessment) => assessment!.lookalikeOf)?.lookalikeOf ?? null,
+    };
   } catch {
     return null;
   }
+}
+
+/** The tokens a request moves, for the balances and prices its review reads. */
+function tokensOf(request: ApprovalRequest): Array<string | null> {
+  const preview = request.preview;
+  if (preview.kind === "connect" || preview.kind === "addToken" || preview.kind === "scanAttestation") return [];
+  const transfer = transferRequestFromPreview(preview);
+  if (transfer) return transfer.transfers.filter((line) => !line.collectible).map((line) => line.token);
+  return request.device ? [preview.token] : [];
 }
 
 function hostnameOf(origin: string): string {
@@ -175,15 +213,18 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
         payload: { requestId: id },
       });
       const walletState = await runtime.send<{ recordActivity: boolean }, WalletState>({ type: "getState", payload: { recordActivity: false } });
+      const wallet = walletState.wallets.find((candidate) => candidate.id === walletState.activeWalletId) ?? null;
       if (request.device) {
-        setState({ kind: "awaiting-device", runtime, request, device: request.device });
+        const device = request.device;
+        const signer = walletState.wallets.find((candidate) => candidate.address === device.address) ?? wallet;
+        setState({ kind: "awaiting-device", runtime, request, device, wallet: signer });
       } else if (walletState.wallets.length === 0) {
         setState({ kind: "no-wallet", runtime, request });
       } else if (needsUnlock(walletState, request)) {
         setState({ kind: "locked", runtime, request });
       } else {
         const assessment = await assessRecipientFor(runtime, request, walletState.activeWalletId);
-        setState({ kind: "ready", runtime, request, assessment });
+        setState({ kind: "ready", runtime, request, assessment, wallet });
       }
     } catch (error) {
       setState({ kind: "error", message: errorText(error) });
@@ -232,6 +273,13 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
     }
   };
 
+  const reviewing = state.kind === "ready" || state.kind === "awaiting-device" ? state : null;
+  const transferContext = useApprovalTransferContext(
+    reviewing?.runtime ?? null,
+    reviewing?.kind === "awaiting-device" ? reviewing.device.address : (reviewing?.wallet?.address ?? null),
+    reviewing ? tokensOf(reviewing.request) : [],
+  );
+
   let content: ReactNode;
 
   if (state.kind === "loading") {
@@ -265,13 +313,23 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
       />
     );
   } else if (state.kind === "awaiting-device") {
-    const { runtime, request, device } = state;
+    const { runtime, request, device, wallet } = state;
     const Panel = devicePanels?.[device.method];
     content = Panel ? (
       <AwaitingDeviceView
         origin={request.origin}
+        siteIcon={request.siteIcon ?? null}
         device={device}
         Panel={Panel}
+        from={{ name: wallet?.address === device.address ? wallet.name : null, address: device.address }}
+        context={transferContext}
+        collectible={
+          request.preview.kind !== "connect" &&
+          request.preview.kind !== "addToken" &&
+          request.preview.kind !== "scanAttestation"
+            ? request.preview.collectible
+            : undefined
+        }
         token={
           request.preview.kind !== "connect" &&
           request.preview.kind !== "addToken" &&
@@ -303,7 +361,7 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
       <CenteredMessage text={t("approval.cantReachDevice", { device: DEVICE_NAMES[device.method] })} tone="warning" />
     );
   } else {
-    const { runtime, request, assessment } = state;
+    const { runtime, request, assessment, wallet } = state;
 
     const handleReject = () => rejectRequest(runtime, request);
 
@@ -320,7 +378,8 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
           return;
         }
         if (next?.device) {
-          setState({ kind: "awaiting-device", runtime, request: next, device: next.device });
+          const signer = wallet?.address === next.device.address ? wallet : null;
+          setState({ kind: "awaiting-device", runtime, request: next, device: next.device, wallet: signer });
           return;
         }
         setState({ kind: "done", message: t(doneKey) });
@@ -344,6 +403,7 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
       content = (
         <AddTokenScreen
           origin={request.origin}
+          siteIcon={request.siteIcon ?? null}
           preview={request.preview}
           onReject={() => void handleReject()}
           onAdd={() => handleApprove("approval.tokenAdded", "approval.couldntAddToken")}
@@ -370,8 +430,11 @@ function ApprovalRootContent({ requestId, runtime: runtimeProp, onClose = () => 
       content = (
         <SigningApprovalScreen
           origin={request.origin}
+          siteIcon={request.siteIcon ?? null}
           preview={signingPreview}
           assessment={assessment}
+          from={wallet ? { name: wallet.name, address: wallet.address } : null}
+          context={transferContext}
           onReject={() => void handleReject()}
           onSign={() => handleApprove("approval.signed", "approval.signingFailed")}
         />

@@ -5,6 +5,7 @@ import { MemorableAddress } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
 import { errorText } from "../i18n/errors";
+import { RequestHeader } from "../transfer-review/RequestHeader";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -14,25 +15,18 @@ import { errorText } from "../i18n/errors";
  */
 export interface AddTokenScreenProps {
   origin: string;
+  /** The site's icon from its grant, if any. */
+  siteIcon?: string | null;
   preview: AddTokenApprovalPreview;
   onReject: () => void;
   /** Rejects, with its message shown inline, if the token can't be added. */
   onAdd: () => Promise<void>;
 }
 
-function hostnameOf(origin: string): string {
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return origin;
-  }
-}
-
-export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScreenProps) {
+export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: AddTokenScreenProps) {
   const t = useT();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
-  const host = hostnameOf(origin);
   const identity = useAddressIdentity();
 
   const handleAdd = async () => {
@@ -48,16 +42,9 @@ export function AddTokenScreen({ origin, preview, onReject, onAdd }: AddTokenScr
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5">
-        <div className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-md border border-line bg-mist text-[10px] font-bold text-muted">
-          {host.charAt(0).toUpperCase()}
-        </div>
-        <span className="min-w-0 flex-1 truncate text-caption font-semibold text-foreground">{host}</span>
-      </div>
+      <RequestHeader origin={origin} icon={siteIcon} requestType={t("approval.addToken")} />
 
-      <div className="flex flex-1 flex-col gap-5 px-5 py-4.5">
-        <div className="text-center text-body font-bold text-foreground">{t("approval.addToken")}</div>
-
+      <div className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-6 phone:px-5">
         <div className="flex flex-col items-center gap-1 py-1 text-center">
           <span className="text-[28px] font-semibold tracking-[-0.02em] text-foreground">
             {preview.ticker ?? t("approval.unknownToken")}
