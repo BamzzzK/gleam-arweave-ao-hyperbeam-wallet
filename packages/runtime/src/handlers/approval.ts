@@ -426,6 +426,24 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "signMessage",
 ]);
 
+const WALLET_SWITCHED = "The active wallet changed.";
+
+/**
+ * A dApp's signing request signs with the wallet that was active when it
+ * was made, and its approval shows no account, so it must not outlive that
+ * wallet being active. Connect and addToken don't sign, a scan attestation
+ * shows and unlocks its own wallet, and Gleam's own requests name theirs.
+ */
+function signsForActiveWallet(entry: PendingApprovalRecord): boolean {
+  const kind = entry.request.kind;
+  return (
+    kind !== "connect" &&
+    kind !== "addToken" &&
+    kind !== "scanAttestation" &&
+    entry.request.origin !== WALLET_APPROVAL_ORIGIN
+  );
+}
+
 const TIMED_OUT = userErrorMessage("approvalTimedOut");
 
 /** How soon a timeout looks again at a request that was being resolved when it fired. */
@@ -939,6 +957,18 @@ export class ApprovalHandler {
         : {}),
     };
     await this.updatePending((pending) => [...pending, record]);
+    // The preview is built after the caller read the active wallet, so a
+    // switch can land in between. `switchWallet` sets the new wallet before
+    // `rejectSwitchedApprovals` scans, so a record stored too late for that
+    // scan sees the new wallet here. No active wallet means none is left,
+    // which already rejects every pending request.
+    if (signsForActiveWallet(record)) {
+      const active = await this.activeWalletId();
+      if (active !== null && active !== record.walletId) {
+        await this.updatePending((pending) => pending.filter((entry) => entry.request.requestId !== requestId));
+        throw new Error(WALLET_SWITCHED);
+      }
+    }
 
     await this.presenter.present(requestId);
 
@@ -1730,6 +1760,11 @@ export class ApprovalHandler {
    */
   async rejectWalletApprovals(walletId: string): Promise<void> {
     await this.rejectPendingWhere((entry) => entry.walletId === walletId, "The wallet was removed.");
+  }
+
+  /** Rejects the dApp signing requests made for another wallet than `walletId`, which just became active. */
+  async rejectSwitchedApprovals(walletId: string): Promise<void> {
+    await this.rejectPendingWhere((entry) => signsForActiveWallet(entry) && entry.walletId !== walletId, WALLET_SWITCHED);
   }
 
   /**

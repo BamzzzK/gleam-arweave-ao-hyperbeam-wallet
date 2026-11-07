@@ -782,6 +782,7 @@ export function createRuntime(platform: Platform): Runtime {
     renameWallet: (data) => lifecycle.renameWallet(data),
     switchWallet: async (data) => {
       await lifecycle.switchWallet(data);
+      await approval.rejectSwitchedApprovals(data.walletId);
       void broadcastWalletSwitch();
     },
     downloadKeyfile: (data) => lifecycle.downloadKeyfile(data),
