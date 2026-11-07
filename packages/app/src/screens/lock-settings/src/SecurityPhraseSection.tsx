@@ -64,7 +64,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
         <SkeletonRow />
       ) : state.kind === "editing" ? (
         <form
-          className="flex flex-col gap-4 pt-4"
+          className="flex flex-col gap-4 pb-3 pt-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (readSecurityPhrase(state.draft) && !state.saving) void save(state.phrase, state.draft);
@@ -93,7 +93,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           </div>
         </form>
       ) : state.phrase && icon ? (
-        <div className="flex items-center gap-3 py-3.5">
+        <div className="flex items-center gap-3 pb-1.5 pt-3.5">
           <SecurityPhraseMark phrase={state.phrase} iconSvg={icon} />
           <span className="flex-1" />
           <button
@@ -114,7 +114,7 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           <span className="text-caption text-muted">{t("lockSettings.phraseSetUpHint")}</span>
         </button>
       )}
-      <p className="pt-2.5 text-caption leading-relaxed text-faint">
+      <p className="pt-1 text-caption leading-relaxed text-faint">
         {t("lockSettings.phraseExplain")}
       </p>
     </div>
