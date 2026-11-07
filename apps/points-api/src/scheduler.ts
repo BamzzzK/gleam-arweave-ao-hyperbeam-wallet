@@ -11,7 +11,7 @@ const SNAPSHOT_LOCK_ID = 0x61e4_0001;
  */
 export function startSnapshotScheduler(
   db: Db,
-  options: SnapshotOptions & { intervalMs?: number; log?: (line: string) => void },
+  options: SnapshotOptions & { intervalMs?: number },
 ): () => void {
   const log = options.log ?? console.log;
   let running = false;

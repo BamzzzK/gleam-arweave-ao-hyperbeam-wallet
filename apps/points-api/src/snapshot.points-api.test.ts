@@ -122,19 +122,52 @@ describe("runSnapshot", () => {
     expect(await pointsByAddress(db)).toEqual({ phone: { holding: "100", referee: "0", referrer: "0" } });
   });
 
-  it("retries a failing read, then leaves the wallet out of the day", async () => {
+  it("retries a failing read, then leaves out a wallet with no earlier read", async () => {
     const db = await createTestDb();
     await seed(db, [
       { address: "ok", heartbeat: HOURS_AGO },
       { address: "flaky", heartbeat: HOURS_AGO },
     ]);
     const readBalances = reader({ ok: { arAtomic: "1", aoAtomic: "1" } });
+    const log = vi.fn();
 
-    const summary = await runSnapshot(db, NOW, { readBalances, retryDelayMs: 0 });
+    const summary = await runSnapshot(db, NOW, { readBalances, retryDelayMs: 0, log });
 
-    expect(readBalances.mock.calls.filter(([address]) => address === "flaky")).toHaveLength(3);
+    expect(readBalances.mock.calls.filter(([address]) => address === "flaky")).toHaveLength(5);
     expect(summary).toMatchObject({ walletCount: 2, liveCount: 1, failedCount: 1 });
     expect(Object.keys(await pointsByAddress(db))).toEqual(["ok"]);
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/flaky failed \(gateway down for flaky\); left out/));
+  });
+
+  it("credits a wallet whose reads keep failing from its last live read", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { address: "alice", heartbeat: HOURS_AGO },
+      { address: "bob", heartbeat: HOURS_AGO, referredBy: "alice" },
+    ]);
+    await runSnapshot(db, new Date(NOW.getTime() - 2 * 86_400_000), {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" }, bob: { arAtomic: "50", aoAtomic: "0" } }),
+    });
+    await runSnapshot(db, new Date(NOW.getTime() - 86_400_000), {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" }, bob: { arAtomic: "100", aoAtomic: "0" } }),
+    });
+
+    const summary = await runSnapshot(db, NOW, {
+      readBalances: reader({ alice: { arAtomic: "0", aoAtomic: "0" } }),
+      retryDelayMs: 0,
+      log: () => {},
+    });
+
+    expect(summary).toMatchObject({ liveCount: 2, failedCount: 1 });
+    const { rows } = await db.query<{ address: string; holding: string; referee: string; referrer: string }>(
+      `SELECT address, holding_atomic::text AS holding, referee_bonus_atomic::text AS referee,
+              referrer_bonus_atomic::text AS referrer
+         FROM points WHERE day = '2026-10-08' ORDER BY address`,
+    );
+    expect(rows).toEqual([
+      { address: "alice", holding: "0", referee: "0", referrer: "10" },
+      { address: "bob", holding: "100", referee: "10", referrer: "0" },
+    ]);
   });
 
   it("runs once per day", async () => {
