@@ -6,6 +6,8 @@ export interface Balances {
   aoAtomic: string;
 }
 
+const AO_BALANCE_TIMEOUT_MS = 10_000;
+
 export type BalanceReader = (address: string) => Promise<Balances>;
 
 export function createBalanceReader(config: {
@@ -30,7 +32,7 @@ export function createBalanceReader(config: {
  */
 async function readAoBalance(address: string, hyperbeamUrl: string, fetchImpl: typeof fetch): Promise<string> {
   const url = `${hyperbeamUrl.replace(/\/$/, "")}/${AO_TOKEN.processId}~process@1.0/compute/balances/${address}`;
-  const response = await fetchImpl(url);
+  const response = await fetchImpl(url, { signal: AbortSignal.timeout(AO_BALANCE_TIMEOUT_MS) });
   if (response.status === 404) return "0";
   if (!response.ok) throw new Error(`AO balance read for ${address} failed (HTTP ${response.status}).`);
   const body = (await response.text()).trim().replace(/^"|"$/g, "");
