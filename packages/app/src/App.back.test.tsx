@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import type { RuntimePort, WalletState, WalletSummary } from "@gleam/core";
 import { fakeAppPlatform, renderWithPlatform as render } from "./app-platform/testing";
 import type { BackButtonPort } from "./app-platform/types";
@@ -35,7 +35,10 @@ function runtimeFor(state: WalletState): RuntimePort {
       if (type === "getPasskeyStatus") return { enrolled: false };
       if (type === "getBalance") return "0";
       if (type === "getTokenBalances") return [];
-      if (type === "getContacts") return [];
+      if (type === "listContacts") return [];
+      if (type === "getArFee") return "0";
+      if (type === "getActivity") return { entries: [], cursor: null };
+      if (type === "getConnectedApps") return [];
       return null;
     }) as unknown as RuntimePort["send"],
     onMessage: () => () => {},
@@ -88,12 +91,12 @@ describe("system back button", () => {
       fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
     });
     await act(async () => {
-      fireEvent.click(await screen.findByText("Contacts"));
+      fireEvent.click(await screen.findByText("Appearance"));
     });
-    expect(await screen.findByText(/No contacts yet\./)).toBeTruthy();
+    expect(await screen.findByText("Currency")).toBeTruthy();
 
     expect(await pressBack(back)).toBe(true);
-    expect(await screen.findByText("Help & About")).toBeTruthy();
+    expect(await screen.findByText("Send feedback")).toBeTruthy();
 
     expect(await pressBack(back)).toBe(true);
     expect(await screen.findByRole("button", { name: "Settings" })).toBeTruthy();
@@ -105,10 +108,16 @@ describe("system back button", () => {
     const back = fakeBackButton();
     await mount(back);
     await act(async () => {
-      fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Send" }));
     });
     await act(async () => {
-      fireEvent.click(await screen.findByText("Contacts"));
+      fireEvent.focus(await screen.findByLabelText("Recipient address"));
+    });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("listbox", { name: "Saved contacts" })).getByRole("button", { name: "Saved contacts" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Edit contacts" }));
     });
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: "Add contact" }));
@@ -118,13 +127,10 @@ describe("system back button", () => {
     expect(await pressBack(back)).toBe(true);
     expect(screen.queryByPlaceholderText("Name")).toBeNull();
     expect(screen.getByText("Contacts", { selector: "span" })).toBeTruthy();
-
-    expect(await pressBack(back)).toBe(true);
-    expect(await screen.findByText("Help & About")).toBeTruthy();
   });
 });
 
-describe("Lock & unlock passkey section", () => {
+describe("Security passkey section", () => {
   async function openLockSettings(passkey: boolean) {
     const back = fakeBackButton();
     await mount(back, passkey);
@@ -132,7 +138,7 @@ describe("Lock & unlock passkey section", () => {
       fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
     });
     await act(async () => {
-      fireEvent.click(await screen.findByText("Lock & unlock"));
+      fireEvent.click(await screen.findByText("Security"));
     });
     await screen.findByText("Auto-lock");
   }

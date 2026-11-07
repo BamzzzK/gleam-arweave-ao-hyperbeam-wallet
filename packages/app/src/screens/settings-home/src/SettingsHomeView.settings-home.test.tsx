@@ -4,6 +4,8 @@ import { renderWithPlatform as render } from "../../../app-platform/testing";
 import type { DisplaySettings, LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsHomeView } from "./SettingsHomeView";
+import { AppearanceView } from "./AppearanceView";
+import { ThemeContext } from "../../../theme";
 
 afterEach(() => {
   cleanup();
@@ -22,17 +24,16 @@ const LOCK_SETTINGS: LockSettings = { autoLockTimeout: "never" };
 const NETWORK_SETTINGS: NetworkSettings = { gatewayUrl: "https://arweave.net", peers: [], activePeerUrl: null };
 const DISPLAY_SETTINGS: DisplaySettings = { currency: "EUR", header: "full", tokenLogos: true, tokenRows: "detailed", headline: "total", balancesHidden: false };
 
-function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): RuntimePort["send"] {
+function successfulSend(overrides: { theme?: ThemeSettings["theme"]; setTheme?: () => unknown } = {}): RuntimePort["send"] {
   return vi.fn(async ({ type }: { type: string }) => {
     if (type === "getLockSettings") return LOCK_SETTINGS;
     if (type === "getNetworkSettings") return NETWORK_SETTINGS;
     if (type === "getThemePreference") return { theme: overrides.theme ?? "light" } satisfies ThemeSettings;
-    if (type === "setThemePreference") return undefined;
+    if (type === "setThemePreference") return overrides.setTheme?.();
     if (type === "getScanStats") return null;
     if (type === "getDisplaySettings") return DISPLAY_SETTINGS;
     if (type === "setDisplaySettings") return undefined;
     if (type === "getConnectedApps") return [{}, {}, {}];
-    if (type === "listContacts") return [];
     throw new Error(`Unexpected message type "${type}"`);
   }) as RuntimePort["send"];
 }
@@ -40,227 +41,162 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"] } = {}): Run
 function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeView>[0]> = {}) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-    <SettingsHomeView
-      runtime={fakeRuntime({ send: successfulSend() })}
-      onBack={vi.fn()}
-      onOpenLockSettings={vi.fn()}
-      onOpenConnectedApps={vi.fn()}
-      onOpenNetworkPeers={vi.fn()}
-      onOpenManageTokens={vi.fn()}
-      onOpenContacts={vi.fn()}
-      onOpenDisplayCurrency={vi.fn()}
-      onOpenLanguage={vi.fn()}
-      onOpenHomeScreen={vi.fn()}
-      onOpenFeedback={vi.fn()}
-      {...overrides}
-    />
+      <SettingsHomeView
+        runtime={fakeRuntime({ send: successfulSend() })}
+        onBack={vi.fn()}
+        onOpenLockSettings={vi.fn()}
+        onOpenConnectedApps={vi.fn()}
+        onOpenAppearance={vi.fn()}
+        onOpenNetworkPeers={vi.fn()}
+        onOpenFeedback={vi.fn()}
+        {...overrides}
+      />
     </QueryClientProvider>,
   );
 }
 
 describe("SettingsHomeView", () => {
-  it("shows the current auto-lock and gateway values as row labels", async () => {
+  it("shows the auto-lock time on Security and the gateway on Network", async () => {
     renderSettingsHome();
 
-    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
-    expect(screen.getByText("arweave.net")).toBeTruthy();
+    await waitFor(() => expect(within(screen.getByRole("button", { name: "Security" })).getByText("Auto-lock off")).toBeTruthy());
+    expect(within(screen.getByRole("button", { name: "Network" })).getByText("arweave.net")).toBeTruthy();
   });
 
-  it("counts connected apps beside their row, and leaves an empty contact list uncounted", async () => {
-    renderSettingsHome();
-
-    const apps = await screen.findByRole("button", { name: "Connected apps" });
-    await waitFor(() => expect(within(apps).getByText("3")).toBeTruthy());
-    expect(within(screen.getByRole("button", { name: "Contacts" })).queryByText("0")).toBeNull();
-  });
-
-  it("calls onOpenFeedback when the feedback card is pressed", async () => {
-    const onOpenFeedback = vi.fn();
-    renderSettingsHome({ onOpenFeedback });
-
-    fireEvent.click(screen.getByRole("button", { name: /Got an issue or suggestion\?/ }));
-
-    expect(onOpenFeedback).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
-  });
-
-  it("links to the GitHub source in a new tab", async () => {
-    renderSettingsHome();
-
-    const link = screen.getByRole("link", { name: /Gleam is open source/ });
-    expect(link.getAttribute("href")).toBe("https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet");
-    expect(link.getAttribute("target")).toBe("_blank");
-    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
-  });
-
-  it("calls onOpenLockSettings when the Lock & unlock row is pressed", async () => {
-    const onOpenLockSettings = vi.fn();
-    renderSettingsHome({ onOpenLockSettings });
-
-    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
-    fireEvent.click(screen.getByText("Lock & unlock"));
-
-    expect(onOpenLockSettings).toHaveBeenCalled();
-  });
-
-  it("hides the Lock & unlock row when there is no lock to open (vault without a password)", async () => {
-    renderSettingsHome({ onOpenLockSettings: undefined });
-
-    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
-    expect(screen.queryByText("Lock & unlock")).toBeNull();
-  });
-
-  it("calls onOpenConnectedApps when the Connected apps row is pressed", async () => {
+  it("counts connected apps on their row, which opens them", async () => {
     const onOpenConnectedApps = vi.fn();
     renderSettingsHome({ onOpenConnectedApps });
 
-    await waitFor(() => expect(screen.getByText("Connected apps")).toBeTruthy());
-    fireEvent.click(screen.getByText("Connected apps"));
-
-    expect(onOpenConnectedApps).toHaveBeenCalled();
+    const apps = screen.getByRole("button", { name: "Connected apps" });
+    await waitFor(() => expect(within(apps).getByText("3")).toBeTruthy());
+    fireEvent.click(apps);
+    expect(onOpenConnectedApps).toHaveBeenCalledTimes(1);
   });
 
-  it("calls onOpenNetworkPeers when the Network & peers row is pressed", async () => {
+  it("drops Security when the vault has no password", async () => {
+    renderSettingsHome({ onOpenLockSettings: undefined });
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Security" })).toBeNull();
+  });
+
+  it("opens Security, Appearance and Network from their rows", async () => {
+    const onOpenLockSettings = vi.fn();
+    const onOpenAppearance = vi.fn();
     const onOpenNetworkPeers = vi.fn();
-    renderSettingsHome({ onOpenNetworkPeers });
+    renderSettingsHome({ onOpenLockSettings, onOpenAppearance, onOpenNetworkPeers });
 
-    await waitFor(() => expect(screen.getByText("Network & peers")).toBeTruthy());
-    fireEvent.click(screen.getByText("Network & peers"));
+    fireEvent.click(screen.getByRole("button", { name: "Security" }));
+    fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Network" }));
 
-    expect(onOpenNetworkPeers).toHaveBeenCalled();
+    expect(onOpenLockSettings).toHaveBeenCalledTimes(1);
+    expect(onOpenAppearance).toHaveBeenCalledTimes(1);
+    expect(onOpenNetworkPeers).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
   });
 
-  it("calls onOpenManageTokens when the Manage tokens row is pressed", async () => {
-    const onOpenManageTokens = vi.fn();
-    renderSettingsHome({ onOpenManageTokens });
+  it("shows the currency and language on Appearance", async () => {
+    renderSettingsHome();
 
-    await waitFor(() => expect(screen.getByText("Manage tokens")).toBeTruthy());
-    fireEvent.click(screen.getByText("Manage tokens"));
-
-    expect(onOpenManageTokens).toHaveBeenCalled();
+    await waitFor(() => expect(within(screen.getByRole("button", { name: "Appearance" })).getByText("EUR · English")).toBeTruthy());
   });
 
-  it("calls onOpenContacts when the Contacts row is pressed", async () => {
-    const onOpenContacts = vi.fn();
-    renderSettingsHome({ onOpenContacts });
+  it("Dark persists the choice and applies it at once", async () => {
+    const send = successfulSend({ theme: "light" });
+    renderSettingsHome({ runtime: fakeRuntime({ send }) });
 
-    await waitFor(() => expect(screen.getByText("Contacts")).toBeTruthy());
-    fireEvent.click(screen.getByText("Contacts"));
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Light" }).getAttribute("aria-checked")).toBe("true"));
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
 
-    expect(onOpenContacts).toHaveBeenCalled();
+    await waitFor(() => expect(document.documentElement.getAttribute("data-theme")).toBe("dark"));
+    expect(screen.getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark" } }));
+  });
+
+  it("flips the theme App's root reads from, starting from dark", async () => {
+    const setTheme = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ThemeContext.Provider value={{ theme: "dark", setTheme }}>
+          <SettingsHomeView
+            runtime={fakeRuntime({ send: successfulSend({ theme: "dark" }) })}
+            onBack={vi.fn()}
+            onOpenLockSettings={vi.fn()}
+                onOpenConnectedApps={vi.fn()}
+            onOpenAppearance={vi.fn()}
+            onOpenNetworkPeers={vi.fn()}
+            onOpenFeedback={vi.fn()}
+          />
+        </ThemeContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    expect(setTheme).toHaveBeenCalledWith("light");
+    await waitFor(() => expect((screen.getByRole("radio", { name: "Light" }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("puts the theme back if saving it fails", async () => {
+    const send = successfulSend({
+      setTheme: () => {
+        throw new Error("write failed");
+      },
+    });
+    renderSettingsHome({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "getThemePreference", payload: undefined }));
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark" } }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Light" }).getAttribute("aria-checked")).toBe("true"));
+    expect(document.documentElement.getAttribute("data-theme")).toBeNull();
+  });
+
+  it("opens feedback from its row", async () => {
+    const onOpenFeedback = vi.fn();
+    renderSettingsHome({ onOpenFeedback });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    expect(onOpenFeedback).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
   });
 
   it("calls onBack when the header back button is pressed", async () => {
     const onBack = vi.fn();
     renderSettingsHome({ onBack });
 
-    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-
     expect(onBack).toHaveBeenCalled();
-  });
-
-  it("flipping the Dark mode toggle persists via setThemePreference and applies data-theme immediately", async () => {
-    const send = successfulSend({ theme: "light" });
-    renderSettingsHome({ runtime: fakeRuntime({ send }) });
-
-    await waitFor(() =>
-      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
-        "false",
-      ),
-    );
-
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }));
-
-    await waitFor(() => expect(document.documentElement.getAttribute("data-theme")).toBe("dark"));
-    await waitFor(() =>
-      expect(send).toHaveBeenCalledWith({ type: "setThemePreference", payload: { theme: "dark" } }),
-    );
-  });
-
-  it("reverts the toggle and data-theme if setThemePreference fails", async () => {
-    const send = vi.fn(async ({ type }: { type: string }) => {
-      if (type === "getLockSettings") return LOCK_SETTINGS;
-      if (type === "getNetworkSettings") return NETWORK_SETTINGS;
-      if (type === "getThemePreference") return { theme: "light" } satisfies ThemeSettings;
-      if (type === "setThemePreference") throw new Error("write failed");
-      throw new Error(`Unexpected message type "${type}"`);
-    }) as RuntimePort["send"];
-    renderSettingsHome({ runtime: fakeRuntime({ send }) });
-
-    await waitFor(() =>
-      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
-        "false",
-      ),
-    );
-
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }));
-
-    await waitFor(() =>
-      expect(screen.getByRole("menuitemcheckbox", { name: /Dark mode/i }).getAttribute("aria-checked")).toBe(
-        "false",
-      ),
-    );
-    expect(document.documentElement.getAttribute("data-theme")).toBeNull();
-  });
-
-  it("does not render the removed Import & export or About placeholder rows", async () => {
-    renderSettingsHome();
-
-    await waitFor(() => expect(screen.getByText("Lock & unlock")).toBeTruthy());
-    expect(screen.queryByText("Import & export")).toBeNull();
-    expect(screen.queryByText("About")).toBeNull();
-  });
-
-  it("shows the display currency and opens the picker from its row", async () => {
-    const onOpenDisplayCurrency = vi.fn();
-    renderSettingsHome({ onOpenDisplayCurrency });
-
-    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Currency" }));
-
-    expect(onOpenDisplayCurrency).toHaveBeenCalled();
-  });
-
-  it("opens Home screen from a row with no value, since it holds several settings", async () => {
-    const onOpenHomeScreen = vi.fn();
-    renderSettingsHome({ onOpenHomeScreen });
-
-    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
-    const row = screen.getByRole("button", { name: "Home screen" });
-    expect(row.textContent).toBe("Home screen");
-    fireEvent.click(row);
-
-    expect(onOpenHomeScreen).toHaveBeenCalled();
-  });
-
-  it("keeps the home screen's layout controls off the settings screen", async () => {
-    renderSettingsHome();
-
-    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
-    expect(screen.queryByLabelText("Main balance")).toBeNull();
-    expect(screen.queryByLabelText("Header")).toBeNull();
-    expect(screen.queryByLabelText("Token rows")).toBeNull();
-    expect(screen.queryByRole("menuitemcheckbox", { name: /Token logos/i })).toBeNull();
-  });
-
-  it("lists network under Wallet with no section of its own", async () => {
-    renderSettingsHome();
-
     await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
-    expect(screen.queryByRole("region", { name: "Network" })).toBeNull();
-    const wallet = screen.getByRole("region", { name: "Wallet" });
-    expect(within(wallet).getByRole("button", { name: "Network & peers" })).toBeTruthy();
   });
+});
 
-  it("describes only the rows whose titles need it", async () => {
-    renderSettingsHome();
+describe("AppearanceView", () => {
+  it("opens currency, language and home screen", async () => {
+    const onOpenDisplayCurrency = vi.fn();
+    const onOpenLanguage = vi.fn();
+    const onOpenHomeScreen = vi.fn();
+    const send = successfulSend();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AppearanceView
+          runtime={fakeRuntime({ send })}
+          onBack={vi.fn()}
+          onOpenDisplayCurrency={onOpenDisplayCurrency}
+          onOpenLanguage={onOpenLanguage}
+          onOpenHomeScreen={onOpenHomeScreen}
+        />
+      </QueryClientProvider>,
+    );
 
-    await waitFor(() => expect(screen.getByText("EUR")).toBeTruthy());
-    expect(screen.getByText("Auto-lock and passkey")).toBeTruthy();
-    expect(screen.getByText("Gateway and AO nodes")).toBeTruthy();
-    for (const name of ["Connected apps", "Manage tokens", "Contacts", "Currency", "Language", "Home screen"]) {
-      expect(screen.getByRole("button", { name }).getAttribute("aria-describedby")).toBeNull();
-    }
+    await waitFor(() => expect(within(screen.getByRole("button", { name: "Currency" })).getByText("EUR")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Currency" }));
+    fireEvent.click(screen.getByRole("button", { name: "Language" }));
+    fireEvent.click(screen.getByRole("button", { name: "Home screen" }));
+    expect(onOpenDisplayCurrency).toHaveBeenCalledTimes(1);
+    expect(onOpenLanguage).toHaveBeenCalledTimes(1);
+    expect(onOpenHomeScreen).toHaveBeenCalledTimes(1);
   });
 });

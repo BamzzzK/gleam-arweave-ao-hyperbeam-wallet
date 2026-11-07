@@ -20,11 +20,10 @@ import { WalletSwitcherView } from "./screens/wallet-switcher/index.tsx";
 import { WalletDetailView } from "./screens/wallet-detail/index.tsx";
 import { LockSettingsView } from "./screens/lock-settings/index.tsx";
 import { NetworkPeersView } from "./screens/network-peers/index.tsx";
-import { SettingsHomeView } from "./screens/settings-home/index.tsx";
+import { AppearanceView, SettingsHomeView } from "./screens/settings-home/index.tsx";
 import { BrowserView } from "./screens/browser/index.tsx";
 import { ConnectedAppsView } from "./screens/connected-apps/index.tsx";
 import { ManageTokensView } from "./screens/manage-tokens/index.tsx";
-import { ContactsView } from "./screens/contacts/index.tsx";
 import { DisplayCurrencyView } from "./screens/display-currency/index.tsx";
 import { HomeScreenView } from "./screens/home-screen/index.tsx";
 import { LanguageView } from "./screens/language/index.tsx";
@@ -38,6 +37,7 @@ import { QueryCachePersistence } from "./query-cache/persistence";
 import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
 import { errorText } from "./i18n/errors";
+import { applyDocumentTheme, ThemeContext } from "./theme";
 
 /**
  * The one shared shell mounted from the popup and the side panel (the
@@ -95,13 +95,13 @@ type MainSubView =
   | { kind: "wallet-detail"; walletId: string }
   | { kind: "add-wallet" }
   | { kind: "settings-home" }
+  | { kind: "appearance" }
   | { kind: "lock-settings" }
   | { kind: "network-peers" }
   | { kind: "browser"; url?: string }
   /** `origin` is the site whose entry to show; `returnToUrl` is the browser page to go back to. */
   | { kind: "connected-apps"; origin?: string; returnToUrl?: string }
   | { kind: "manage-tokens" }
-  | { kind: "contacts" }
   | { kind: "display-currency" }
   | { kind: "home-screen" }
   | { kind: "language" }
@@ -179,34 +179,21 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
    * blocking `init()` or leaving `data-theme` unset.
    */
   const applyTheme = async (runtime: RuntimePort) => {
-    // `MainScreenView`'s theme toggle sets `data-theme="dark"` directly on
-    // `document.documentElement` (see that file's doc comment) so the
-    // running surface reflects a change immediately with no storage-change
-    // listener. That write outlives the component that made it — a
-    // sidepanel/approval document that stays alive across view transitions
-    // keeps whatever `documentElement` attribute the last toggle left, and
-    // `[data-theme="dark"]` matches any ancestor, so a stale attribute here
-    // would force dark styling on every view, including this shell's own
-    // onboarding/unlock screens, regardless of the actual stored
-    // preference. Resetting it here, from the same read this component
-    // already uses to drive its own root `data-theme`, keeps the two in
-    // sync instead of trusting whatever the document happened to be left
-    // at.
+    // A document that outlives a view keeps whatever `documentElement`
+    // attribute the last toggle left, and `[data-theme="dark"]` matches any
+    // ancestor, so reset it from the stored preference rather than trust it.
+    let stored: ThemeSettings["theme"] = "light";
     try {
       const settings = await runtime.send<void, ThemeSettings>({
         type: "getThemePreference",
         payload: undefined,
       });
-      setTheme(settings.theme);
-      if (settings.theme === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
+      stored = settings.theme;
     } catch {
-      setTheme("light");
-      document.documentElement.removeAttribute("data-theme");
+      // Falls back to light.
     }
+    setTheme(stored);
+    applyDocumentTheme(stored);
   };
 
   useEffect(() => {
@@ -275,6 +262,8 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     () => makeAddressIdentity(identityKey, () => void loadAddressIdentityKey(runtime).then(setIdentityKey)),
     [identityKey, runtime],
   );
+
+  const themeContext = useMemo(() => ({ theme, setTheme }), [theme]);
 
   let content: ReactNode;
 
@@ -392,15 +381,21 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         onBack={() => setSubView({ kind: "home" })}
         onOpenLockSettings={vaultHasPassword(wallets) ? () => setSubView({ kind: "lock-settings" }) : undefined}
         onOpenConnectedApps={() => setSubView({ kind: "connected-apps" })}
+        onOpenAppearance={() => setSubView({ kind: "appearance" })}
         onOpenNetworkPeers={() => setSubView({ kind: "network-peers" })}
-        onOpenManageTokens={() => setSubView({ kind: "manage-tokens" })}
-        onOpenContacts={() => setSubView({ kind: "contacts" })}
-        onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
-        onOpenLanguage={() => setSubView({ kind: "language" })}
-        onOpenHomeScreen={() => setSubView({ kind: "home-screen" })}
         onOpenFeedback={() =>
           window.open(sitePageUrl("feedback", platform.buildInfo.version), "_blank", "noopener,noreferrer")
         }
+      />
+    );
+  } else if (subView.kind === "appearance") {
+    content = (
+      <AppearanceView
+        runtime={runtime}
+        onBack={() => setSubView({ kind: "settings-home" })}
+        onOpenDisplayCurrency={() => setSubView({ kind: "display-currency" })}
+        onOpenLanguage={() => setSubView({ kind: "language" })}
+        onOpenHomeScreen={() => setSubView({ kind: "home-screen" })}
       />
     );
   } else if (subView.kind === "lock-settings") {
@@ -441,17 +436,15 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
       <ManageTokensView
         runtime={runtime}
         address={wallet.address}
-        onBack={() => setSubView({ kind: "settings-home" })}
+        onBack={() => setSubView({ kind: "home" })}
       />
     );
-  } else if (subView.kind === "contacts") {
-    content = <ContactsView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
   } else if (subView.kind === "display-currency") {
-    content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+    content = <DisplayCurrencyView runtime={runtime} onBack={() => setSubView({ kind: "appearance" })} />;
   } else if (subView.kind === "home-screen") {
-    content = <HomeScreenView runtime={runtime} onBack={() => setSubView({ kind: "settings-home" })} />;
+    content = <HomeScreenView runtime={runtime} onBack={() => setSubView({ kind: "appearance" })} />;
   } else if (subView.kind === "language") {
-    content = <LanguageView onBack={() => setSubView({ kind: "settings-home" })} />;
+    content = <LanguageView onBack={() => setSubView({ kind: "appearance" })} />;
   } else if (subView.kind === "use-gleam-on-site") {
     content = (
       <UseGleamOnSiteView
@@ -479,6 +472,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
             onOpenBrowser={platform.capabilities.dappBrowser ? () => setSubView({ kind: "browser" }) : undefined}
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
             onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
+            onAddToken={() => setSubView({ kind: "manage-tokens" })}
             initialTab={homeTab}
             onTabChange={setHomeTab}
           />
@@ -491,6 +485,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     <QueryClientProvider client={queryClient}>
       <BackStackContext.Provider value={backStack}>
       <AddressIdentityProvider value={addressIdentity}>
+      <ThemeContext.Provider value={themeContext}>
         <div
           ref={setLayoutRoot}
           data-layout={layout}
@@ -514,6 +509,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
           {notice !== null ? <Toast message={notice} multiline className="fixed bottom-[calc(0.875rem+var(--safe-bottom))] z-40" /> : null}
           {platform.approvalSheet ? <ApprovalSheet port={platform.approvalSheet} container={layoutRoot} /> : null}
         </div>
+      </ThemeContext.Provider>
       </AddressIdentityProvider>
       </BackStackContext.Provider>
     </QueryClientProvider>
