@@ -67,6 +67,20 @@ describe("switching wallets with a dApp signing request pending", () => {
   });
 });
 
+describe("adding a wallet with a dApp signing request pending", () => {
+  it("rejects the request, since the new wallet becomes active", async () => {
+    const { runtime, present } = await setupTwoWallets();
+
+    const pending = runtime.dispatch("providerCall", { method: "sign", params: { transaction: TRANSACTION } }, CONTENT_SCRIPT) as Promise<unknown>;
+    void pending.catch(() => {});
+    await vi.waitFor(() => expect(present).toHaveBeenCalledTimes(1));
+
+    await runtime.dispatch("createWallet", { name: "C", password: "correct horse" }, EXTENSION);
+
+    await expect(pending).rejects.toThrow("The active wallet changed.");
+  });
+});
+
 describe("a dApp signing request whose preview finishes after a wallet switch", () => {
   it("is rejected before it is shown", async () => {
     const platform = createInMemoryPlatform();

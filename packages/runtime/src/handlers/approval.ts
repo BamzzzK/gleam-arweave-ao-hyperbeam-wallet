@@ -1051,16 +1051,30 @@ export class ApprovalHandler {
     // scan sees the new wallet here. No active wallet means none is left,
     // which already rejects every pending request.
     if (signsForActiveWallet(record)) {
-      const active = await this.activeWalletId();
+      let active: string | null;
+      try {
+        active = await this.activeWalletId();
+      } catch (error) {
+        await this.dropPending(requestId);
+        throw error;
+      }
       if (active !== null && active !== record.walletId) {
-        await this.updatePending((pending) => pending.filter((entry) => entry.request.requestId !== requestId));
+        await this.dropPending(requestId);
         throw new Error(WALLET_SWITCHED);
       }
     }
 
-    await this.presenter.present(requestId);
-
-    return this.awaitResolution(requestId, input.kind);
+    // Watch before presenting: a switch landing while the window opens
+    // writes its rejection then, and a later watcher would miss it.
+    const resolution = this.awaitResolution(requestId, input.kind);
+    try {
+      await this.presenter.present(requestId);
+    } catch (error) {
+      resolution.catch(() => {});
+      await this.dropPending(requestId);
+      throw error;
+    }
+    return resolution;
   }
 
   /**

@@ -749,8 +749,18 @@ export function createRuntime(platform: Platform): Runtime {
     const before = await lifecycle.getState();
     const summary = await add();
     void points.markUnlockedForVault().catch(() => {});
-    if (before.activeWalletId !== null) void broadcastWalletSwitch();
+    if (before.activeWalletId !== null) await activeWalletChanged(summary.id);
     return summary;
+  }
+
+  // A site's pending signing request stays bound to the wallet it was made
+  // for, so it can't outlive that wallet being active.
+  async function activeWalletChanged(walletId: string): Promise<void> {
+    try {
+      await approval.rejectSwitchedApprovals(walletId);
+    } finally {
+      void broadcastWalletSwitch();
+    }
   }
 
   /** The work behind each `BACKGROUND_MESSAGES` entry, run once its sender has been checked. */
@@ -777,13 +787,14 @@ export function createRuntime(platform: Platform): Runtime {
       if (isLastWallet) await announceGleamSitesForgotten(revoked);
 
       const after = await lifecycle.getState();
-      if (after.activeWalletId !== null && after.activeWalletId !== before.activeWalletId) void broadcastWalletSwitch();
+      if (after.activeWalletId !== null && after.activeWalletId !== before.activeWalletId) {
+        await activeWalletChanged(after.activeWalletId);
+      }
     },
     renameWallet: (data) => lifecycle.renameWallet(data),
     switchWallet: async (data) => {
       await lifecycle.switchWallet(data);
-      await approval.rejectSwitchedApprovals(data.walletId);
-      void broadcastWalletSwitch();
+      await activeWalletChanged(data.walletId);
     },
     downloadKeyfile: (data) => lifecycle.downloadKeyfile(data),
     cancelKeyfileDownload: (data) => lifecycle.cancelKeyfileDownload(data),
