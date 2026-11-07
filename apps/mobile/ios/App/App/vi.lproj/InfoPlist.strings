@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam dùng camera để quét mã QR địa chỉ người nhận hoặc tài khoản và chữ ký Keystone.";
+NSFaceIDUsageDescription = "Gleam dùng Face ID để mở khóa ví của bạn.";

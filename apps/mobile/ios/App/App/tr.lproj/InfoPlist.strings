@@ -1,0 +1,2 @@
+NSCameraUsageDescription = "Gleam, alıcı adresleri veya Keystone hesabı ve imzaları için QR kodlarını taramak üzere kamerayı kullanır.";
+NSFaceIDUsageDescription = "Gleam, cüzdanınızın kilidini açmak için Face ID kullanır.";

@@ -31,6 +31,17 @@ describe("matchLanguage", () => {
     ["zh-HK", "zh-TW"],
     ["zh-Hant", "zh-TW"],
     ["zh-Hant-HK", "zh-TW"],
+    ["ko-KR", "ko"],
+    ["ja", "ja"],
+    ["es-MX", "es"],
+    ["es-419", "es"],
+    ["pt-BR", "pt-BR"],
+    ["pt-PT", "pt-BR"],
+    ["tr-TR", "tr"],
+    ["vi-VN", "vi"],
+    ["ru-RU", "ru"],
+    ["id-ID", "id"],
+    ["in-ID", "id"],
   ])("%s → %s", (tag, expected) => {
     expect(matchLanguage(tag)).toBe(expected);
   });

@@ -15,7 +15,7 @@ import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { SecurityPhraseSection } from "./SecurityPhraseSection";
 import { BiometricSection } from "./BiometricSection";
 import type { BiometricUnlockPort } from "../../../app-platform/types";
-import { useLocale, useT, type MessageKey } from "../../../i18n";
+import { useT, type MessageKey } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
 
 const TIMEOUT_OPTIONS = [
@@ -230,14 +230,6 @@ type PasskeyState =
   | { kind: "loading" }
   | { kind: "ready"; status: PasskeyStatus; busy: boolean; error?: string };
 
-function formatSetUpDate(timestamp: number, locale: string): string {
-  return new Date(timestamp).toLocaleDateString(locale, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 /**
  * The passkey is set up in its own window, so this section re-reads its
  * status whenever this view regains focus, as the side panel does once
@@ -253,7 +245,6 @@ function PasskeySection({
   onSetUp: () => Promise<void>;
 }) {
   const t = useT();
-  const locale = useLocale();
   const [passkey, setPasskey] = useState<PasskeyState>({ kind: "loading" });
 
   const loadStatus = useCallback(async () => {
@@ -332,13 +323,8 @@ function PasskeySection({
           <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-mist text-foreground">
             <PasskeyIcon />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-label font-semibold text-foreground">
-              {t("lockSettings.passkeyOn")}
-            </span>
-            <span className="text-caption text-muted">
-              {t("lockSettings.passkeySetUpOn", { date: formatSetUpDate(passkey.status.createdAt, locale) })}
-            </span>
+          <span className="min-w-0 flex-1 text-label font-semibold text-foreground">
+            {t("lockSettings.passkeyOn")}
           </span>
           <button
             type="button"

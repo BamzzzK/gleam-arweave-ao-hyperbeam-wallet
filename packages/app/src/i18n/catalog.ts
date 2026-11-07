@@ -1,4 +1,4 @@
-import type { Language } from "./define";
+import { LANGUAGES, type Language } from "./define";
 import { NAMESPACES } from "./messages";
 
 type Namespaces = typeof NAMESPACES;
@@ -19,8 +19,4 @@ function flatten(language: Language): Catalog {
   return out as Catalog;
 }
 
-export const CATALOGS: Record<Language, Catalog> = {
-  en: flatten("en"),
-  "zh-CN": flatten("zh-CN"),
-  "zh-TW": flatten("zh-TW"),
-};
+export const CATALOGS = Object.fromEntries(LANGUAGES.map(({ code }) => [code, flatten(code)])) as Record<Language, Catalog>;

@@ -11,6 +11,14 @@
 		<string>en</string>
 		<string>zh-Hans</string>
 		<string>zh-Hant</string>
+		<string>es</string>
+		<string>id</string>
+		<string>pt-BR</string>
+		<string>vi</string>
+		<string>tr</string>
+		<string>ru</string>
+		<string>ja</string>
+		<string>ko</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Gleam</string>

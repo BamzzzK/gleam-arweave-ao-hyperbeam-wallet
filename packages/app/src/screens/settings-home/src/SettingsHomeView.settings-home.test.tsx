@@ -158,7 +158,7 @@ describe("SettingsHomeView", () => {
     const onOpenFeedback = vi.fn();
     renderSettingsHome({ onOpenFeedback });
 
-    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send us feedback" }));
     expect(onOpenFeedback).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
   });

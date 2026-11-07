@@ -348,8 +348,11 @@ These are true of the current release.
   translated sentence for any message equal to a template. AO process
   errors never reach `errorText`, and a placeholder can't change the
   sentence around it.
-- **Chinese translations are machine-written.** Approval and recovery
-  text has been spot-checked but not reviewed by a native speaker.
+- **Translations are machine-written.** Chinese, Korean, Japanese,
+  Spanish, Portuguese, Turkish, Vietnamese, Russian and Indonesian
+  approval and recovery text has been spot-checked but not reviewed by
+  a native speaker. Decoded transaction data, addresses and tag values
+  are never translated.
 - **The stored query cache is plaintext.** Anyone with access to the
   browser profile or the app's storage can read balances and activity
   without unlocking. It holds no key material.
