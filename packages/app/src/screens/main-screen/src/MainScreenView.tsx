@@ -112,6 +112,8 @@ export interface MainScreenViewProps {
   onOpenCollectible: (collectible: Collectible) => void;
   /** Opens the add-token screen from the token list's edit mode. */
   onAddToken: () => void;
+  /** Opens with the token list already in edit mode, as when coming back from add-token. */
+  initialTokenEditing?: boolean;
   /** The tab to show on mount; the caller keeps it across detail screens that unmount this view. */
   initialTab?: MainScreenTab;
   onTabChange?: (tab: MainScreenTab) => void;
@@ -425,6 +427,7 @@ export function MainScreenView({
   onUseGleamOnSite,
   onOpenCollectible,
   onAddToken,
+  initialTokenEditing = false,
   initialTab = "tokens",
   onTabChange,
 }: MainScreenViewProps) {
@@ -437,7 +440,7 @@ export function MainScreenView({
   const collectiblesQuery = useCollectibles(runtime, wallet.address, { enabled: collectiblesOpened });
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [listDocked, setListDocked] = useState(false);
-  const [hiddenExpanded, setHiddenExpanded] = useState(false);
+  const [hiddenExpanded, setHiddenExpanded] = useState(initialTokenEditing);
   // Tagged with its address so a wallet switch reads that wallet's choices without an effect.
   const [storedVisibility, setStoredVisibility] = useState(() => ({
     address: wallet.address,
@@ -674,6 +677,12 @@ export function MainScreenView({
     setHiddenExpanded((prev) => !prev);
     scrollListToDockedTop();
   };
+
+  useEffect(() => {
+    if (initialTokenEditing) scrollListToDockedTop();
+    // Mount only: put the list where toggling edit mode leaves it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Scrolling to the top un-collapses the header, which un-docks the list and fades the chart back in. */
   const returnHome = () => {
