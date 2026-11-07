@@ -132,6 +132,32 @@ function routedSend(handlers: {
   }) as RuntimePort["send"];
 }
 
+describe("SendView contacts", () => {
+  it("edits contacts from the picker and comes back to it", async () => {
+    const send = routedSend({ listContacts: () => [{ address: RECENT_RECIPIENT_A, name: "Alice", createdAt: 0 }] });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    openSavedContacts();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit contacts" }));
+    expect(await screen.findByRole("button", { name: "Add contact" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("dialog", { name: "Saved contacts" })).toBeTruthy();
+  });
+});
+
+describe("SendView with nothing to send", () => {
+  it("says so on the disabled button, without a Max to press", async () => {
+    const send = routedSend({ getBalance: () => "0" });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    const button = await screen.findByRole("button", { name: "No AR to send" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Balance: 0 AR")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Max/ })).toBeNull();
+  });
+});
+
 describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   it("opening the picker lists AR plus every getTokenBalances token, all selectable", async () => {
     const send = routedSend({ getTokenBalances: () => [AO_TOKEN] });
@@ -573,9 +599,8 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Saved contacts" });
     const rows = within(dialog).getAllByRole("button");
-    // Back button in ScreenHeader is a separate `aria-label="Back"` button;
-    // the recipient rows are the remaining ones, most-recent-first, deduped.
-    const recipientRows = rows.filter((row) => row.getAttribute("aria-label") !== "Back");
+    // The header's Back and Edit contacts buttons aside, the rest are recipient rows, most-recent-first, deduped.
+    const recipientRows = rows.filter((row) => !["Back", "Edit contacts"].includes(row.getAttribute("aria-label") ?? ""));
     expect(recipientRows).toHaveLength(2);
     expect(recipientRows[0]!.textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));
     expect(recipientRows[1]!.textContent).toContain(RECENT_RECIPIENT_A.slice(0, 6));
@@ -599,7 +624,7 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
 
     const recipientRows = within(dialog)
       .getAllByRole("button")
-      .filter((row) => row.getAttribute("aria-label") !== "Back");
+      .filter((row) => !["Back", "Edit contacts"].includes(row.getAttribute("aria-label") ?? ""));
     expect(recipientRows).toHaveLength(2);
     expect(recipientRows[0]!.textContent).toContain("Alice");
     expect(recipientRows[1]!.textContent).toContain(RECENT_RECIPIENT_B.slice(0, 6));

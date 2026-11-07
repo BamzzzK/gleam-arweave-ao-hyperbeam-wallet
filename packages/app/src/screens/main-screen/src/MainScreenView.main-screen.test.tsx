@@ -94,6 +94,7 @@ function renderMainScreen(overrides: Partial<Parameters<typeof MainScreenView>[0
         onOpenPoints={vi.fn()}
         onUseGleamOnSite={vi.fn()}
         onOpenCollectible={vi.fn()}
+        onAddToken={vi.fn()}
         {...overrides}
       />
     </QueryClientProvider>,
@@ -693,6 +694,22 @@ describe("MainScreenView hidden token rows", () => {
 
     await screen.findByRole("button", { name: "Hidden (1)" });
     expect(screen.queryByText("Arweave")).toBeNull();
+    scrollTo.mockRestore();
+  });
+
+  it("offers Add a token as a row while editing the list, and only then", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const onAddToken = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }), onAddToken });
+
+    await screen.findByText("Gleam Points");
+    setScrollY(200);
+    expect(screen.queryByRole("button", { name: /Add a token/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit list" }));
+    fireEvent.click(screen.getByRole("button", { name: /Add a token/ }));
+
+    expect(onAddToken).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
     scrollTo.mockRestore();
   });
 
@@ -1408,6 +1425,7 @@ describe("MainScreenView cached-to-live fade", () => {
           onOpenPoints={vi.fn()}
           onUseGleamOnSite={vi.fn()}
           onOpenCollectible={vi.fn()}
+          onAddToken={vi.fn()}
         />
       </QueryClientProvider>,
     );

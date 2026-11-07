@@ -319,6 +319,49 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     expect(await storage.get("session:pendingApprovals")).toEqual([]);
   });
 
+  async function approveConnect(input: { appInfo?: { name: string | null; logo: string | null }; favIconUrl?: string | null }) {
+    const presentedBefore = presenter.presented.length;
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+      ...input,
+    });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(presentedBefore + 1));
+    await handler.resolveApproval({ requestId: presenter.presented.at(-1)!, approved: true });
+    await pending;
+    return (await handler.getConnectedApps())[0];
+  }
+
+  it("keeps the dApp's logo on the grant, ahead of the tab's favicon", async () => {
+    const grant = await approveConnect({
+      appInfo: { name: "Bazar", logo: "https://bazar.arweave.net/logo.png" },
+      favIconUrl: "https://bazar.arweave.net/favicon.ico",
+    });
+    expect(grant?.icon).toBe("https://bazar.arweave.net/logo.png");
+  });
+
+  it("falls back to the tab's favicon, and drops an icon the wallet can't show as an image", async () => {
+    expect((await approveConnect({ appInfo: { name: null, logo: "javascript:alert(1)" }, favIconUrl: "https://bazar.arweave.net/favicon.ico" }))?.icon).toBe(
+      "https://bazar.arweave.net/favicon.ico",
+    );
+    await storage.set("local:grants", []);
+    expect((await approveConnect({ favIconUrl: "http://bazar.arweave.net/favicon.ico" }))?.icon).toBeNull();
+  });
+
+  it("keeps the dApp's name on the grant, dropping one with bidi overrides", async () => {
+    expect((await approveConnect({ appInfo: { name: "Bazar", logo: null } }))?.name).toBe("Bazar");
+    await storage.set("local:grants", []);
+    expect((await approveConnect({ appInfo: { name: "Ba\u202Ezar", logo: null } }))?.name).toBeNull();
+  });
+
+  it("a later connect without an icon keeps the one the grant already has", async () => {
+    await approveConnect({ favIconUrl: "https://bazar.arweave.net/favicon.ico" });
+    const grant = await approveConnect({});
+    expect(grant?.icon).toBe("https://bazar.arweave.net/favicon.ico");
+  });
+
   it("an expired grant's permissions are not carried into the new one", async () => {
     const origin = "https://bazar.arweave.net";
     await storage.set("local:grants", [

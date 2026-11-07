@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
@@ -91,6 +92,7 @@ type Step =
     }
   | { kind: "token-picker" }
   | { kind: "saved-addresses" }
+  | { kind: "edit-contacts" }
   | {
       kind: "review";
       recipient: string;
@@ -431,9 +433,14 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         otherWallets={otherWalletsQuery.data ?? []}
         otherWalletsLoading={otherWalletsQuery.isLoading}
         onSelect={(recipient) => setStep({ ...INITIAL_STEP, recipient })}
+        onEditContacts={() => setStep({ kind: "edit-contacts" })}
         onBack={() => setStep(INITIAL_STEP)}
       />
     );
+  }
+
+  if (step.kind === "edit-contacts") {
+    return <ContactsView runtime={runtime} onBack={() => setStep({ kind: "saved-addresses" })} />;
   }
 
   const requote = async (recipient: string, amountAtomic: string): Promise<FeeEstimate | null> => {
@@ -583,11 +590,18 @@ function ComposeStep({
   const unsupported = token === null ? null : capabilityRefusal(wallet.method, "signDataItem", `send ${ticker}`);
   const recipientValid = recipientSchema.safeParse(step.recipient).success;
   const amountValid = amountSchema(denomination).safeParse(step.amountDisplay).success;
-  const canContinue = !step.submitting && unsupported === null && recipientValid && amountValid;
+  const rawMaxAtomic =
+    token === null
+      ? balancesQuery.data?.arBalance
+      : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
+  const holdsNone = typeof rawMaxAtomic === "string" && BigInt(rawMaxAtomic) === 0n;
+  const canContinue = !step.submitting && unsupported === null && !holdsNone && recipientValid && amountValid;
   // A disabled button names what's missing rather than leaving it to guesswork.
   const continueLabel = step.submitting
     ? t("send.estimatingFee")
-    : !recipientValid
+    : holdsNone
+      ? t("send.nothingToSend", { ticker })
+      : !recipientValid
       ? t("send.enterAddress")
       : !amountValid
         ? t("send.enterAmount")
@@ -596,10 +610,6 @@ function ComposeStep({
   // hidden until that estimate resolves. This is still an underestimate
   // for a first-seen recipient — `handleContinue`'s post-estimate check
   // is the one that's actually enforced.
-  const rawMaxAtomic =
-    token === null
-      ? balancesQuery.data?.arBalance
-      : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
   const maxAtomic =
     token === null
       ? rawMaxAtomic !== undefined && arFeeAtomic !== undefined
@@ -669,9 +679,8 @@ function ComposeStep({
             onClick={() => onShowInfo(true)}
             className="flex max-w-[104px] flex-shrink-0 items-center gap-1 rounded-md px-1 py-1 text-label font-normal text-muted hover:text-foreground phone:hit-target focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
           >
-            <span aria-hidden="true">[</span>
             <span className="truncate">{ticker}</span>
-            <span aria-hidden="true">]</span>
+            <InfoIcon />
           </button>
         }
       />
@@ -710,10 +719,10 @@ function ComposeStep({
             <span className="flex items-center gap-1 text-label">
               {balanceDisplay !== undefined ? (
                 <span className="tabular-nums text-muted">
-                  {balanceDisplay} {ticker}
+                  {t("send.balance", { amount: `${balanceDisplay} ${ticker}` })}
                 </span>
               ) : null}
-              {maxDisplay !== undefined ? (
+              {maxDisplay !== undefined && !holdsNone ? (
                 <button
                   type="button"
                   aria-label={t("send.maxAria", { amount: maxDisplay })}
@@ -1350,6 +1359,7 @@ export function SavedAddressesStep({
   otherWallets,
   otherWalletsLoading,
   onSelect,
+  onEditContacts,
   onBack,
 }: {
   runtime: RuntimePort;
@@ -1359,6 +1369,8 @@ export function SavedAddressesStep({
   otherWallets: WalletSummary[];
   otherWalletsLoading: boolean;
   onSelect: (recipient: string) => void;
+  /** Opens the contact list to add, rename or delete; omitted where the picker can't host it. */
+  onEditContacts?: () => void;
   onBack: () => void;
 }) {
   const t = useT();
@@ -1386,7 +1398,22 @@ export function SavedAddressesStep({
 
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label={t("send.savedContacts")}>
-      <ScreenHeader title={t("send.savedContacts")} onBack={onBack} />
+      <ScreenHeader
+        title={t("send.savedContacts")}
+        onBack={onBack}
+        end={
+          onEditContacts ? (
+            <button
+              type="button"
+              aria-label={t("send.editContacts")}
+              onClick={onEditContacts}
+              className="rounded-md px-2 py-1 text-label font-semibold text-muted hover:bg-mist hover:text-foreground phone:hit-target"
+            >
+              {t("send.edit")}
+            </button>
+          ) : undefined
+        }
+      />
       <div className="px-3.5 pb-2 pt-3 phone:px-5">
         <input
           type="text"
@@ -1603,5 +1630,15 @@ export function SuccessStep({
         </Button>
       </ScreenFooter>
     </div>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0">
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.6v.01" strokeWidth="2.6" />
+    </svg>
   );
 }

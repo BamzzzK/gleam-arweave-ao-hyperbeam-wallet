@@ -122,7 +122,7 @@ describe("LockSettingsView biometric section", () => {
 
   it("is hidden without a biometric port", async () => {
     renderSettings(runtimeWith());
-    await screen.findByText("Never");
+    await screen.findByText("Stay unlocked");
     expect(screen.queryByText("Biometrics")).toBeNull();
     expect(screen.queryByText(/Face ID/)).toBeNull();
   });

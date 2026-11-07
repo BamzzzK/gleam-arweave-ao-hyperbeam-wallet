@@ -14,7 +14,7 @@ export interface OptionSectionProps {
 export function OptionSection({ title, children }: OptionSectionProps) {
   return (
     <section aria-label={title}>
-      <div className="border-b border-line pb-2 text-label font-semibold uppercase tracking-[0.04em] text-muted phone:border-b-0 phone:pb-0">
+      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted phone:pb-0">
         {title}
       </div>
       <div className="flex flex-col">{children}</div>
@@ -33,19 +33,25 @@ export interface OptionRowProps {
   description?: string;
   /** The setting's current value, shown before the chevron. */
   value?: string;
+  /** How many items the row leads to, as a small round count. Left out at zero. */
+  count?: number;
   onClick?: () => void;
   disabled?: boolean;
   /** Draws a line between rows. Turn off for plain lists of settings. */
   divided?: boolean;
+  /** Opens a page outside Gleam: an arrow out replaces the chevron. */
+  external?: boolean;
 }
 
 export function OptionRow({
   title,
   description,
   value,
+  count,
   onClick,
   disabled = false,
   divided = true,
+  external = false,
 }: OptionRowProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -73,10 +79,15 @@ export function OptionRow({
         ) : null}
       </span>
       {value ? <span className="flex-shrink-0 text-label text-muted">{value}</span> : null}
+      {count ? (
+        <span className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-mist px-1.5 text-caption font-semibold tabular-nums text-muted">
+          {count}
+        </span>
+      ) : null}
       {disabled ? null : (
         <span aria-hidden="true" className="flex-shrink-0 text-faint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={external ? "M7 17 17 7M8 7h9v9" : "m9 6 6 6-6 6"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
       )}

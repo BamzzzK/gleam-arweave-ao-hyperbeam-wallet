@@ -33,7 +33,9 @@ describe("ContactsView", () => {
 
     renderWithClient(<ContactsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("No contacts yet.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/No contacts yet\./)).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Add your first contact" }));
+    expect(screen.getByPlaceholderText("Name")).toBeTruthy();
   });
 
   it("lists saved contacts by name", async () => {
@@ -57,7 +59,7 @@ describe("ContactsView", () => {
 
     renderWithClient(<ContactsView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("No contacts yet.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/No contacts yet\./)).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Add contact" }));
 
     fireEvent.change(screen.getByPlaceholderText("Name"), { target: { value: "Carol" } });

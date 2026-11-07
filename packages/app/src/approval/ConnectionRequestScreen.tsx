@@ -18,7 +18,7 @@ export interface ConnectionRequestScreenProps {
   onGrant: () => void;
 }
 
-const SCOPE_COPY: Record<PermissionType, { title: MessageKey; detail: MessageKey }> = {
+export const SCOPE_COPY: Record<PermissionType, { title: MessageKey; detail: MessageKey }> = {
   ACCESS_ADDRESS: { title: "approval.scopeAddressTitle", detail: "approval.scopeAddressDetail" },
   ACCESS_PUBLIC_KEY: { title: "approval.scopePublicKeyTitle", detail: "approval.scopePublicKeyDetail" },
   ACCESS_ALL_ADDRESSES: { title: "approval.scopeAllAddressesTitle", detail: "approval.scopeAllAddressesDetail" },

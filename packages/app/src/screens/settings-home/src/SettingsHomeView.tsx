@@ -1,19 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
-import type {
-  AutoLockTimeout,
-  LockSettings,
-  NetworkSettings,
-  RuntimePort,
-  ThemePreference,
-  ThemeSettings,
-} from "@gleam/core";
+import type { AutoLockTimeout, Grant, LockSettings, NetworkSettings, RuntimePort, ThemePreference } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { OptionRow, OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
-import { ToggleRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
+import { OptionRow } from "@gleam/ui/src/primitives/option-list.tsx";
+import { SegmentedRow } from "@gleam/ui/src/primitives/setting-rows.tsx";
 import { useDisplaySettings } from "../../../display-settings";
-import { REPO_URL } from "@gleam/core";
 import { AboutBuild } from "./AboutBuild";
+import { useTheme } from "./useTheme";
 import { LANGUAGES, useLanguage, useT, type MessageKey } from "../../../i18n";
 
 const TIMEOUT_KEYS = {
@@ -24,7 +17,6 @@ const TIMEOUT_KEYS = {
   "4hr": "settingsHome.timeout4hr",
 } as const satisfies Record<AutoLockTimeout, MessageKey>;
 
-
 function gatewayHostname(gatewayUrl: string): string {
   try {
     return new URL(gatewayUrl).hostname;
@@ -34,32 +26,25 @@ function gatewayHostname(gatewayUrl: string): string {
 }
 
 /**
- * The settings screen the gear icon opens: WALLET and DISPLAY sections of
- * rows that open a screen, with Help & About pinned below. Kept short on
- * purpose: a row gets a description only when its title could mislead,
- * and a value only when it opens a single choice (Currency, Language).
- * Lock & unlock is the one exception: its auto-lock time is security
- * state worth seeing at a glance. Fine-tuning that most people set once
- * (the home screen's layout) sits a level down.
+ * The settings screen the gear icon opens: the wallet's own settings, then
+ * what connects to it, then the build. Lock now sits in Security. Token and
+ * contact lists live where they're used: the token list and Send.
  */
 export interface SettingsHomeViewProps {
   runtime: RuntimePort;
   onBack: () => void;
-  /** Omitted when the vault has no password, which hides the lock row. */
+  /** Omitted when the vault has no password, which hides Security. */
   onOpenLockSettings?: () => void;
   onOpenConnectedApps: () => void;
+  onOpenAppearance: () => void;
   onOpenNetworkPeers: () => void;
-  onOpenManageTokens: () => void;
-  onOpenContacts: () => void;
-  onOpenDisplayCurrency: () => void;
-  onOpenLanguage: () => void;
-  onOpenHomeScreen: () => void;
   onOpenFeedback: () => void;
 }
 
 interface LoadState {
   lockSettings: LockSettings | null;
   networkSettings: NetworkSettings | null;
+  connectedApps: number | null;
   loading: boolean;
 }
 
@@ -68,210 +53,89 @@ export function SettingsHomeView({
   onBack,
   onOpenLockSettings,
   onOpenConnectedApps,
+  onOpenAppearance,
   onOpenNetworkPeers,
-  onOpenManageTokens,
-  onOpenContacts,
-  onOpenDisplayCurrency,
-  onOpenLanguage,
-  onOpenHomeScreen,
   onOpenFeedback,
 }: SettingsHomeViewProps) {
   const platform = usePlatform();
   const t = useT();
   const language = useLanguage();
   const { version } = platform.buildInfo;
-  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, loading: true });
-  const [theme, setTheme] = useState<ThemePreference>("light");
-  const [savingTheme, setSavingTheme] = useState(false);
+  const [state, setState] = useState<LoadState>({ lockSettings: null, networkSettings: null, connectedApps: null, loading: true });
+  const theme = useTheme(runtime);
   const { settings: display } = useDisplaySettings(runtime);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true }));
-    const [lockSettings, networkSettings, themeSettings] = await Promise.allSettled([
+    const [lockSettings, networkSettings, connectedApps] = await Promise.allSettled([
       runtime.send<void, LockSettings>({ type: "getLockSettings", payload: undefined }),
       runtime.send<void, NetworkSettings>({ type: "getNetworkSettings", payload: undefined }),
-      runtime.send<void, ThemeSettings>({ type: "getThemePreference", payload: undefined }),
+      runtime.send<void, Grant[]>({ type: "getConnectedApps", payload: undefined }),
     ]);
     setState({
       lockSettings: lockSettings.status === "fulfilled" ? lockSettings.value : null,
       networkSettings: networkSettings.status === "fulfilled" ? networkSettings.value : null,
+      connectedApps: connectedApps.status === "fulfilled" ? (connectedApps.value?.length ?? null) : null,
       loading: false,
     });
-    if (themeSettings.status === "fulfilled") {
-      setTheme(themeSettings.value.theme);
-    }
   }, [runtime]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const handleToggleTheme = async () => {
-    const next: ThemePreference = theme === "dark" ? "light" : "dark";
-    const previous = theme;
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next === "dark" ? "dark" : "");
-    if (next !== "dark") document.documentElement.removeAttribute("data-theme");
-    setSavingTheme(true);
-    try {
-      await runtime.send<ThemeSettings, void>({ type: "setThemePreference", payload: { theme: next } });
-    } catch {
-      setTheme(previous);
-      if (previous === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      } else {
-        document.documentElement.removeAttribute("data-theme");
-      }
-    } finally {
-      setSavingTheme(false);
-    }
-  };
+  const languageName = LANGUAGES.find((entry) => entry.code === language)?.name;
 
   return (
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("settingsHome.title")} onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-8 phone:gap-6 px-6 phone:px-5 pb-6 pt-9 phone:pt-4">
-        <OptionSection title={t("settingsHome.sectionWallet")}>
+      <div className="flex flex-1 flex-col gap-6 px-6 pb-4 pt-4 phone:px-5">
+        <div className="flex flex-col">
+          <SegmentedRow<ThemePreference>
+            title={t("settingsHome.theme")}
+            value={theme.theme}
+            options={[
+              { value: "light", label: t("settingsHome.themeLight") },
+              { value: "dark", label: t("settingsHome.themeDark") },
+            ]}
+            disabled={theme.saving}
+            onChange={(next) => void theme.select(next)}
+          />
           {onOpenLockSettings ? (
             <OptionRow
               divided={false}
-              title={t("settingsHome.lockTitle")}
-              description={t("settingsHome.lockDescription")}
+              title={t("settingsHome.security")}
               value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
-          <OptionRow divided={false} title={t("settingsHome.connectedAppsTitle")} onClick={onOpenConnectedApps} />
-          <OptionRow divided={false} title={t("settingsHome.manageTokensTitle")} onClick={onOpenManageTokens} />
-          <OptionRow divided={false} title={t("settingsHome.contactsTitle")} onClick={onOpenContacts} />
+          <OptionRow
+            divided={false}
+            title={t("settingsHome.appearance")}
+            value={display ? [display.currency, languageName].filter(Boolean).join(" · ") : undefined}
+            onClick={onOpenAppearance}
+          />
           <OptionRow
             divided={false}
             title={t("settingsHome.networkTitle")}
-            description={t("settingsHome.networkDescription")}
-            value={
-              state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"
-            }
+            value={state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"}
             onClick={onOpenNetworkPeers}
           />
-        </OptionSection>
-
-        <OptionSection title={t("settingsHome.sectionDisplay")}>
-          <OptionRow
-            divided={false}
-            title={t("settingsHome.currencyTitle")}
-            value={display?.currency}
-            onClick={onOpenDisplayCurrency}
-          />
-          <OptionRow
-            divided={false}
-            title={t("language.title")}
-            value={LANGUAGES.find((entry) => entry.code === language)?.name}
-            onClick={onOpenLanguage}
-          />
-          {/* No value: it opens several settings, and naming one would imply it's the only one. */}
-          <OptionRow divided={false} title={t("homeScreen.title")} onClick={onOpenHomeScreen} />
-          <ToggleRow
-            title={t("settingsHome.darkMode")}
-            checked={theme === "dark"}
-            disabled={savingTheme}
-            onToggle={() => void handleToggleTheme()}
-          />
-        </OptionSection>
-
-        <div className="mt-auto">
-          <OptionSection title={t("settingsHome.sectionHelp")}>
-            <FeedbackCard onClick={onOpenFeedback} />
-            <SourceLink />
-            <AboutBuild runtime={runtime} version={version} />
-          </OptionSection>
         </div>
+
+        <div className="flex flex-col">
+          <OptionRow
+            divided={false}
+            title={t("settingsHome.connectedApps")}
+            count={state.connectedApps ?? undefined}
+            onClick={onOpenConnectedApps}
+          />
+          <OptionRow divided={false} external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />
+        </div>
+
+        <AboutBuild runtime={runtime} version={version} />
       </div>
     </div>
-  );
-}
-
-/** The geometry every Help & About row shares with `OptionRow`: no horizontal inset, a 20px leading icon box, the trailing icon on the right edge. */
-const HELP_ROW =
-  "flex w-full items-center gap-2.5 py-3.5 text-left hover:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground";
-
-function LeadingIcon({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center ${className ?? "text-foreground"}`}>
-      {children}
-    </span>
-  );
-}
-
-/** It leaves the wallet for the website's feedback form, so the trailing icon marks it as a link out. */
-function FeedbackCard({ onClick }: { onClick: () => void }) {
-  const t = useT();
-  return (
-    <button type="button" onClick={onClick} className={HELP_ROW}>
-      <LeadingIcon>
-        <FeedbackIcon />
-      </LeadingIcon>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-label font-semibold text-foreground">{t("settingsHome.feedbackTitle")}</span>
-        <span className="text-caption text-muted">{t("settingsHome.feedbackDescription")}</span>
-      </span>
-      <span aria-hidden="true" className="shrink-0 text-faint">
-        <ExternalIcon />
-      </span>
-    </button>
-  );
-}
-
-/** A wallet asks for trust, so the source sits one click away. */
-function SourceLink() {
-  const t = useT();
-  return (
-    <a href={REPO_URL} target="_blank" rel="noreferrer" className={HELP_ROW}>
-      <LeadingIcon>
-        <GitHubIcon />
-      </LeadingIcon>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-label font-semibold text-foreground">{t("settingsHome.sourceTitle")}</span>
-        <span className="text-caption text-muted">{t("settingsHome.sourceDescription")}</span>
-      </span>
-      <span aria-hidden="true" className="shrink-0 text-faint">
-        <ExternalIcon />
-      </span>
-    </a>
-  );
-}
-
-function FeedbackIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-4 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function GitHubIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
-    </svg>
-  );
-}
-
-function ExternalIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

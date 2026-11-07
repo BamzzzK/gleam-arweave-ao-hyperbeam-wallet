@@ -38,7 +38,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor({ lock: { autoLockTimeout: "5min" } });
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("5 minutes")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("After 5 minutes")).toBeTruthy());
     expect(send).toHaveBeenCalledWith({ type: "getLockSettings", payload: undefined });
   });
 
@@ -58,8 +58,8 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("1 hour")).toBeTruthy());
-    fireEvent.click(screen.getByText("1 hour"));
+    await waitFor(() => expect(screen.getByText("After 1 hour")).toBeTruthy());
+    fireEvent.click(screen.getByText("After 1 hour"));
 
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({ type: "setLockSettings", payload: { autoLockTimeout: "1hr" } }),
@@ -70,8 +70,8 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked always, even when your computer locks/));
-    fireEvent.click(screen.getByText("1 hour"));
+    await waitFor(() => expect(screen.getByRole("note").textContent).toMatch(/stays unlocked always even when your computer locks/));
+    fireEvent.click(screen.getByText("After 1 hour"));
 
     await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
     expect(screen.getByText(/whenever your computer locks/)).toBeTruthy();
@@ -82,7 +82,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} lockOnSystemLock={false} />);
 
     await waitFor(() => expect(screen.getByRole("note").textContent).toBe("Gleam stays unlocked always."));
-    fireEvent.click(screen.getByText("1 hour"));
+    fireEvent.click(screen.getByText("After 1 hour"));
 
     await waitFor(() => expect(screen.queryByRole("note")).toBeNull());
     expect(screen.getByText("Gleam locks after this long without use.")).toBeTruthy();
@@ -93,8 +93,8 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={vi.fn()} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
-    fireEvent.click(screen.getByText("Never"));
+    await waitFor(() => expect(screen.getByText("Stay unlocked")).toBeTruthy());
+    fireEvent.click(screen.getByText("Stay unlocked"));
 
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setLockSettings" }));
   });
@@ -111,7 +111,7 @@ describe("LockSettingsView (1.6 lock-settings)", () => {
     const send = sendFor();
     render(<LockSettingsView runtime={fakeRuntime({ send })} onBack={onBack} onLocked={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByText("Never")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Stay unlocked")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(onBack).toHaveBeenCalled();
   });

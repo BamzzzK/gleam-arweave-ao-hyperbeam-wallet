@@ -79,21 +79,27 @@ export function SiteWalletCard({ runtime, onUseGleam }: SiteWalletCardProps) {
   );
 }
 
+const SITE_ICON_SIZES = {
+  sm: { box: "h-6 w-6 rounded-md border border-line", image: "h-4 w-4", letter: "text-caption" },
+  md: { box: "h-9 w-9 rounded-xl", image: "h-5 w-5", letter: "text-label" },
+  lg: { box: "h-12 w-12 rounded-lg border border-line", image: "h-7 w-7", letter: "text-lg" },
+} as const;
+
 /** The site's favicon, or the first letter of its hostname when it has none or it fails to load. */
 export function SiteIcon({
   origin,
   favIconUrl,
   size = "sm",
+  className,
 }: {
   origin: string;
   favIconUrl: string | null;
-  size?: "sm" | "lg";
+  size?: keyof typeof SITE_ICON_SIZES;
+  className?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const box =
-    size === "lg"
-      ? "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-line bg-mist"
-      : "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border border-line bg-mist";
+  const sizes = SITE_ICON_SIZES[size];
+  const box = cn("flex flex-shrink-0 items-center justify-center bg-mist", sizes.box, className);
 
   if (favIconUrl && !failed) {
     return (
@@ -102,14 +108,14 @@ export function SiteIcon({
           src={favIconUrl}
           alt=""
           referrerPolicy="no-referrer"
-          className={size === "lg" ? "h-7 w-7" : "h-4 w-4"}
+          className={sizes.image}
           onError={() => setFailed(true)}
         />
       </div>
     );
   }
   return (
-    <div aria-hidden="true" className={cn(box, "font-bold text-muted", size === "lg" ? "text-lg" : "text-caption")}>
+    <div aria-hidden="true" className={cn(box, "font-bold text-muted", sizes.letter)}>
       {hostnameOf(origin).charAt(0).toUpperCase()}
     </div>
   );

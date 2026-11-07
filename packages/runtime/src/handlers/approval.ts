@@ -78,6 +78,7 @@ import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { safeSiteIconUrl } from "./site-wallet";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -166,7 +167,9 @@ function isValidGrant(value: unknown): value is Grant {
     candidate.permissions.every(isValidPermissionType) &&
     typeof candidate.createdAt === "number" &&
     (candidate.expiresAt === null || typeof candidate.expiresAt === "number") &&
-    candidate.budget === null
+    candidate.budget === null &&
+    (candidate.icon === undefined || candidate.icon === null || typeof candidate.icon === "string") &&
+    (candidate.name === undefined || candidate.name === null || typeof candidate.name === "string")
   );
 }
 
@@ -346,6 +349,8 @@ export interface ConnectRequestInput {
   requestedPermissions: PermissionType[];
   /** Omitted by callers (tests, internal re-grants) that have no dApp-supplied identity. */
   appInfo?: ConnectAppInfo | null;
+  /** The requesting tab's favicon, kept on the grant when `appInfo` has no logo. */
+  favIconUrl?: string | null;
 }
 
 /**
@@ -379,6 +384,8 @@ interface PendingApprovalRecord {
    * `null` for a `connect` request.
    */
   signingInput: unknown;
+  /** A `connect` request's site icon, saved on the grant it creates. */
+  siteIcon?: string | null;
   /** Set by `resolveApproval` immediately before the record is removed. */
   outcome?: ApprovalOutcome;
   /** Set once a hardware wallet's request is approved and waits for the device. */
@@ -905,6 +912,9 @@ export class ApprovalHandler {
       request,
       walletId: input.walletId,
       signingInput: input.kind === "connect" ? null : encodeTaggedBinary(input),
+      ...(input.kind === "connect"
+        ? { siteIcon: safeSiteIconUrl(input.appInfo?.logo) ?? safeSiteIconUrl(input.favIconUrl) }
+        : {}),
     };
     await this.updatePending((pending) => [...pending, record]);
 
@@ -1486,17 +1496,21 @@ export class ApprovalHandler {
 
   private async createGrant(entry: PendingApprovalRecord): Promise<{ granted: PermissionType[] }> {
     const preview = entry.request.preview as ConnectApprovalPreview;
-    return this.mergeGrant(entry.request.origin, entry.walletId, preview.requestedPermissions);
+    const name = preview.appInfo?.name ?? null;
+    return this.mergeGrant(entry.request.origin, entry.walletId, preview.requestedPermissions, {
+      icon: entry.siteIcon ?? null,
+      name: name !== null && !UNSAFE_TEXT.test(name) ? name : null,
+    });
   }
 
   /**
    * Grants `origin` from the popup's "Use Gleam here", where the user
    * picked the permissions themselves, so no approval window opens.
    */
-  async grantSite(req: { origin: string; permissions: PermissionType[] }): Promise<Grant> {
+  async grantSite(req: { origin: string; permissions: PermissionType[]; favIconUrl?: string | null }): Promise<Grant> {
     const permissions = Array.isArray(req.permissions) ? [...new Set(req.permissions.filter(isValidPermissionType))] : [];
     if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
-    await this.mergeGrant(req.origin, null, permissions);
+    await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
     const grant = await this.findActiveGrant(req.origin);
     if (!grant) throw new Error(`Couldn't save the grant for "${req.origin}".`);
     return grant;
@@ -1506,6 +1520,7 @@ export class ApprovalHandler {
     origin: string,
     walletId: string | null,
     requested: readonly PermissionType[],
+    site: { icon: string | null; name: string | null },
   ): Promise<{ granted: PermissionType[] }> {
     const grantWalletId = walletId ?? (await this.activeWalletId());
     if (!grantWalletId) {
@@ -1531,6 +1546,8 @@ export class ApprovalHandler {
       createdAt: Date.now(),
       expiresAt: null,
       budget: null,
+      icon: site.icon ?? existing?.icon ?? null,
+      name: site.name ?? existing?.name ?? null,
     };
 
     await this.saveGrants([...withoutExisting, grant]);
