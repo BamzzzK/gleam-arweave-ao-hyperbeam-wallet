@@ -91,7 +91,23 @@ export interface SigningApprovalPreview {
     tags: Array<{ name: string; value: string }>;
     target: string | null;
     payloadHash: string;
+    /** Set when the item is an AO `Transfer` message, read from its own target and tags. */
+    transfer: DataItemTransferPreview | null;
   }> | null;
+}
+
+/**
+ * An AO token transfer carried by a data item. `token`, `recipient` and
+ * `amount` come from the signed item; `tokenDenomination` and
+ * `tokenTicker` are the same best-effort metadata a `transferAoTokens`
+ * preview carries, `null` when unresolved.
+ */
+export interface DataItemTransferPreview {
+  token: string;
+  recipient: string;
+  amount: string;
+  tokenDenomination: number | null;
+  tokenTicker: string | null;
 }
 
 /**

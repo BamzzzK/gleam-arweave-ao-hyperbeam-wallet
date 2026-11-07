@@ -71,6 +71,7 @@ import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
+import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
 import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
@@ -243,6 +244,12 @@ export interface SigningRequestInput {
   last_tx?: string;
   /** `signDataItem`/`batchSignDataItem`'s items. `payload` and `tags` above are the first item's, for the preview. */
   dataItems?: DataItemInput[];
+  /**
+   * Display-only token metadata for each `dataItems` entry that is an AO
+   * transfer, by index; never signed. The transfer itself is read from
+   * the item.
+   */
+  itemTokenMetadata?: Array<{ tokenDenomination: number | null; tokenTicker: string | null } | null>;
   /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`'s hash digest selection. */
@@ -544,10 +551,6 @@ function decodeTransactionTag(tag: { name: string; value: string }): { name: str
   return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
 }
 
-function tagValue(tags: Array<{ name: string; value: string }>, name: string): string | undefined {
-  return tags.find((tag) => tag.name === name)?.value;
-}
-
 function summarize(payload: UnsignedPayload): DeviceSigningSummary {
   if (payload.kind === "message") {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
@@ -571,10 +574,9 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
-  const recipient = tagValue(tags, "Recipient");
-  const quantity = tagValue(tags, "Quantity");
-  if (tagValue(tags, "Data-Protocol") === "ao" && tagValue(tags, "Action") === "Transfer" && target && recipient && quantity) {
-    return { kind: "aoTransfer", process: target, recipient, quantity };
+  const transfer = readAoTransferMessage({ target, tags });
+  if (transfer) {
+    return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
   }
   return { kind: "dataItem", target: target || null, dataSize: data.byteLength };
 }
@@ -841,15 +843,28 @@ function buildConnectPreview(
  */
 async function buildDataItemPreviews(
   dataItems: NonNullable<SigningRequestInput["dataItems"]>,
+  tokenMetadata: SigningRequestInput["itemTokenMetadata"],
 ): Promise<SigningApprovalPreview["items"]> {
   return Promise.all(
-    dataItems.map(async (item) => {
+    dataItems.map(async (item, index) => {
       const bytes = base64ToBytes(item.data);
+      const tags = item.tags ?? [];
+      const transfer = readAoTransferMessage({ target: item.target, tags });
+      const metadata = tokenMetadata?.[index] ?? null;
       return {
         decodedData: decodeDataPreview(bytes),
-        tags: item.tags ?? [],
+        tags,
         target: item.target ?? null,
         payloadHash: await sha256Hex(bytes),
+        transfer: transfer
+          ? {
+              token: transfer.processId,
+              recipient: transfer.recipient,
+              amount: transfer.quantity,
+              tokenDenomination: metadata?.tokenDenomination ?? null,
+              tokenTicker: metadata?.tokenTicker ?? null,
+            }
+          : null,
       };
     }),
   );
@@ -876,7 +891,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
-    items: signedItems ? await buildDataItemPreviews(signedItems) : null,
+    items: signedItems ? await buildDataItemPreviews(signedItems, input.itemTokenMetadata) : null,
   };
 }
 

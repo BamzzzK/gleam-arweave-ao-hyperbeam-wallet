@@ -69,12 +69,14 @@ const BATCH_PREVIEW: SigningApprovalPreview = {
       tags: [{ name: "Action", value: "Transfer" }],
       target: null,
       payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
+      transfer: null,
     },
     {
       decodedData: '{"Action":"Notify"}',
       tags: [{ name: "Action", value: "Notify" }],
       target: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
       payloadHash: "2b8e5f0a3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c1a9d4f7c",
+      transfer: null,
     },
   ],
 };

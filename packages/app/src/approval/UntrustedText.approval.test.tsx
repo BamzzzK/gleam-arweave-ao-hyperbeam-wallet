@@ -77,6 +77,7 @@ describe("SigningApprovalScreen hidden characters", () => {
               tags: [{ name: "Quan\u200btity", value: "\u2067100\u2069" }],
               target: null,
               payloadHash: SIGN_MESSAGE_PREVIEW.payloadHash,
+              transfer: null,
             },
           ],
         }}

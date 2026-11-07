@@ -1140,8 +1140,45 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
           tags: [{ name: "Action", value: "Eval" }],
           target,
           payloadHash: request.preview.payloadHash,
+          transfer: null,
         },
       ]);
+
+      await handler.resolveApproval({ requestId, approved: false });
+      await expect(pending).rejects.toThrow();
+    });
+
+    it("reads an AO Transfer item's token, recipient and amount from the item, and its scale from the metadata", async () => {
+      const target = "Z".repeat(43);
+      const recipient = "R".repeat(43);
+      const tags = [
+        { name: "Action", value: "Transfer" },
+        { name: "Recipient", value: recipient },
+        { name: "Quantity", value: "1500000000000" },
+      ];
+      const pending = handler.requestApproval({
+        kind: "signDataItem",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode(" "),
+        tags,
+        dataItems: [{ data: toBase64(" "), tags, target }],
+        itemTokenMetadata: [{ tokenDenomination: 12, tokenTicker: "AO" }],
+      });
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
+
+      const request = await handler.getApproval({ requestId });
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+        throw new Error("expected a signing preview");
+      }
+      expect(request.preview.items?.[0]?.transfer).toEqual({
+        token: target,
+        recipient,
+        amount: "1500000000000",
+        tokenDenomination: 12,
+        tokenTicker: "AO",
+      });
 
       await handler.resolveApproval({ requestId, approved: false });
       await expect(pending).rejects.toThrow();

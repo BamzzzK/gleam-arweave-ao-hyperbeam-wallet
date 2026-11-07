@@ -35,6 +35,8 @@ import {
 import { WalletLifecycleHandler } from "./handlers/wallet-lifecycle";
 import { PasskeyHandler } from "./handlers/passkey";
 import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
+import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
+import { readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
 import { TransferHandler } from "./handlers/transfer";
@@ -619,9 +621,21 @@ export function createRuntime(platform: Platform): Runtime {
   async function requestTransactionApproval(
     kind: "sign" | "dispatch",
     transaction: ProviderTransaction,
-    { origin, activeWalletId }: GrantedCall,
+    { origin, wallet, activeWalletId }: GrantedCall,
   ): Promise<unknown> {
     const { gatewayUrl } = await reads.getNetworkSettings();
+    // A token transfer to an arweave-scheduler process moves no AR, so it
+    // shows as the token it sends, read from the transaction's own tags.
+    const tokenTransfer = transaction.target
+      ? readL1TokenTransfer({
+          target: transaction.target,
+          quantity: transaction.quantity ?? "0",
+          data_size: String(transaction.data.byteLength),
+          tags: transaction.tags,
+        })
+      : null;
+    const tokenMetadata =
+      tokenTransfer && wallet ? await resolveTokenDenominationAndTicker(wallet.address, tokenTransfer.processId) : null;
     // The dApp's reward is the fee actually charged. Without one, the quote
     // the preview shows becomes the reward, so a gateway can't charge more
     // than the user approved. A bundled dispatch carries no reward at all.
@@ -631,8 +645,18 @@ export function createRuntime(platform: Platform): Runtime {
       kind,
       origin,
       walletId: activeWalletId(),
-      recipient: transaction.target ?? null,
-      amount: transaction.target ? (transaction.quantity ?? "0") : null,
+      ...(tokenTransfer
+        ? {
+            recipient: tokenTransfer.recipient,
+            amount: tokenTransfer.quantity,
+            token: tokenTransfer.processId,
+            tokenDenomination: tokenMetadata?.tokenDenomination ?? null,
+            tokenTicker: tokenMetadata?.tokenTicker ?? null,
+          }
+        : {
+            recipient: transaction.target ?? null,
+            amount: transaction.target ? (transaction.quantity ?? "0") : null,
+          }),
       fee,
       payload: transaction.data,
       tags: transaction.tags,
@@ -647,9 +671,18 @@ export function createRuntime(platform: Platform): Runtime {
   async function requestDataItemApproval(
     kind: "signDataItem" | "batchSignDataItem",
     items: ProviderDataItem[],
-    { origin, activeWalletId }: GrantedCall,
+    { origin, wallet, activeWalletId }: GrantedCall,
   ): Promise<unknown> {
     const [first] = items;
+    const signed = kind === "signDataItem" ? items.slice(0, 1) : items;
+    // Scale and ticker for each AO transfer, so it shows like a
+    // `transferAoTokens` request. Unresolved metadata shows raw units.
+    const itemTokenMetadata = await Promise.all(
+      signed.map((item) => {
+        const transfer = readAoTransferMessage({ target: item.target, tags: item.tags });
+        return transfer && wallet ? resolveTokenDenominationAndTicker(wallet.address, transfer.processId) : null;
+      }),
+    );
     return approval.requestApproval({
       kind,
       origin,
@@ -662,6 +695,7 @@ export function createRuntime(platform: Platform): Runtime {
         target: item.target,
         anchor: item.anchor,
       })),
+      itemTokenMetadata,
     });
   }
 

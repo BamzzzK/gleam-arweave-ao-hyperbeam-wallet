@@ -142,6 +142,28 @@ describe("createRuntime", () => {
       else expect(posted).toEqual([expect.objectContaining({ reward: "1" })]);
     });
 
+    it("a dApp's sign of an L1 token transfer shows the token, recipient and amount it moves", async () => {
+      stubLyingGateway();
+      const { runtime, present } = await setupGranted();
+      const token = "t".repeat(43);
+      const recipient = "r".repeat(43);
+      const b64u = (text: string) => Buffer.from(text).toString("base64url");
+      const tags = [
+        { name: b64u("action"), value: b64u("transfer") },
+        { name: b64u("recipient"), value: b64u(recipient) },
+        { name: b64u("quantity"), value: b64u("5000000") },
+      ];
+
+      const pending = runtime.dispatch("providerCall", { method: "sign", params: { transaction: { target: token, quantity: "0", tags } } }, CONTENT_SCRIPT);
+      void (pending as Promise<unknown>).catch(() => {});
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      const requestId = present.mock.calls[0]![0];
+      await expect(runtime.dispatch("getApproval", { requestId }, EXTENSION)).resolves.toMatchObject({
+        preview: { recipient, amount: "5000000", token },
+      });
+      await runtime.dispatch("resolveApproval", { requestId, approved: false }, EXTENSION);
+    });
+
     it("a dApp's L1 token transfer shows the fee and pays exactly that", async () => {
       const posted = stubLyingGateway();
       const { runtime, storage, present } = await setupGranted();
