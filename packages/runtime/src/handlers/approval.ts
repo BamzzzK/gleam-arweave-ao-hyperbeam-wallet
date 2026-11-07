@@ -144,6 +144,13 @@ import { safeSiteIconUrl } from "./site-wallet";
  */
 const GRANTS_KEY = "local:grants";
 
+function activeGrant(grants: readonly Grant[], origin: string): Grant | null {
+  const grant = grants.find((candidate) => candidate.origin === origin);
+  if (!grant) return null;
+  if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) return null;
+  return grant;
+}
+
 /** How long a request waits for its first answer. */
 function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
   return kind === "scanAttestation" ? SCAN_ATTESTATION_TIMEOUT_MS : APPROVAL_TIMEOUT_MS;
@@ -794,6 +801,9 @@ export class ApprovalHandler {
    */
   private pendingQueue: Promise<void> = Promise.resolve();
 
+  /** The same for `local:grants`: a revoke written from a stale read would restore another origin's grant. */
+  private grantsQueue: Promise<void> = Promise.resolve();
+
   /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
   private attesting = false;
 
@@ -818,8 +828,19 @@ export class ApprovalHandler {
     return raw.filter(isValidGrant);
   }
 
-  private async saveGrants(grants: Grant[]): Promise<void> {
-    await this.storage.set(GRANTS_KEY, grants);
+  /** The only way to write grants. `update` sees the current grants and returns the new ones. */
+  private updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
+    const run = this.grantsQueue.then(async () => {
+      const { next, result } = update(await this.loadGrants());
+      if (next === null) await this.storage.remove(GRANTS_KEY);
+      else await this.storage.set(GRANTS_KEY, next);
+      return result;
+    });
+    this.grantsQueue = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
   }
 
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
@@ -875,11 +896,7 @@ export class ApprovalHandler {
    * letting it expire) ends all access it covered.
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
-    const grants = await this.loadGrants();
-    const grant = grants.find((candidate) => candidate.origin === origin);
-    if (!grant) return null;
-    if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) return null;
-    return grant;
+    return activeGrant(await this.loadGrants(), origin);
   }
 
   /**
@@ -1529,29 +1546,29 @@ export class ApprovalHandler {
     if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
       throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
     }
-    const grants = await this.loadGrants();
-    const withoutExisting = grants.filter((grant) => grant.origin !== origin);
-    // A connect from an already-connected origin only asks for what the
-    // grant lacks, so approving it adds to the grant instead of narrowing it.
-    const existing = await this.findActiveGrant(origin);
-    const permissions = [...(existing?.permissions ?? [])];
-    for (const permission of requested) {
-      if (!permissions.includes(permission)) permissions.push(permission);
-    }
+    return this.updateGrants((grants) => {
+      const withoutExisting = grants.filter((grant) => grant.origin !== origin);
+      // A connect from an already-connected origin only asks for what the
+      // grant lacks, so approving it adds to the grant instead of narrowing it.
+      const existing = activeGrant(grants, origin);
+      const permissions = [...(existing?.permissions ?? [])];
+      for (const permission of requested) {
+        if (!permissions.includes(permission)) permissions.push(permission);
+      }
 
-    const grant: Grant = {
-      origin,
-      walletId: grantWalletId,
-      permissions,
-      createdAt: Date.now(),
-      expiresAt: null,
-      budget: null,
-      icon: site.icon ?? existing?.icon ?? null,
-      name: site.name ?? existing?.name ?? null,
-    };
+      const grant: Grant = {
+        origin,
+        walletId: grantWalletId,
+        permissions,
+        createdAt: Date.now(),
+        expiresAt: null,
+        budget: null,
+        icon: site.icon ?? existing?.icon ?? null,
+        name: site.name ?? existing?.name ?? null,
+      };
 
-    await this.saveGrants([...withoutExisting, grant]);
-    return { granted: grant.permissions };
+      return { next: [...withoutExisting, grant], result: { granted: grant.permissions } };
+    });
   }
 
   /**
@@ -1716,10 +1733,9 @@ export class ApprovalHandler {
    * origins, which should be told they're disconnected.
    */
   async revokeAllAccess(reason = "The wallet was reset."): Promise<string[]> {
-    const grants = await this.loadGrants();
-    await this.storage.remove(GRANTS_KEY);
+    const origins = await this.updateGrants((grants) => ({ next: null, result: grants.map((grant) => grant.origin) }));
     await this.rejectPendingWhere(() => true, reason);
-    return grants.map((grant) => grant.origin);
+    return origins;
   }
 
   /**
@@ -1750,8 +1766,10 @@ export class ApprovalHandler {
 
   /** Revokes a Grant — ends all access it covered immediately. */
   async revokeGrant(req: { origin: string }): Promise<void> {
-    const grants = await this.loadGrants();
-    await this.saveGrants(grants.filter((grant) => grant.origin !== req.origin));
+    await this.updateGrants((grants) => ({
+      next: grants.filter((grant) => grant.origin !== req.origin),
+      result: undefined,
+    }));
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */

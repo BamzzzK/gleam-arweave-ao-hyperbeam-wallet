@@ -606,6 +606,15 @@ describe("ApprovalHandler: revocation ends access", () => {
     expect(await handler.getConnectedApps()).toEqual([]);
   });
 
+  it("overlapping revokes for different origins both stick", async () => {
+    await Promise.all([
+      handler.revokeGrant({ origin: "https://bazar.arweave.net" }),
+      handler.revokeGrant({ origin: "https://unconnected.example" }),
+    ]);
+
+    expect(await handler.findActiveGrant("https://bazar.arweave.net")).toBeNull();
+  });
+
   it("an expired Grant is treated as inactive even though it's still stored", async () => {
     await storage.set("local:grants", [
       {
