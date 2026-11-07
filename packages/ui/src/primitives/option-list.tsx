@@ -39,6 +39,8 @@ export interface OptionRowProps {
   disabled?: boolean;
   /** Draws a line between rows. Turn off for plain lists of settings. */
   divided?: boolean;
+  /** Opens a page outside Gleam: an arrow out replaces the chevron. */
+  external?: boolean;
 }
 
 export function OptionRow({
@@ -49,6 +51,7 @@ export function OptionRow({
   onClick,
   disabled = false,
   divided = true,
+  external = false,
 }: OptionRowProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -84,7 +87,7 @@ export function OptionRow({
       {disabled ? null : (
         <span aria-hidden="true" className="flex-shrink-0 text-faint">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={external ? "M7 17 17 7M8 7h9v9" : "m9 6 6 6-6 6"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
       )}

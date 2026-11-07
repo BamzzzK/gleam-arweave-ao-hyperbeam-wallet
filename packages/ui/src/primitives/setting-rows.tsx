@@ -114,3 +114,50 @@ export function ToggleRow({
     </button>
   );
 }
+
+/** Picks one of two or three short values with a single tap, all of them in view. */
+export function SegmentedRow<T extends string>({
+  title,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  title: string;
+  value: T;
+  options: SelectRowOption<T>[];
+  disabled: boolean;
+  onChange: (value: T) => void;
+}) {
+  const titleId = useId();
+  return (
+    <div className="flex w-full items-center justify-between gap-3 py-2.5 phone:min-h-[3.75rem]">
+      <span id={titleId} className="text-label font-semibold text-foreground">
+        {title}
+      </span>
+      <div role="radiogroup" aria-labelledby={titleId} className="flex shrink-0 rounded-lg bg-mist p-0.5">
+        {options.map((option) => {
+          const selected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={disabled}
+              onClick={() => {
+                if (!selected) onChange(option.value);
+              }}
+              className={cn(
+                "rounded-md px-3 py-1 text-caption font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground disabled:cursor-default",
+                selected ? "bg-background text-foreground shadow-sm" : "text-muted hover:enabled:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
