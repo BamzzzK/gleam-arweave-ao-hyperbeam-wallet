@@ -31,15 +31,15 @@ export function CollectibleDetailView({ collectible, onBack, onSend }: Collectib
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("collectibles.detailTitle")} onBack={onBack} />
 
-      <div className="flex flex-1 flex-col gap-5 px-6 phone:px-5 pb-6 phone:pb-0 pt-6">
-        <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="mx-auto max-w-[280px]" />
+      <div className="flex flex-1 flex-col gap-4 px-6 phone:px-5 pb-6 phone:pb-0 pt-4">
+        <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="mx-auto max-w-[200px]" />
 
         <div className="flex flex-col gap-0.5 text-center">
-          <h2 className="break-words text-h3 font-semibold">{collectible.name}</h2>
+          <h2 className="line-clamp-2 break-words text-h3 font-semibold" title={collectible.name}>{collectible.name}</h2>
           {collectible.collectionName ? <p className="text-label text-muted">{collectible.collectionName}</p> : null}
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-line pt-3.5 phone:border-t-0 phone:pt-0">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-label text-muted">{t("collectibles.processId")}</span>
           <span className="flex items-center gap-1.5">
             <span className="font-mono text-label" title={collectible.id}>
