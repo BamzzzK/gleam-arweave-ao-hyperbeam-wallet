@@ -308,6 +308,29 @@ describe("SigningApprovalScreen network fee", () => {
     expect(screen.getByText("TOK")).toBeTruthy();
     expect(screen.getByText("0.5 AR")).toBeTruthy();
   });
+
+  it.each(["sign", "dispatch"] as const)("shows the fee of a %s with no recipient", (kind) => {
+    const preview: SigningApprovalPreview = {
+      ...TRANSFER_PREVIEW,
+      kind,
+      recipient: null,
+      amount: null,
+      fee: "900000000000000",
+    };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getByText("Network fee")).toBeTruthy();
+    expect(screen.getByText("900 AR")).toBeTruthy();
+  });
+
+  it("shows no fee row for a data item, which pays none", () => {
+    render(
+      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={MESSAGE_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
+    );
+
+    expect(screen.queryByText("Network fee")).toBeNull();
+    expect(screen.queryByText("Fee")).toBeNull();
+  });
 });
 
 describe("SigningApprovalScreen: a send from the wallet itself", () => {

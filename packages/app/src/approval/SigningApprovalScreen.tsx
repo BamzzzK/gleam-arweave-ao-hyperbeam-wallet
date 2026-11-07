@@ -252,6 +252,10 @@ export function SigningApprovalScreen({
               />
             </div>
           </>
+        ) : preview.fee !== null ? (
+          <div className="flex flex-col">
+            <ReviewRow label={t("approval.networkFee")} value={formatFee(preview.fee)} />
+          </div>
         ) : null}
 
         {preview.items ? (
