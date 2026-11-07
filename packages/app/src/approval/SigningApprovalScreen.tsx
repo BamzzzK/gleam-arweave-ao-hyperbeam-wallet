@@ -7,6 +7,7 @@ import { useAddressIdentity } from "../address-identity";
 import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { errorText } from "../i18n/errors";
+import { UntrustedText } from "./UntrustedText";
 
 /**
  * The highest-stakes screen in the product: recipient, amount, fee, a
@@ -270,7 +271,7 @@ export function SigningApprovalScreen({
               <div className="flex flex-col gap-1.5">
                 <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
                 <div className="max-h-24 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-mist p-3 font-mono text-caption leading-relaxed text-foreground">
-                  {preview.decodedData}
+                  <UntrustedText text={preview.decodedData} />
                 </div>
               </div>
             ) : null}
@@ -281,7 +282,7 @@ export function SigningApprovalScreen({
                 <div className="flex flex-wrap gap-1.5">
                   {preview.tags.map((tag, index) => (
                     <span key={index} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
-                      <span className="text-muted">{tag.name}:</span> {tag.value}
+                      <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
                     </span>
                   ))}
                 </div>
@@ -351,7 +352,7 @@ function DataItemPreview({
         <div className="flex flex-col gap-0.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
           <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-[11px] leading-relaxed text-foreground">
-            {item.decodedData}
+            <UntrustedText text={item.decodedData} />
           </div>
         </div>
       ) : null}
@@ -362,7 +363,7 @@ function DataItemPreview({
           <div className="flex flex-wrap gap-1.5">
             {item.tags.map((tag, tagIndex) => (
               <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
-                <span className="text-muted">{tag.name}:</span> {tag.value}
+                <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
               </span>
             ))}
           </div>
