@@ -106,7 +106,7 @@ function formatAmountUnit(
 }
 
 function formatFee(fee: string | null): string {
-  return fee === null ? "—" : formatWinstonAsAr(fee, 12);
+  return fee === null ? "—" : `${formatWinstonAsAr(fee, 12)} AR`;
 }
 
 /**
@@ -123,7 +123,7 @@ function formatTotal(
 ): string {
   if (token !== null || amount === null || fee === null) return formatAmount(amount, token, tokenDenomination);
   try {
-    return formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString(), 12);
+    return `${formatWinstonAsAr((BigInt(amount) + BigInt(fee)).toString(), 12)} AR`;
   } catch {
     return "—";
   }
@@ -218,7 +218,7 @@ export function SigningApprovalScreen({
             <RecipientBlock address={preview.recipient ?? ""} />
 
             <div className="flex flex-col">
-              <ReviewRow label={t("approval.networkFee")} value={preview.fee === null ? "—" : `${formatWinstonAsAr(preview.fee, 12)} AR`} />
+              <ReviewRow label={t("approval.networkFee")} value={formatFee(preview.fee)} />
             </div>
           </>
         ) : isTransfer ? (

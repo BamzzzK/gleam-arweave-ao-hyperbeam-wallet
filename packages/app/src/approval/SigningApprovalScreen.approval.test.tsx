@@ -275,9 +275,8 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
 
     // amount: 50000000000000 Winston -> "50", fee: 800000000 Winston -> "0.0008"
     expect(screen.getByText("50")).toBeTruthy();
-    expect(screen.getByText("0.0008")).toBeTruthy();
-    // Total = 50 + 0.0008 = 50.0008 AR
-    expect(screen.getByText("50.0008")).toBeTruthy();
+    expect(screen.getByText("0.0008 AR")).toBeTruthy();
+    expect(screen.getByText("50.0008 AR")).toBeTruthy();
   });
 
   it("shows a tiny amount and fee exactly, not rounded to 0", () => {
@@ -293,6 +292,21 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
 
     expect(screen.getByText("—")).toBeTruthy();
+  });
+});
+
+describe("SigningApprovalScreen network fee", () => {
+  it("labels an L1 token transfer's fee as AR, apart from the token amount", () => {
+    const preview: SigningApprovalPreview = {
+      ...AO_TRANSFER_PREVIEW,
+      fee: "500000000000",
+      tokenDenomination: 0,
+      tokenTicker: "TOK",
+    };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getByText("TOK")).toBeTruthy();
+    expect(screen.getByText("0.5 AR")).toBeTruthy();
   });
 });
 
