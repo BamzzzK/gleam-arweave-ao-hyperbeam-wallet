@@ -54,8 +54,6 @@ import {
   APPROVAL_MAX_MS,
   APPROVAL_TIMEOUT_MS,
   SCAN_ATTESTATION_TIMEOUT_MS,
-  decodeTaggedBinary,
-  encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
 import {
   buildAttestMessage,
@@ -371,9 +369,9 @@ export type CreateApprovalInput =
   | ({ origin: string; walletId: string } & AddTokenRequestInput);
 
 /**
- * `result` and `signingInput` hold bytes (payloads, AES IVs, signatures),
- * and `chrome.storage` serializes a `Uint8Array` as a plain object. Both
- * are stored through the tagged-binary codec and decoded when read.
+ * `result`, `signingInput` and `device.payloads` hold bytes (payloads, AES
+ * IVs, signatures), and `chrome.storage` serializes a `Uint8Array` as a
+ * plain object. They are written with `toStored` and read with `fromStored`.
  */
 interface ApprovalOutcome {
   approved: boolean;
@@ -398,6 +396,78 @@ interface PendingApprovalRecord {
   /** Set once a hardware wallet's request is approved and waits for the device. */
   device?: PendingDeviceSigning;
 }
+
+/** A byte array in a pending record. */
+interface StoredBinary {
+  __gleamStored: "ArrayBuffer" | "Uint8Array";
+  base64: string;
+}
+
+function isStoredBinary(value: unknown): value is StoredBinary {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<StoredBinary>;
+  return (
+    (candidate.__gleamStored === "ArrayBuffer" || candidate.__gleamStored === "Uint8Array") &&
+    typeof candidate.base64 === "string"
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Bytes go in as base64 rather than the tagged-binary codec's number
+ * arrays: `chrome.storage.session` charges every array element as a value
+ * of its own, about 32 bytes per byte.
+ */
+function toStored(value: unknown): unknown {
+  // `instanceof` is avoided: WebCrypto results and page values can come from another realm.
+  if (Object.prototype.toString.call(value) === "[object ArrayBuffer]") {
+    return { __gleamStored: "ArrayBuffer", base64: bytesToBase64(new Uint8Array(value as ArrayBuffer)) } satisfies StoredBinary;
+  }
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return { __gleamStored: "Uint8Array", base64: bytesToBase64(bytes) } satisfies StoredBinary;
+  }
+  if (Array.isArray(value)) return value.map(toStored);
+  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toStored(entry)]));
+  return value;
+}
+
+function fromStored(value: unknown): unknown {
+  if (isStoredBinary(value)) {
+    const bytes = base64ToBytes(value.base64);
+    return value.__gleamStored === "ArrayBuffer" ? bytes.buffer : bytes;
+  }
+  if (Array.isArray(value)) return value.map(fromStored);
+  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, fromStored(entry)]));
+  return value;
+}
+
+const STORED_VALUE_BYTES = 32;
+
+/**
+ * Roughly what `chrome.storage.session` charges for `value`: it counts the
+ * memory of the stored value tree, a fixed cost per value plus each
+ * string's length.
+ */
+function storedSize(value: unknown): number {
+  if (typeof value === "string") return STORED_VALUE_BYTES + value.length;
+  if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + storedSize(entry), STORED_VALUE_BYTES);
+  if (isPlainRecord(value)) {
+    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + key.length + storedSize(entry), STORED_VALUE_BYTES);
+  }
+  return STORED_VALUE_BYTES;
+}
+
+/*
+ * `chrome.storage.session` holds 10 MiB. Pending requests may use 4 MiB of
+ * it and one site 2 MiB, so one site can't fill it, and the outcomes and
+ * device payloads written onto records before they are dropped still fit.
+ */
+const PENDING_BYTES_LIMIT = 4 * 1024 * 1024;
+const PENDING_BYTES_PER_ORIGIN = 2 * 1024 * 1024;
 
 interface PendingDeviceSigning {
   /** Tagged-binary encoded `UnsignedPayload[]`. */
@@ -951,12 +1021,26 @@ export class ApprovalHandler {
     const record: PendingApprovalRecord = {
       request,
       walletId: input.walletId,
-      signingInput: input.kind === "connect" ? null : encodeTaggedBinary(input),
+      signingInput: input.kind === "connect" ? null : toStored(input),
       ...(input.kind === "connect"
         ? { siteIcon: safeSiteIconUrl(input.appInfo?.logo) ?? safeSiteIconUrl(input.favIconUrl) }
         : {}),
     };
-    await this.updatePending((pending) => [...pending, record]);
+    const size = storedSize(record);
+    if (size > PENDING_BYTES_PER_ORIGIN) {
+      throw new Error("Gleam refused this request because it is too large to hold for approval.");
+    }
+    await this.updatePending((pending) => {
+      const live = pending.filter((entry) => !this.isStale(entry));
+      const total = live.reduce((sum, entry) => sum + storedSize(entry), size);
+      const fromOrigin = live
+        .filter((entry) => entry.request.origin === input.origin)
+        .reduce((sum, entry) => sum + storedSize(entry), size);
+      if (total > PENDING_BYTES_LIMIT || fromOrigin > PENDING_BYTES_PER_ORIGIN) {
+        throw new Error("Gleam refused this request because too many requests are waiting for approval.");
+      }
+      return [...pending, record];
+    });
     // The preview is built after the caller read the active wallet, so a
     // switch can land in between. `switchWallet` sets the new wallet before
     // `rejectSwitchedApprovals` scans, so a record stored too late for that
@@ -1020,7 +1104,7 @@ export class ApprovalHandler {
         } else if (outcome.error) {
           reject(new Error(outcome.error));
         } else {
-          resolve(decodeTaggedBinary(outcome.result));
+          resolve(fromStored(outcome.result));
         }
       });
     });
@@ -1092,7 +1176,7 @@ export class ApprovalHandler {
   private async requestView(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
     if (!entry.device || !entry.walletId) return entry.request;
     const wallet = await this.hardwareWallet(entry.walletId);
-    const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+    const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
     return {
       ...entry.request,
       device: {
@@ -1137,7 +1221,7 @@ export class ApprovalHandler {
         try {
           if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
           result = await this.finalizeApproval(entry);
-          outcome = { approved: true, result: encodeTaggedBinary(result) };
+          outcome = { approved: true, result: toStored(result) };
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
@@ -1200,7 +1284,7 @@ export class ApprovalHandler {
     const payloads = await this.prepareDevicePayloads(walletId, wallet, input);
     assertPreparedMatches(input, payloads, wallet.address);
     const device: PendingDeviceSigning = {
-      payloads: encodeTaggedBinary(payloads),
+      payloads: toStored(payloads),
       deadline: this.deviceDeadline(entry.request),
     };
     const requestId = entry.request.requestId;
@@ -1261,7 +1345,7 @@ export class ApprovalHandler {
         throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
       const walletId = entry.walletId;
-      const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+      const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
       const wallet = await this.hardwareWallet(walletId);
       const signatures = await this.verifiedSignatures(payloads, req.signatures, wallet.publicKey);
 
@@ -1269,7 +1353,7 @@ export class ApprovalHandler {
       let result: unknown;
       try {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
-        outcome = { approved: true, result: encodeTaggedBinary(result) };
+        outcome = { approved: true, result: toStored(result) };
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -1304,7 +1388,7 @@ export class ApprovalHandler {
   }
 
   private signingInputOf(entry: PendingApprovalRecord): SigningRequestInput {
-    const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
+    const input = fromStored(entry.signingInput) as SigningRequestInput | null;
     if (!input) {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
@@ -1615,7 +1699,7 @@ export class ApprovalHandler {
     if (!this.tokens) {
       throw new Error("addToken is not wired to a token list. ApprovalHandler was constructed without one.");
     }
-    const input = decodeTaggedBinary(entry.signingInput) as AddTokenRequestInput | null;
+    const input = fromStored(entry.signingInput) as AddTokenRequestInput | null;
     if (!input || input.kind !== "addToken") {
       throw new Error(`Approval request "${entry.request.requestId}" has no token to add.`);
     }
