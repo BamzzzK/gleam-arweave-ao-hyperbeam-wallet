@@ -87,7 +87,8 @@ const NOTICE_MS = 6000;
 
 type TopView = "loading" | "onboarding" | "unlock" | "main-screen";
 type MainSubView =
-  | { kind: "home" }
+  /** `editTokens` reopens the token list in edit mode, where add-token was opened from. */
+  | { kind: "home"; editTokens?: boolean }
   /** `token: null` is the AR path (the top-level Send action); an AO token row's click carries its `TokenBalance`. */
   | { kind: "send"; token: TokenBalance | null }
   | { kind: "receive" }
@@ -436,7 +437,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
       <ManageTokensView
         runtime={runtime}
         address={wallet.address}
-        onBack={() => setSubView({ kind: "home" })}
+        onBack={() => setSubView({ kind: "home", editTokens: true })}
       />
     );
   } else if (subView.kind === "display-currency") {
@@ -473,6 +474,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
             onUseGleamOnSite={(site) => setSubView({ kind: "use-gleam-on-site", ...site })}
             onOpenCollectible={(collectible) => setSubView({ kind: "collectible", collectible })}
             onAddToken={() => setSubView({ kind: "manage-tokens" })}
+            initialTokenEditing={subView.kind === "home" && subView.editTokens}
             initialTab={homeTab}
             onTabChange={setHomeTab}
           />

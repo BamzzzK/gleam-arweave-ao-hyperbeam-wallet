@@ -713,6 +713,15 @@ describe("MainScreenView hidden token rows", () => {
     scrollTo.mockRestore();
   });
 
+  it("opens with the list in edit mode when coming back from Add a token", async () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWithTokens([]) }), initialTokenEditing: true });
+
+    expect(await screen.findByRole("button", { name: /Add a token/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+    scrollTo.mockRestore();
+  });
+
   it("ignores a hidden token only after confirming, removing it from Hidden too", async () => {
     let tokens = [DISCOVERED];
     const base = successfulSend();
