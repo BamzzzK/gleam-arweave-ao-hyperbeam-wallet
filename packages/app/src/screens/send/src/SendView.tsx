@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
@@ -91,6 +92,7 @@ type Step =
     }
   | { kind: "token-picker" }
   | { kind: "saved-addresses" }
+  | { kind: "edit-contacts" }
   | {
       kind: "review";
       recipient: string;
@@ -431,9 +433,14 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
         otherWallets={otherWalletsQuery.data ?? []}
         otherWalletsLoading={otherWalletsQuery.isLoading}
         onSelect={(recipient) => setStep({ ...INITIAL_STEP, recipient })}
+        onEditContacts={() => setStep({ kind: "edit-contacts" })}
         onBack={() => setStep(INITIAL_STEP)}
       />
     );
+  }
+
+  if (step.kind === "edit-contacts") {
+    return <ContactsView runtime={runtime} onBack={() => setStep({ kind: "saved-addresses" })} />;
   }
 
   const requote = async (recipient: string, amountAtomic: string): Promise<FeeEstimate | null> => {
@@ -587,7 +594,7 @@ function ComposeStep({
     token === null
       ? balancesQuery.data?.arBalance
       : balancesQuery.data?.tokenBalances.find((candidate) => candidate.processId === token.processId)?.quantity;
-  const holdsNone = rawMaxAtomic !== undefined && BigInt(rawMaxAtomic) === 0n;
+  const holdsNone = typeof rawMaxAtomic === "string" && BigInt(rawMaxAtomic) === 0n;
   const canContinue = !step.submitting && unsupported === null && !holdsNone && recipientValid && amountValid;
   // A disabled button names what's missing rather than leaving it to guesswork.
   const continueLabel = step.submitting
@@ -1352,6 +1359,7 @@ export function SavedAddressesStep({
   otherWallets,
   otherWalletsLoading,
   onSelect,
+  onEditContacts,
   onBack,
 }: {
   runtime: RuntimePort;
@@ -1361,6 +1369,8 @@ export function SavedAddressesStep({
   otherWallets: WalletSummary[];
   otherWalletsLoading: boolean;
   onSelect: (recipient: string) => void;
+  /** Opens the contact list to add, rename or delete; omitted where the picker can't host it. */
+  onEditContacts?: () => void;
   onBack: () => void;
 }) {
   const t = useT();
@@ -1388,7 +1398,22 @@ export function SavedAddressesStep({
 
   return (
     <div className="flex min-h-full flex-col" role="dialog" aria-label={t("send.savedContacts")}>
-      <ScreenHeader title={t("send.savedContacts")} onBack={onBack} />
+      <ScreenHeader
+        title={t("send.savedContacts")}
+        onBack={onBack}
+        end={
+          onEditContacts ? (
+            <button
+              type="button"
+              aria-label={t("send.editContacts")}
+              onClick={onEditContacts}
+              className="rounded-md px-2 py-1 text-label font-semibold text-muted hover:bg-mist hover:text-foreground phone:hit-target"
+            >
+              {t("send.edit")}
+            </button>
+          ) : undefined
+        }
+      />
       <div className="px-3.5 pb-2 pt-3 phone:px-5">
         <input
           type="text"
