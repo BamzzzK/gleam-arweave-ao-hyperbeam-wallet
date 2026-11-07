@@ -110,6 +110,8 @@ export interface MainScreenViewProps {
   /** Opens the permissions screen for a site that was using another wallet. */
   onUseGleamOnSite: SiteWalletCardProps["onUseGleam"];
   onOpenCollectible: (collectible: Collectible) => void;
+  /** Opens the add-token screen from the token list's edit mode. */
+  onAddToken: () => void;
   /** The tab to show on mount; the caller keeps it across detail screens that unmount this view. */
   initialTab?: MainScreenTab;
   onTabChange?: (tab: MainScreenTab) => void;
@@ -422,6 +424,7 @@ export function MainScreenView({
   onOpenBrowser,
   onUseGleamOnSite,
   onOpenCollectible,
+  onAddToken,
   initialTab = "tokens",
   onTabChange,
 }: MainScreenViewProps) {
@@ -1067,6 +1070,24 @@ export function MainScreenView({
                     </div>
                   );
                 };
+                const addTokenRow = hiddenExpanded ? (
+                  <button
+                    type="button"
+                    onClick={onAddToken}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left hover:bg-mist phone:gap-3 phone:px-0 phone:py-3.5 phone:active:bg-mist"
+                  >
+                    <span aria-hidden="true" className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg border border-line bg-background text-foreground">
+                      <PlusIcon />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="text-label font-semibold text-foreground">{t("mainScreen.addToken")}</span>
+                      <span className="text-caption text-muted">{t("mainScreen.addTokenHint")}</span>
+                    </span>
+                    <span aria-hidden="true" className="flex-shrink-0 text-faint">
+                      <ChevronRightIcon />
+                    </span>
+                  </button>
+                ) : null;
                 return (
                   <>
                     {rows.filter((row) => !isRowHidden(row)).map(renderRow)}
@@ -1082,16 +1103,20 @@ export function MainScreenView({
                           <ChevronIcon open={hiddenExpanded} />
                         </button>
                         {hiddenExpanded ? hiddenRows.map(renderRow) : null}
+                        {addTokenRow}
                       </>
                     ) : listDocked || hiddenExpanded ? (
                       // With nothing hidden there's no accordion to open, so this is the way into Show/Hide.
-                      <button
-                        type="button"
-                        onClick={() => setHiddenExpanded((prev) => !prev)}
-                        className="px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label"
-                      >
-                        {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
-                      </button>
+                      <>
+                        {addTokenRow}
+                        <button
+                          type="button"
+                          onClick={() => setHiddenExpanded((prev) => !prev)}
+                          className={`px-3.5 py-3 text-caption text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-0 phone:text-label ${hiddenExpanded ? "ml-auto block w-fit" : ""}`}
+                        >
+                          {hiddenExpanded ? t("mainScreen.done") : t("mainScreen.editList")}
+                        </button>
+                      </>
                     ) : null}
                   </>
                 );
@@ -1275,4 +1300,20 @@ function relativeTime(t: TFunction, timestampMs: number): string {
   if (hours < 24) return t("mainScreen.hoursAgo", { count: hours });
   const days = Math.floor(hours / 24);
   return t("mainScreen.daysAgo", { count: days });
+}
+
+function PlusIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
 }

@@ -61,6 +61,7 @@ function renderMain(runtime: RuntimePort, props: Partial<Parameters<typeof MainS
         onOpenPoints={vi.fn()}
         onUseGleamOnSite={vi.fn()}
         onOpenCollectible={vi.fn()}
+        onAddToken={vi.fn()}
         {...props}
       />
     </QueryClientProvider>,
