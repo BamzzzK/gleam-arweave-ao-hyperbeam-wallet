@@ -372,22 +372,32 @@ export function createRuntime(platform: Platform): Runtime {
   }
 
   /**
-   * `walletSwitch` broadcast for an active-account change: unlike
-   * connect/disconnect (inherently one-origin actions), a wallet switch
-   * affects the whole extension, so every origin currently holding an
-   * active `Grant` gets the push — never every open tab.
-   * `getConnectedApps` is unfiltered by expiry, so this re-checks
-   * `findActiveGrant` per origin so an expired Grant is silently excluded
-   * rather than pushed to.
+   * The active address `origin` could read through `getActiveAddress`, or
+   * `null`. Pushed events carry an address only through this, so a page
+   * never hears one the pull path would refuse it.
    */
-  async function broadcastWalletSwitch(address: string): Promise<void> {
+  async function readableActiveAddress(origin: string): Promise<string | null> {
+    if (!isSecureSigningOrigin(origin)) return null;
+    const grant = await approval.findActiveGrant(origin);
+    if (!grant || missingPermissions("getActiveAddress", grant.permissions).length > 0) return null;
+    const state = await lifecycle.getState();
+    const wallet = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
+    if (!wallet || isWatchWalletMethod(wallet.method)) return null;
+    return wallet.address;
+  }
+
+  /**
+   * `walletSwitch` for an active-account change. A switch affects the whole
+   * extension, so every origin with a grant is considered, never every
+   * open tab, and each hears only the address it could read.
+   */
+  async function broadcastWalletSwitch(): Promise<void> {
     const grants = await approval.getConnectedApps();
     const origins = [...new Set(grants.map((grant) => grant.origin))];
     await Promise.all(
       origins.map(async (origin) => {
-        const activeGrant = await approval.findActiveGrant(origin);
-        if (!activeGrant) return;
-        await emitProviderEventToOrigin(origin, PROVIDER_EVENT.WALLET_SWITCH, { address });
+        const address = await readableActiveAddress(origin);
+        if (address) await emitProviderEventToOrigin(origin, PROVIDER_EVENT.WALLET_SWITCH, { address });
       }),
     );
   }
@@ -467,15 +477,8 @@ export function createRuntime(platform: Platform): Runtime {
 
       // Reached only once the user approved: a rejected or timed-out request
       // throws. ArConnect fires `connect` once connect() resolves.
-      const connectedState = await lifecycle.getState();
-      const connectedWallet = connectedState.wallets.find(
-        (candidate) => candidate.id === connectedState.activeWalletId,
-      );
-      if (connectedWallet) {
-        void emitProviderEventToOrigin(origin, PROVIDER_EVENT.CONNECT, {
-          activeAddress: connectedWallet.address,
-        });
-      }
+      const activeAddress = await readableActiveAddress(origin);
+      if (activeAddress) void emitProviderEventToOrigin(origin, PROVIDER_EVENT.CONNECT, { activeAddress });
       // A site that connected through `window.gleam` chose Gleam, so its
       // `window.arweaveWallet` stops forwarding to another installed wallet.
       await siteWallet.setUseGleam(origin, true);
@@ -746,7 +749,7 @@ export function createRuntime(platform: Platform): Runtime {
     const before = await lifecycle.getState();
     const summary = await add();
     void points.markUnlockedForVault().catch(() => {});
-    if (before.activeWalletId !== null) void broadcastWalletSwitch(summary.address);
+    if (before.activeWalletId !== null) void broadcastWalletSwitch();
     return summary;
   }
 
@@ -774,22 +777,12 @@ export function createRuntime(platform: Platform): Runtime {
       if (isLastWallet) await announceGleamSitesForgotten(revoked);
 
       const after = await lifecycle.getState();
-      if (after.activeWalletId !== before.activeWalletId) {
-        const active = after.wallets.find((candidate) => candidate.id === after.activeWalletId);
-        if (active) void broadcastWalletSwitch(active.address);
-      }
+      if (after.activeWalletId !== null && after.activeWalletId !== before.activeWalletId) void broadcastWalletSwitch();
     },
     renameWallet: (data) => lifecycle.renameWallet(data),
     switchWallet: async (data) => {
       await lifecycle.switchWallet(data);
-      // `switchWallet`'s locked signature returns `void`, so the resulting
-      // active address is derived here from `getState()` after the call
-      // resolves.
-      const state = await lifecycle.getState();
-      const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
-      if (active) {
-        void broadcastWalletSwitch(active.address);
-      }
+      void broadcastWalletSwitch();
     },
     downloadKeyfile: (data) => lifecycle.downloadKeyfile(data),
     cancelKeyfileDownload: (data) => lifecycle.cancelKeyfileDownload(data),

@@ -220,6 +220,121 @@ describe("createRuntime", () => {
     });
   });
 
+  describe("provider events carry only an address the site could read", () => {
+    const WATCHED = "w".repeat(43);
+
+    function grantFor(walletId: string, permissions: string[], origin = ORIGIN) {
+      return { origin, walletId, permissions, createdAt: Date.now(), expiresAt: null, budget: null };
+    }
+
+    async function setupTwoWallets() {
+      const context = setup();
+      context.platform.tabs.tabs = [{ id: 7, url: `${ORIGIN}/` }];
+      const first = (await context.runtime.dispatch("createWallet", { name: "One", password: "correct horse" }, EXTENSION)) as WalletSummary;
+      const second = (await context.runtime.dispatch("createWallet", { name: "Two", password: "correct horse" }, EXTENSION)) as WalletSummary;
+      await context.runtime.dispatch("switchWallet", { walletId: first.id }, EXTENSION);
+      context.platform.tabs.sent.length = 0;
+      return { ...context, first, second };
+    }
+
+    function walletSwitches(sent: Array<{ data: unknown }>) {
+      return sent.filter((entry) => (entry.data as { event?: string }).event === "walletSwitch");
+    }
+
+    it("sends walletSwitch with the new address to a site granted ACCESS_ADDRESS", async () => {
+      const { runtime, storage, first, second, platform } = await setupTwoWallets();
+      await storage.set("local:grants", [grantFor(first.id, ["ACCESS_ADDRESS"])]);
+
+      await runtime.dispatch("switchWallet", { walletId: second.id }, EXTENSION);
+
+      await vi.waitFor(() =>
+        expect(platform.tabs.sent).toContainEqual({
+          tabId: 7,
+          type: "providerEvent",
+          data: { event: "walletSwitch", data: { address: second.address } },
+        }),
+      );
+    });
+
+    it("sends no walletSwitch to a site whose grant lacks ACCESS_ADDRESS", async () => {
+      const { runtime, storage, first, second, platform } = await setupTwoWallets();
+      await storage.set("local:grants", [grantFor(first.id, ["SIGNATURE"])]);
+
+      await runtime.dispatch("switchWallet", { walletId: second.id }, EXTENSION);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(walletSwitches(platform.tabs.sent)).toEqual([]);
+    });
+
+    it("sends no walletSwitch to a plain-http site holding an older grant", async () => {
+      const { runtime, storage, first, second, platform } = await setupTwoWallets();
+      const insecure = "http://dapp.example";
+      platform.tabs.tabs = [{ id: 9, url: `${insecure}/` }];
+      await storage.set("local:grants", [grantFor(first.id, ["ACCESS_ADDRESS"], insecure)]);
+
+      await runtime.dispatch("switchWallet", { walletId: second.id }, EXTENSION);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(walletSwitches(platform.tabs.sent)).toEqual([]);
+    });
+
+    it("sends no connect event to a site that connected without ACCESS_ADDRESS", async () => {
+      const { runtime, platform } = await setupTwoWallets();
+      const present = vi.spyOn(platform.approvalPresenter, "present");
+
+      const pending = runtime.dispatch("providerCall", { method: "connect", params: { permissions: ["SIGNATURE"] } }, CONTENT_SCRIPT);
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      await runtime.dispatch("resolveApproval", { requestId: present.mock.calls[0]![0], approved: true }, EXTENSION);
+      await expect(pending).resolves.toEqual({ granted: ["SIGNATURE"] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      await expect(
+        runtime.dispatch("providerCall", { method: "getActiveAddress", params: undefined }, CONTENT_SCRIPT),
+      ).rejects.toThrow("ACCESS_ADDRESS");
+      expect(platform.tabs.sent.filter((entry) => (entry.data as { event?: string }).event === "connect")).toEqual([]);
+    });
+
+    it("sends the connect event to a site that connected with ACCESS_ADDRESS", async () => {
+      const { runtime, platform, first } = await setupTwoWallets();
+      const present = vi.spyOn(platform.approvalPresenter, "present");
+
+      const pending = runtime.dispatch("providerCall", { method: "connect", params: { permissions: ["ACCESS_ADDRESS"] } }, CONTENT_SCRIPT);
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      await runtime.dispatch("resolveApproval", { requestId: present.mock.calls[0]![0], approved: true }, EXTENSION);
+      await pending;
+
+      await vi.waitFor(() =>
+        expect(platform.tabs.sent).toContainEqual({
+          tabId: 7,
+          type: "providerEvent",
+          data: { event: "connect", data: { activeAddress: first.address } },
+        }),
+      );
+    });
+
+    it("never sends a watch wallet's address on add, switch or removal fallback", async () => {
+      const { runtime, storage, first, second, platform } = await setupTwoWallets();
+      await storage.set("local:grants", [grantFor(first.id, ["ACCESS_ADDRESS", "ACCESS_ALL_ADDRESSES"])]);
+
+      const watch = (await runtime.dispatch("addWatchWallet", { address: WATCHED }, EXTENSION)) as WalletSummary;
+      await expect(
+        runtime.dispatch("providerCall", { method: "getActiveAddress", params: undefined }, CONTENT_SCRIPT),
+      ).rejects.toThrow(WATCH_ONLY_CONNECT_REFUSAL);
+      await runtime.dispatch("switchWallet", { walletId: first.id }, EXTENSION);
+      await runtime.dispatch("switchWallet", { walletId: watch.id }, EXTENSION);
+      await runtime.dispatch("deleteWallet", { walletId: second.id }, EXTENSION);
+      await runtime.dispatch("switchWallet", { walletId: first.id }, EXTENSION);
+      await runtime.dispatch("deleteWallet", { walletId: first.id }, EXTENSION);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const addresses = walletSwitches(platform.tabs.sent).map(
+        (entry) => (entry.data as { data: { address: string } }).data.address,
+      );
+      expect(addresses).not.toContain(WATCHED);
+      expect(addresses).toContain(first.address);
+    });
+  });
+
   describe("dispatchSite", () => {
     const STATUS = { type: "gleam-points:attest-status" };
 
