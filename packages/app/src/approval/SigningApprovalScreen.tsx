@@ -70,12 +70,11 @@ function shortenProcessId(processId: string): string {
  * regardless of what `token` the amount itself is denominated in.
  *
  * An AO amount's `tokenDenomination` comes from the same balance-metadata
- * read the token list uses (`ReadsHandler.previewWatchedToken`), resolved
- * by the background before the approval window opens. That read is best-
- * effort and never blocks the approval — when it's `null` (lookup failed,
- * or hasn't happened for this token), the raw atomic integer is shown
- * as-is; `formatAmountUnit` below labels it "smallest units" so it doesn't
- * read as a scaled amount.
+ * read the token list uses (`ReadsHandler.previewWatchedToken`). That read
+ * is best-effort and unauthenticated, so a scaled amount always shows the
+ * raw quantity that gets signed under it. When it's `null` the raw atomic
+ * integer is shown as-is; `formatAmountUnit` below labels it "smallest
+ * units" so it doesn't read as a scaled amount.
  */
 function formatAmount(atomic: string | null, token: string | null, tokenDenomination: number | null): string {
   if (atomic === null) return "—";
@@ -232,6 +231,11 @@ export function SigningApprovalScreen({
                   {formatAmountUnit(preview.token, preview.tokenDenomination, preview.tokenTicker, t)}
                 </span>
               ) : null}
+              {preview.token != null && preview.tokenDenomination !== null && preview.amount !== null ? (
+                <span dir="ltr" className="break-all font-mono text-caption tabular-nums text-muted">
+                  {preview.amount}
+                </span>
+              ) : null}
             </div>
 
             <RecipientWarning
@@ -242,6 +246,8 @@ export function SigningApprovalScreen({
             />
 
             <RecipientBlock address={preview.recipient ?? ""} />
+
+            {preview.token != null ? <TokenProcessBlock processId={preview.token} /> : null}
 
             <div className="flex flex-col">
               <ReviewRow label={t("approval.fee")} value={formatFee(preview.fee)} />
@@ -401,6 +407,18 @@ function RecipientBlock({ address }: { address: string }) {
         </button>
       </div>
       <RecipientCard address={address} avatarSvg={avatarSvg} emphasisPick={emphasisPick} tone="confirm" />
+    </div>
+  );
+}
+
+/** The token is named by the process id the message targets; its ticker is whatever its creator chose. */
+function TokenProcessBlock({ processId }: { processId: string }) {
+  const t = useT();
+  const identity = useAddressIdentity();
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tokenProcess")}</span>
+      <MemorableAddress address={processId} emphasisPick={identity.emphasisPick} avatarSvg={identity.avatarSvg(processId)} />
     </div>
   );
 }

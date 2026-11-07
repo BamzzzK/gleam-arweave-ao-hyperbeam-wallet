@@ -181,6 +181,18 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
 
+  it.each<[string, Partial<SigningApprovalPreview>]>([
+    ["unscaled", {}],
+    ["scaled with a ticker", { tokenDenomination: 12, tokenTicker: "USDC" }],
+  ])("transferAoTokens shows the full token process id, %s", (_name, scale) => {
+    const token = "P".repeat(43);
+    const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, token, ...scale };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
+
+    expect(screen.getByText("Token process")).toBeTruthy();
+    expect(screen.getByText(addressText(token))).toBeTruthy();
+  });
+
   it("transferAoTokens with a resolved denomination but no ticker shows the scaled amount and a shortened process id", () => {
     const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12 };
     render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
@@ -188,6 +200,17 @@ describe("SigningApprovalScreen (6.2 signing approval)", () => {
     expect(screen.getAllByText("0.15").length).toBeGreaterThan(0);
     expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
     expect(screen.queryByText(/smallest units/i)).toBeNull();
+  });
+
+  it("transferAoTokens shows the raw quantity under a scaled amount, and only then", () => {
+    const scaled: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12, tokenTicker: "AO" };
+    const { unmount } = render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={scaled} onReject={vi.fn()} onSign={vi.fn()} />);
+    expect(screen.getByText("150000000000")).toBeTruthy();
+    unmount();
+
+    const raw: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: null };
+    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={raw} onReject={vi.fn()} onSign={vi.fn()} />);
+    expect(screen.getAllByText("150000000000").some((node) => node.classList.contains("font-mono"))).toBe(false);
   });
 
   it("transferAoTokens with a resolved ticker shows it as the unit label instead of the process id", () => {
