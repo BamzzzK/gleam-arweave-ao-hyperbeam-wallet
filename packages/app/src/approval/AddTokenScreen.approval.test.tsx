@@ -63,4 +63,20 @@ describe("AddTokenScreen", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/No HyperBEAM peer/));
     expect((screen.getByRole("button", { name: "Add token" }) as HTMLButtonElement).disabled).toBe(false);
   });
+
+  it("shows hidden characters in the ticker and name as code points in isolated runs", () => {
+    const { container } = render(
+      <AddTokenScreen
+        origin="https://bazar.arweave.net"
+        preview={{ ...PREVIEW, ticker: "A\u202eR", name: "Wrapped\u2066 AR" }}
+        onReject={vi.fn()}
+        onAdd={vi.fn()}
+      />,
+    );
+
+    const runs = Array.from(container.querySelectorAll("bdi"), (run) => run.textContent);
+    expect(runs).toContain("A<U+202E>R");
+    expect(runs).toContain("Wrapped<U+2066> AR");
+    expect(container.textContent).not.toMatch(/[\u202e\u2066]/);
+  });
 });
