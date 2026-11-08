@@ -289,10 +289,11 @@ body:has([data-layout="popup"]) {
 /*
  * A native-feeling shell: no pinch zoom (the viewport meta says so too,
  * but Android's WebView only honours the touch-action), no rubber band
- * that reveals a different colour behind the page, and no text selection
- * handles popping up on a control that was only tapped. Inputs and
- * anything marked selectable keep selection so addresses can still be
- * copied by hand.
+ * that reveals a different colour behind the page, and no text selection.
+ * Selection is off for the whole tree, not per element: on iOS a press on
+ * one figure extends the selection across its neighbours, the chart
+ * included. Addresses are copied with their copy buttons. Fields keep
+ * selection, since WebKit won't take typing in a field that has it off.
  */
 html:has([data-layout="phone"]) {
   scroll-padding-bottom: calc(6.5rem + var(--safe-bottom));
@@ -301,10 +302,16 @@ html:has([data-layout="phone"]) {
   background: var(--color-background);
 }
 
-[data-layout="phone"] :is(button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="menuitemcheckbox"], a, label, summary) {
+[data-layout="phone"] {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+[data-layout="phone"] :is(input, textarea, [contenteditable="true"]) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /*

@@ -349,9 +349,8 @@ export function PortfolioChart({
     </ChartArea>
   );
 
-  // On a phone a tap on the figures or a single-wallet chart (a plain div, not a control) starts an iOS text selection.
   return (
-    <div className={cn("flex flex-col gap-3 phone:select-none phone:[-webkit-touch-callout:none]", className)}>
+    <div className={cn("flex flex-col gap-3", className)}>
       {onRetry ? (
         <NetworkErrorBanner onRetry={onRetry} retrying={retrying} className="phone:mx-0 phone:mt-0" />
       ) : minimal ? (
