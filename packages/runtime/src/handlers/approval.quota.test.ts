@@ -159,6 +159,9 @@ describe("ApprovalHandler: pending requests stay within session storage", () => 
       unlockedWalletIds: [WALLET_ID],
     });
     await keySession.cacheKey(WALLET_ID, await generateJWK(), "abc-address");
+    await storage.set("local:grants", [
+      { origin: SITE_A, walletId: WALLET_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
 
     const pending = signDataItem(handler, SITE_A, 400_000);
     await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));

@@ -195,6 +195,9 @@ beforeEach(async () => {
   keySessionStore.set("local:wallets", [wallet]);
   storage = createWatchableStorage();
   await storage.set("local:wallets", [wallet]);
+  await storage.set("local:grants", [
+    { origin: ORIGIN, walletId: HW_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+  ]);
   presenter = createFakePresenter();
   transfer = new TransferHandler(storage, keySession, { requestTransfer: (req) => handler.requestWalletTransfer(req) });
   handler = new ApprovalHandler(storage, keySession, presenter, transfer, "https://bundler.example");
@@ -453,6 +456,69 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     presenter.userDismisses(requestId);
 
     await expect(pending).rejects.toThrow(/approval was dismissed/);
+  });
+
+  it("revoking the site's grant while waiting for the device rejects the dApp and closes the window", async () => {
+    const { pending, requestId, device } = await approveOnDevice({
+      kind: "signDataItem",
+      payload: new TextEncoder().encode("hello"),
+      dataItems: [{ data: btoa("hello") }],
+    });
+
+    await handler.revokeGrant({ origin: ORIGIN });
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toContain(requestId);
+    await expect(
+      handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) }),
+    ).rejects.toThrow(/No pending approval/);
+  });
+
+  it("a revoke landing while the device step is prepared rejects the dApp and closes the window", async () => {
+    const readGrant = handler.findActiveGrant.bind(handler);
+    let reads = 0;
+    // The second read is the device view's, made once the payloads are stored.
+    vi.spyOn(handler, "findActiveGrant").mockImplementation(async (origin) => {
+      if (++reads === 2) await handler.revokeGrant({ origin });
+      return readGrant(origin);
+    });
+    const pending = handler.requestApproval({
+      origin: ORIGIN,
+      walletId: HW_ID,
+      kind: "signDataItem",
+      payload: new TextEncoder().encode("hello"),
+      dataItems: [{ data: btoa("hello") }],
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const requestId = presenter.presented[0]!;
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The site was disconnected.");
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toContain(requestId);
+    await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
+  });
+
+  it("a device signature arriving after the site's grant is gone is not returned or posted", async () => {
+    const calls = mockNetwork();
+    const { pending, requestId, device } = await approveOnDevice({
+      kind: "dispatch",
+      payload: new TextEncoder().encode("hello"),
+      gatewayUrl: GATEWAY,
+      reward: "5000",
+      last_tx: "b".repeat(64),
+    });
+    // Gone without `revokeGrant` reaching the pending request, as when it expires.
+    await storage.set("local:grants", []);
+
+    await expect(
+      handler.submitDeviceSignature({ requestId, signatures: await deviceSign(device, deviceKey) }),
+    ).rejects.toThrow("The site was disconnected.");
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toContain(requestId);
+    expect(calls).not.toContain(`POST ${GATEWAY}:443/tx`);
   });
 
   it("submitDeviceSignature is refused for a request still in review", async () => {

@@ -507,6 +507,29 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
 
 const WALLET_SWITCHED = "The active wallet changed.";
 
+const SITE_DISCONNECTED = "The site was disconnected.";
+const DISCONNECTED_OUTCOME: ApprovalOutcome = { approved: false, error: SITE_DISCONNECTED };
+
+/** Kinds whose only effect is the result handed back: nothing is posted or stored. */
+const RESULT_ONLY_KINDS: ReadonlySet<ApprovalKind> = new Set([
+  "sign",
+  "signDataItem",
+  "batchSignDataItem",
+  "signMessage",
+  "encrypt",
+  "decrypt",
+]);
+
+/**
+ * A dApp request the site's grant let through, so it must not outlive the
+ * grant. A connect makes a new grant from the user's own approval, and a
+ * scan attestation comes from the Gleam site, which holds none.
+ */
+function needsGrant(entry: PendingApprovalRecord): boolean {
+  const kind = entry.request.kind;
+  return kind !== "connect" && kind !== "scanAttestation" && entry.request.origin !== WALLET_APPROVAL_ORIGIN;
+}
+
 /**
  * A dApp's signing request signs with the wallet that was active when it
  * was made, and its approval shows no account, so it must not outlive that
@@ -1012,7 +1035,8 @@ export class ApprovalHandler {
    * Origin -> wallet permission lookup. A connected origin's Grant must
    * still be present and unexpired for a `PROVIDER_METHODS` call to
    * proceed without a fresh approval prompt — revoking a Grant (or
-   * letting it expire) ends all access it covered.
+   * letting it expire) ends all access it covered, including requests
+   * still waiting in an approval window (`revokeGrant`, `grantLapsed`).
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
     return activeGrant(await this.loadGrants(), origin);
@@ -1266,10 +1290,16 @@ export class ApprovalHandler {
       if (!req.approved) {
         outcome = { approved: false };
       } else {
+        if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
         try {
-          if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
-          result = await this.finalizeApproval(entry);
-          outcome = { approved: true, result: toStored(result) };
+          if (await this.signsOnDevice(entry)) {
+            const view = await this.startDeviceSigning(entry);
+            if (!(await this.lapsedSince(entry))) return view;
+            outcome = DISCONNECTED_OUTCOME;
+          } else {
+            result = await this.finalizeApproval(entry);
+            outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
+          }
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
@@ -1299,11 +1329,43 @@ export class ApprovalHandler {
       current.map((candidate) => (candidate.request.requestId === requestId ? { ...candidate, outcome } : candidate)),
     );
     await this.dropPending(requestId);
-    if (outcome.error !== undefined) throw new Error(outcome.error);
+    if (outcome.error !== undefined) {
+      // Ended for the user rather than failed: nothing is left to show.
+      if (!outcome.approved) await this.presenter.dismiss(requestId);
+      throw new Error(outcome.error);
+    }
     if (outcome.approved && entry.request.kind === "scanAttestation") {
       return { shown: "scanAttestation", result: result as SiteAttestResponse };
     }
     await this.presenter.dismiss(requestId);
+  }
+
+  /** The site's grant was revoked or expired after it made this request. */
+  private async grantLapsed(entry: PendingApprovalRecord): Promise<boolean> {
+    return needsGrant(entry) && (await this.findActiveGrant(entry.request.origin)) === null;
+  }
+
+  /**
+   * `grantLapsed` once the request's work is done. A revoke landing during
+   * it skipped the record, since it was resolving. A failed read keeps
+   * what was done rather than leave the request without an outcome.
+   */
+  private async lapsedSince(entry: PendingApprovalRecord): Promise<boolean> {
+    try {
+      return await this.grantLapsed(entry);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Withholds a signature or plaintext from a site that lost its grant
+   * while it was made. A request that already posted or stored something
+   * keeps its real outcome, so the site doesn't retry and send twice.
+   */
+  private async withheldIfLapsed(entry: PendingApprovalRecord, outcome: ApprovalOutcome): Promise<ApprovalOutcome> {
+    if (!RESULT_ONLY_KINDS.has(entry.request.kind)) return outcome;
+    return (await this.lapsedSince(entry)) ? DISCONNECTED_OUTCOME : outcome;
   }
 
   private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
@@ -1392,6 +1454,7 @@ export class ApprovalHandler {
       if (!entry.device || !entry.walletId) {
         throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
+      if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
       const walletId = entry.walletId;
       const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
       const wallet = await this.hardwareWallet(walletId);
@@ -1401,7 +1464,7 @@ export class ApprovalHandler {
       let result: unknown;
       try {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
-        outcome = { approved: true, result: toStored(result) };
+        outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -1936,12 +1999,19 @@ export class ApprovalHandler {
     await Promise.all([...rejected].map((requestId) => this.presenter.dismiss(requestId)));
   }
 
-  /** Revokes a Grant — ends all access it covered immediately. */
+  /**
+   * Revokes a Grant — ends all access it covered immediately: the site's
+   * requests still waiting for approval are rejected and their windows
+   * closed. A pending connect stays, since approving it is a fresh grant.
+   * One already being resolved is caught by `lapsedSince` once its work
+   * is done (`withheldIfLapsed`).
+   */
   async revokeGrant(req: { origin: string }): Promise<void> {
     await this.updateGrants((grants) => ({
       next: grants.filter((grant) => grant.origin !== req.origin),
       result: undefined,
     }));
+    await this.rejectPendingWhere((entry) => needsGrant(entry) && entry.request.origin === req.origin, SITE_DISCONNECTED);
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */
