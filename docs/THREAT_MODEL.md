@@ -288,10 +288,11 @@ count as a finding.
   receives data over a non-https connection (for example through a
   production `connect-src` that permits a non-https scheme, or a
   `script-src` that permits a remote source).
-- **Dependency advisories that touch only development tools.** None of the
-  packages below has a patched release. `osv-scanner.toml` ignores each
-  advisory until 2027-04-16 unless noted, so the scan fails again and the
-  entry is re-checked. Every Gleam signature is RSA-PSS through WebCrypto
+- **Dependency advisories that touch only development tools.** Each
+  package below either has no patched release, or has one only in a major
+  version that the dependent pulling it in doesn't accept.
+  `osv-scanner.toml` ignores each advisory until 2027-04-16 unless noted,
+  so the scan fails again and the entry is re-checked. Every Gleam signature is RSA-PSS through WebCrypto
   (`core/signer/keys.ts`, `core/arweave/rsa-pss.ts`).
   - `elliptic` ≤ 6.6.1 (GHSA-848j-6mx2-7j84): faulty ECDSA nonces can
     leak the signing key. It enters the lockfile through
@@ -305,11 +306,20 @@ count as a finding.
   - `deepmerge` 4.3.1 (GHSA-gcqx-w48m-w2h4): it comes only through
     `wxt` → `web-ext` → `addons-linter`, a development tool, and isn't in
     the build. Its ignore runs until 2027-04-28.
+  - `minimatch` (GHSA-g3hv-75wg-m249): fixed only in 11.0.1, a major that
+    `eslint` and `typescript-estree` don't accept. It reaches only lint and
+    `web-ext` tooling, which match the repository's own globs, and isn't
+    in the build. Its ignore runs until 2027-01-31.
+  - `glob` (GHSA-3g3m-2fjr-6pw4): fixed only in 14.0.2, a major that
+    `rimraf` doesn't accept. It reaches only `@capacitor/cli` at build
+    time, which passes `rimraf` no `AbortSignal`, and isn't in the build.
+    Its ignore runs until 2027-01-31.
 
   *Still a finding if,* by any path, `.output/chrome-mv3` contains code
   from any of these packages, or shipped code signs or verifies with ECDSA or
   PKCS#1 v1.5, so the advisory's harm reaches users; or a patched
-  version of either package exists, which ends the ignore.
+  version that the dependent accepts exists for any of them, which ends
+  the ignore.
 
 ## Known limitations
 

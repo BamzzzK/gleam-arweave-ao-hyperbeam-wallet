@@ -1,6 +1,8 @@
-# Known advisories with no patched release. Remove each entry once its
-# package has a fix. ignoreUntil makes the scan fail again so the entry is
-# re-checked rather than forgotten.
+# Known advisories with no patched release, or with a fix only in a major
+# version their dependents don't accept. Each is listed with its reason in
+# docs/THREAT_MODEL.md (By design). Remove an entry once a fix its
+# dependents accept exists. ignoreUntil makes the scan fail again so the
+# entry is re-checked rather than forgotten.
 
 [[IgnoredVulns]]
 id = "GHSA-848j-6mx2-7j84"
