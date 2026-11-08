@@ -91,7 +91,7 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
       />,
     );
 
-    expect(screen.getByText("Bazar")).toBeTruthy();
+    expect(screen.getAllByText("Bazar")).toHaveLength(2);
   });
 
   it("shows the dApp-supplied appInfo name instead of the origin-derived fallback", () => {
@@ -103,7 +103,7 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
       <ConnectionRequestScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onGrant={vi.fn()} />,
     );
 
-    expect(screen.getByText("Permaswap")).toBeTruthy();
+    expect(screen.getAllByText("Permaswap")).toHaveLength(2);
     expect(screen.queryByText("Bazar")).toBeNull();
   });
 
@@ -134,5 +134,21 @@ describe("ConnectionRequestScreen (6.1 connection request)", () => {
 
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByText("B")).toBeTruthy();
+  });
+
+  it("shows bidi and zero-width characters in the site's name as code points, isolated from the copy around it", () => {
+    const preview: ConnectApprovalPreview = {
+      ...SCOPED_PREVIEW,
+      appInfo: { name: "Perma\u202eswap\u200b", logo: null },
+    };
+    const { container } = render(
+      <ConnectionRequestScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onGrant={vi.fn()} />,
+    );
+
+    const runs = Array.from(container.querySelectorAll("bdi"));
+    expect(runs).toHaveLength(2);
+    for (const run of runs) expect(run.textContent).toBe("Perma<U+202E>swap<U+200B>");
+    expect(screen.getByText(/wants to:/).textContent).toBe("Perma<U+202E>swap<U+200B> wants to:");
+    expect(container.textContent).not.toMatch(/[\u202e\u200b]/);
   });
 });

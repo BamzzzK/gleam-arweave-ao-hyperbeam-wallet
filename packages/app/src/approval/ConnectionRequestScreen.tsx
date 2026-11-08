@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ConnectApprovalPreview, PermissionType } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { useT, type MessageKey } from "../i18n";
+import { UntrustedText } from "./UntrustedText";
 
 /**
  * Ports `connection-request.html` (6.1): origin identity, "wants to:"
@@ -39,6 +40,9 @@ function faviconLetter(origin: string): string {
   }
 }
 
+/** Stands in for the site's name so the sentence can be translated whole and the name rendered as untrusted text. */
+const NAME_SLOT = "\u0000";
+
 function hostnameOf(origin: string): string {
   try {
     return new URL(origin).hostname;
@@ -54,6 +58,7 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
   const displayName = appInfo?.name?.trim() || fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1);
   const [logoFailed, setLogoFailed] = useState(false);
   const logoUrl = !logoFailed ? (appInfo?.logo ?? null) : null;
+  const [wantsBefore = "", wantsAfter = ""] = t("approval.wantsTo", { name: NAME_SLOT }).split(NAME_SLOT);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -73,11 +78,17 @@ export function ConnectionRequestScreen({ origin, preview, onReject, onGrant }: 
               {faviconLetter(origin)}
             </div>
           )}
-          <div className="text-body font-bold text-foreground">{displayName}</div>
+          <div className="text-body font-bold text-foreground">
+            <UntrustedText text={displayName} />
+          </div>
           <div className="flex items-center gap-1.5 font-mono text-caption text-muted">{hostnameOf(origin)}</div>
         </div>
 
-        <div className="text-center text-caption font-semibold text-muted">{t("approval.wantsTo", { name: displayName })}</div>
+        <div className="text-center text-caption font-semibold text-muted">
+          {wantsBefore}
+          <UntrustedText text={displayName} />
+          {wantsAfter}
+        </div>
 
         <div className="flex flex-col">
           {requestedPermissions.map((permission) => {

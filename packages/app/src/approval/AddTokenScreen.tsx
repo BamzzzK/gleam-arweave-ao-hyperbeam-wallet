@@ -6,6 +6,7 @@ import { useAddressIdentity } from "../address-identity";
 import { useT } from "../i18n";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
+import { UntrustedText } from "./UntrustedText";
 
 /**
  * A dApp's `addToken` request. Adding only lists the token, so this stays
@@ -47,9 +48,13 @@ export function AddTokenScreen({ origin, siteIcon, preview, onReject, onAdd }: A
       <div className="flex flex-1 flex-col gap-5 px-6 pb-6 pt-6 phone:px-5">
         <div className="flex flex-col items-center gap-1 py-1 text-center">
           <span className="text-[28px] font-semibold tracking-[-0.02em] text-foreground">
-            {preview.ticker ?? t("approval.unknownToken")}
+            {preview.ticker !== null ? <UntrustedText text={preview.ticker} /> : t("approval.unknownToken")}
           </span>
-          {preview.name !== null ? <span className="text-label text-muted">{preview.name}</span> : null}
+          {preview.name !== null ? (
+            <span className="text-label text-muted">
+              <UntrustedText text={preview.name} />
+            </span>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-1.5">
