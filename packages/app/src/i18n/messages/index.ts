@@ -22,6 +22,7 @@ import { receive } from "./receive";
 import { send } from "./send";
 import { settingsHome } from "./settings-home";
 import { siteWallet } from "./site-wallet";
+import { transferReview } from "./transfer-review";
 import { unlock } from "./unlock";
 import { walletDetail } from "./wallet-detail";
 import { walletSwitcher } from "./wallet-switcher";
@@ -51,6 +52,7 @@ export const NAMESPACES = {
   send,
   settingsHome,
   siteWallet,
+  transferReview,
   unlock,
   walletDetail,
   walletSwitcher,

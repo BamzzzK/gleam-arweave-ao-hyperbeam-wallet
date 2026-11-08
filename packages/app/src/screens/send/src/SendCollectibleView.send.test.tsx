@@ -96,7 +96,7 @@ describe("SendCollectibleView", () => {
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Send collectible" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await screen.findByText("Signed and sent.");
     expect(send).toHaveBeenCalledWith({
@@ -146,7 +146,7 @@ describe("SendCollectibleView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
 
     expect(await screen.findByText("Sending needs about 0.000000654321 AR for the network fee.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Send collectible" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
   it("keeps the review step and shows the error when the send fails", async () => {
@@ -158,7 +158,7 @@ describe("SendCollectibleView", () => {
 
     enterRecipient(RECIPIENT);
     fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Send collectible" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Gateway down"));
     expect(screen.getByText("Review send")).toBeTruthy();

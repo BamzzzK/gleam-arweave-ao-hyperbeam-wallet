@@ -14,7 +14,7 @@ import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
-import { useTokenPrices } from "../../main-screen/src/useTokenPrices";
+import { useOrderbookPrices, useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
 import { useArFee } from "../../activity/src/useArFee";
@@ -29,6 +29,8 @@ import { useLookalikeOf } from "./useLookalikeOf";
 import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
+import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
+import type { RecipientRisk, TransferContext, TransferRequest } from "../../../transfer-review/model";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -205,6 +207,17 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
   const currency = displaySettings?.currency;
   const tokenLogos = displaySettings?.tokenLogos ?? true;
   const tokenPricesQuery = useTokenPrices(runtime, currency);
+  // Only a token added by hand is priced from its orderbook, as on the main screen.
+  const orderbookPricesQuery = useOrderbookPrices(
+    runtime,
+    currency,
+    selectedToken !== null &&
+      selectedToken.processId !== DEFAULT_AO_TOKEN.processId &&
+      selectedToken.source !== "discovered" &&
+      selectedToken.available !== false
+      ? [selectedToken.processId]
+      : [],
+  );
   // Invalidates the shared balances/activity cache for `wallet.address` on
   // success so both Send and Main Screen reflect the updated balance
   // without a manual popup reopen, wrapping the same `submitTransfer` call
@@ -499,10 +512,19 @@ export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewPro
     return (
       <ReviewStep
         token={selectedToken}
+        wallet={wallet}
+        context={{
+          address: wallet.address,
+          balances: balancesQuery.data,
+          prices: [...(tokenPricesQuery.data ?? []), ...(orderbookPricesQuery.data ?? [])],
+          currency,
+          tokenLogos,
+          balancesHidden: displaySettings?.balancesHidden ?? false,
+          visibility: readRowVisibility(wallet.address),
+        }}
         step={step}
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
-        emphasisPick={emphasisPick}
         signsOnDevice={isHardwareWalletMethod(wallet.method)}
         onBack={() => setStep({ ...INITIAL_STEP, recipient: step.recipient })}
         onSign={() => void handleSign()}
@@ -1080,116 +1102,95 @@ function SaveAddressInline({
 
 function ReviewStep({
   token,
+  wallet,
+  context,
   step,
   contact,
   ownWallet,
-  emphasisPick,
   signsOnDevice,
   onBack,
   onSign,
 }: {
   token: TokenBalance | null;
+  wallet: WalletSummary;
+  context: TransferContext;
   step: Extract<Step, { kind: "review" }>;
   /** A saved contact for `step.recipient`, if any — a known recipient skips first-seen framing. */
   contact: Contact | undefined;
   /** One of the vault's own other wallets, if `step.recipient` is its address — same known-recipient treatment as a saved contact. */
   ownWallet: WalletSummary | undefined;
-  emphasisPick: number | null;
   /** A hardware wallet signs in the approval window the background opens; the popup may close when it takes focus. */
   signsOnDevice: boolean;
   onBack: () => void;
   onSign: () => void;
 }) {
   const t = useT();
-  const ticker = tickerFor(token);
-  // A legacy AO transfer has no sender-side fee (`estimate.fee` is `null`),
-  // so the Fee row says so rather than showing a fabricated "0 <TICKER>".
-  // An L1 token transfer's fee is AR, a different unit from the amount,
-  // so only an AR send folds the fee into its total.
-  const total =
-    step.estimate.fee === null || token !== null
-      ? step.amountAtomic
-      : (BigInt(step.amountAtomic) + BigInt(step.estimate.fee)).toString();
   // A saved contact or one of your own wallets counts as a known recipient
   // even if the backend's own activity-log-based `firstSeenRecipient`
   // check has no record of it yet (e.g. a contact saved from elsewhere, or
   // a wallet you've never actually sent to before).
   const known = contact ?? ownWallet;
-  const lookalikeOf = known ? null : (step.estimate.lookalikeOf ?? null);
-  const irreversible = (step.estimate.firstSeenRecipient && !known) || lookalikeOf !== null;
-  const knownName = contact?.name ?? ownWallet?.name;
-  const identity = useAddressIdentity();
-  const avatarSvg = identity.avatarSvg(step.recipient);
-  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
+  const risk: RecipientRisk = {
+    firstTime: step.estimate.firstSeenRecipient && !known,
+    lookalikeOf: known ? null : (step.estimate.lookalikeOf ?? null),
+  };
+  const request: TransferRequest = {
+    transfers: [
+      {
+        token: token === null ? null : token.processId,
+        ticker: tickerFor(token),
+        denomination: token === null ? 12 : token.denomination,
+        amount: step.amountAtomic,
+        recipient: step.recipient,
+        part: { tags: [], decodedData: null, payloadHash: null },
+        index: 0,
+      },
+    ],
+    others: [],
+    // A legacy AO transfer has no sender-side fee (`estimate.fee` is `null`).
+    fee: step.estimate.fee,
+    method: null,
+    itemCount: 1,
+  };
 
   return (
-    <div className="flex min-h-full flex-col">
-      <ScreenHeader title={t("send.reviewSend")} onBack={onBack} busy={step.submitting} />
-      <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
-        <div className="flex flex-col items-center gap-1 pb-1 pt-2 text-center">
-          <span className="text-[30px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-            {formatAmount(step.amountAtomic, token)} {ticker}
-          </span>
+    <TransferReview
+      header={<ScreenHeader title={t("send.reviewSend")} onBack={onBack} busy={step.submitting} />}
+      request={request}
+      from={{ name: wallet.name, address: wallet.address }}
+      toName={known?.name ?? null}
+      context={context}
+      risk={risk}
+      footer={(warned) => (
+        <div className="mt-auto flex flex-col px-6 phone:px-5">
+          <ScreenFooter pinned={false} className="pb-6 pt-5">
+            {warned ? null : <p className="text-center text-label text-muted">{t("send.cannotBeUndone")}</p>}
+            <ReviewButtons
+              secondaryLabel={t("transferReview.cancel")}
+              onSecondary={onBack}
+              primaryLabel={
+                step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("transferReview.send")
+              }
+              onPrimary={onSign}
+              warned={warned}
+              busy={step.submitting}
+              className="mt-0 p-0 phone:px-0"
+            />
+          </ScreenFooter>
         </div>
-
-        {irreversible ? (
-          <RecipientWarning
-            firstTime={step.estimate.firstSeenRecipient && !known}
-            lookalikeOf={lookalikeOf}
-            lookalikeAvatarSvg={lookalikeAvatarSvg}
-            emphasisPick={emphasisPick}
-          />
-        ) : null}
-
-        <div className="flex flex-col gap-1.5">
-          <span className="text-label font-semibold text-muted">{t("send.to")}</span>
-          <RecipientCard
-            address={step.recipient}
-            name={knownName ?? null}
-            avatarSvg={avatarSvg}
-            emphasisPick={emphasisPick}
-            tone="confirm"
-          />
+      )}
+    >
+      {step.error ? (
+        <div role="alert" className="text-label leading-snug text-warning">
+          {step.error}
         </div>
-
-        <div className="flex flex-col">
-          <ReviewRow
-            label={t("send.fee")}
-            value={step.estimate.fee === null ? t("send.noNetworkFee") : `${formatWinstonAsAr(step.estimate.fee, 12)} AR`}
-          />
-          <ReviewRow label={t("send.total")} value={`${formatAmount(total, token)} ${ticker}`} strong />
-        </div>
-
-        {step.error ? (
-          <div role="alert" className="text-label leading-snug text-warning">
-            {step.error}
-          </div>
-        ) : null}
-
-        {step.submitting && signsOnDevice ? (
-          <p role="status" className="text-label leading-snug text-muted">
-            {t("send.approveOnDevice")}
-          </p>
-        ) : null}
-
-        <ScreenFooter pinned={false}>
-          {irreversible ? null : <p className="text-center text-label text-muted">{t("send.cannotBeUndone")}</p>}
-          <Button
-            type="button"
-            variant={irreversible ? "destructive" : "primary"}
-            disabled={step.submitting}
-            aria-busy={step.submitting}
-            onClick={onSign}
-          >
-            {step.submitting
-              ? signsOnDevice
-                ? t("send.waitingForApproval")
-                : t("send.sending")
-              : t("send.sendAmount", { amount: formatAmount(step.amountAtomic, token), ticker })}
-          </Button>
-        </ScreenFooter>
-      </div>
-    </div>
+      ) : null}
+      {step.submitting && signsOnDevice ? (
+        <p role="status" className="text-label leading-snug text-muted">
+          {t("send.approveOnDevice")}
+        </p>
+      ) : null}
+    </TransferReview>
   );
 }
 

@@ -1,18 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview } from "@gleam/core";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { WALLET_APPROVAL_ORIGIN, type SigningApprovalPreview, type TokenBalance } from "@gleam/core";
+import { DEFAULT_AO_TOKEN } from "@gleam/ui";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
-import { SigningApprovalScreen } from "./SigningApprovalScreen";
+import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
+import { groupDigits, type TransferContext } from "../transfer-review/model";
+import { SigningApprovalScreen, type SigningApprovalScreenProps } from "./SigningApprovalScreen";
 
 afterEach(() => {
   cleanup();
 });
 
-// Winston atomic-integer strings, matching what `background/index.ts`
-// actually puts on the wire: 50 AR and an 0.0008 AR fee.
-const TRANSFER_PREVIEW: SigningApprovalPreview = {
+const RECIPIENT = "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kL";
+const SECOND_RECIPIENT = "Lm8sQe3Rt5Yu7Io9Pa1Sd3Fg5Hj7Kl9Zx1Cv3Bn5Mq";
+const FROM = { name: "Main", address: "Gx7cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk2Qa" };
+const AO = DEFAULT_AO_TOKEN.processId as string;
+const WAR = "W".repeat(43);
+const KNOWN = { firstTime: false, lookalikeOf: null };
+
+// Winston atomic-integer strings, matching what the background puts on the
+// wire: 50 AR and an 0.0008 AR fee.
+const AR_PREVIEW: SigningApprovalPreview = {
   kind: "dispatch",
-  recipient: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
+  recipient: RECIPIENT,
   amount: "50000000000000",
   fee: "800000000",
   token: null,
@@ -24,17 +35,20 @@ const TRANSFER_PREVIEW: SigningApprovalPreview = {
   items: null,
 };
 
-const AO_TRANSFER_PREVIEW: SigningApprovalPreview = {
+const AO_PREVIEW: SigningApprovalPreview = {
   kind: "transferAoTokens",
-  recipient: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
-  amount: "1000",
+  recipient: RECIPIENT,
+  amount: "1500000000000",
   fee: null,
-  token: "ao-process-id-abcdef1234",
-  tokenDenomination: null,
-  tokenTicker: null,
+  token: AO,
+  tokenDenomination: 12,
+  tokenTicker: "AO",
   decodedData: "",
-  tags: [],
-  payloadHash: "7f3a2e9c1b6d4f80a5e2c7b91d3f6a8e0c4b7d2f9a1e6c3b8d5f0a2e7c9b4d1f",
+  tags: [
+    { name: "Action", value: "Transfer" },
+    { name: "Recipient", value: RECIPIENT },
+  ],
+  payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
   items: null,
 };
 
@@ -46,303 +60,366 @@ const MESSAGE_PREVIEW: SigningApprovalPreview = {
   token: null,
   tokenDenomination: null,
   tokenTicker: null,
-  decodedData: '{"Action":"Transfer"}',
-  tags: [{ name: "Action", value: "Transfer" }],
+  decodedData: '{"Action":"Eval"}',
+  tags: [{ name: "Action", value: "Eval" }],
   payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
   items: null,
 };
 
-const BATCH_PREVIEW: SigningApprovalPreview = {
-  kind: "batchSignDataItem",
-  recipient: null,
-  amount: null,
-  fee: null,
-  token: null,
-  tokenDenomination: null,
-  tokenTicker: null,
-  decodedData: '{"Action":"Transfer"}',
-  tags: [{ name: "Action", value: "Transfer" }],
-  payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
-  items: [
-    {
-      decodedData: '{"Action":"Transfer"}',
-      tags: [{ name: "Action", value: "Transfer" }],
-      target: null,
-      payloadHash: "1a9d4f7c2e5b8a0f3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c",
-    },
-    {
-      decodedData: '{"Action":"Notify"}',
-      tags: [{ name: "Action", value: "Notify" }],
-      target: "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kLp",
-      payloadHash: "2b8e5f0a3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c1a9d4f7c",
-    },
+function balance(processId: string, ticker: string, quantity: string, denomination = 12): TokenBalance {
+  return { address: FROM.address, processId, ticker, denomination, name: ticker, quantity, source: "watched" };
+}
+
+const CONTEXT: TransferContext = {
+  address: FROM.address,
+  currency: "USD",
+  tokenLogos: false,
+  balances: {
+    arBalance: "100000000000000",
+    tokenBalances: [balance(AO, "AO", "12250000000000"), balance(WAR, "wAR", "1450000000000")],
+  },
+  prices: [
+    { processId: null, price: 8.7, change24h: null },
+    { processId: AO, price: 8.4, change24h: null },
+    { processId: WAR, price: 8.72, change24h: null },
   ],
 };
 
-describe("SigningApprovalScreen (6.2 signing approval)", () => {
-  it("shows a collectible send's thumbnail, name, recipient and network fee instead of an amount", () => {
-    render(
-      <SigningApprovalScreen
-        origin={WALLET_APPROVAL_ORIGIN}
-        preview={{
-          ...TRANSFER_PREVIEW,
-          kind: "transfer",
-          amount: "0",
-          fee: "654321",
-          collectible: { id: "asset", name: "Beam #1", imageUrl: "https://arweave.net/asset" },
-        }}
-        onReject={vi.fn()}
-        onSign={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("Beam #1")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
-    expect(screen.getByText(addressText(TRANSFER_PREVIEW.recipient!))).toBeTruthy();
-    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
-    expect(screen.queryByText("Total")).toBeNull();
+function renderScreen(props: Partial<SigningApprovalScreenProps> & { preview: SigningApprovalPreview }) {
+  const all: SigningApprovalScreenProps = {
+    origin: "https://dapp.example",
+    assessment: KNOWN,
+    from: FROM,
+    context: CONTEXT,
+    onReject: vi.fn(),
+    onSign: vi.fn().mockResolvedValue(undefined),
+    ...props,
+  };
+  render(<SigningApprovalScreen {...all} />);
+  return all;
+}
+
+/** Matches the innermost element whose text is exactly `text`; Testing Library would fold its narrow no-break spaces. */
+function exact(text: string) {
+  return (_content: string, element: Element | null): boolean =>
+    element !== null && element.textContent === text && !Array.from(element.children).some((child) => child.textContent === text);
+}
+
+function exactGroup(atomic: string) {
+  return exact(groupDigits(atomic));
+}
+
+function primary(name: RegExp | string) {
+  return screen.getByRole("button", { name });
+}
+
+function openDetails() {
+  fireEvent.click(screen.getByRole("button", { name: /^Details/ }));
+}
+
+describe("SigningApprovalScreen transfer layout: AO token", () => {
+  it("shows the header, amount, fiat, From and the full To, token, fee and balance after", () => {
+    renderScreen({ preview: AO_PREVIEW });
+
+    expect(screen.getByText("https://")).toBeTruthy();
+    expect(screen.getByText("dapp.example")).toBeTruthy();
+    expect(screen.getByText("Transfer request")).toBeTruthy();
+    expect(screen.getByText("1.5")).toBeTruthy();
+    expect(screen.getAllByText("AO").length).toBeGreaterThan(0);
+    expect(screen.getByText(`≈ ${formatCurrencyValue(1.5 * 8.4, "USD")}`)).toBeTruthy();
+    expect(screen.getByText("Main")).toBeTruthy();
+    expect(screen.getByText("Gx7c…k2Qa")).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
+    expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
+    expect(screen.getByText("10.75 AO")).toBeTruthy();
   });
 
-  it("shows the full recipient address, never truncated", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByText(addressText(TRANSFER_PREVIEW.recipient!))).toBeTruthy();
+  it("shows the site's icon when its grant has one, and the letter tile otherwise", () => {
+    renderScreen({ preview: AO_PREVIEW, siteIcon: "https://dapp.example/icon.png" });
+    expect(document.querySelector('img[src="https://dapp.example/icon.png"]')).not.toBeNull();
+    expect(screen.queryByText("D")).toBeNull();
+    cleanup();
+    renderScreen({ preview: AO_PREVIEW });
+    expect(screen.getByText("D")).toBeTruthy();
   });
 
-  it("shows the signing payload hash with its own copy affordance", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
+  it("puts the raw atomic amount, digit-grouped, in the collapsed Details button", () => {
+    renderScreen({ preview: AO_PREVIEW });
+    const details = screen.getByRole("button", { name: /^Details/ });
+    expect(details.getAttribute("aria-expanded")).toBe("false");
+    expect(within(details).getByText(exactGroup("1500000000000")).getAttribute("dir")).toBe("ltr");
+    expect(groupDigits("1500000000000")).toBe("1 500 000 000 000");
+  });
 
-    expect(screen.getByText(TRANSFER_PREVIEW.payloadHash)).toBeTruthy();
+  it("expands Details to the full process id, the method and every tag", () => {
+    renderScreen({ preview: AO_PREVIEW });
+    expect(screen.queryByText(AO)).toBeNull();
+    openDetails();
+    expect(screen.getByRole("button", { name: /^Details/ }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText(AO)).toBeTruthy();
+    expect(screen.getByText("Raw units")).toBeTruthy();
+    expect(screen.getAllByText(exactGroup("1500000000000"))).toHaveLength(2);
+    expect(screen.getByText("transferAoTokens")).toBeTruthy();
+    expect(screen.queryByText("Transfer")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "View all 2 tags" }));
+    expect(screen.getByText("Transfer")).toBeTruthy();
+    expect(screen.getByText(AO_PREVIEW.payloadHash)).toBeTruthy();
     expect(screen.getByRole("button", { name: /copy signing payload/i })).toBeTruthy();
   });
 
-  it("treats a value transfer as Irreversible tier: shows the risk notice and a destructive-styled primary action", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByRole("alert").textContent).toMatch(/cannot be undone/i);
+  it("hides the fiat line and the balance after when they aren't known", () => {
+    renderScreen({ preview: AO_PREVIEW, context: {} });
+    expect(screen.queryByText(/≈/)).toBeNull();
+    expect(screen.queryByText("Balance after")).toBeNull();
   });
 
-  it("shows decoded data and tags for a non-transfer signDataItem request, without a risk notice", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={MESSAGE_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByText(/"Action":"Transfer"/)).toBeTruthy();
-    expect(screen.getByText("Transfer")).toBeTruthy();
-    expect(screen.queryByRole("alert")).toBeNull();
+  it("masks the balance after while balances are hidden", () => {
+    renderScreen({ preview: AO_PREVIEW, context: { ...CONTEXT, balancesHidden: true } });
+    expect(screen.getByText(HIDDEN_AMOUNT)).toBeTruthy();
   });
 
-  it("calls onSign immediately on click, no password required", async () => {
-    const onSign = vi.fn().mockResolvedValue(undefined);
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={onSign} />,
-    );
-
-    const signButton = screen.getByRole("button", { name: /sign and send/i });
-    expect(signButton).toHaveProperty("disabled", false);
-
-    fireEvent.click(signButton);
-    expect(onSign).toHaveBeenCalledWith();
+  it("names a token by its shortened id when its ticker only echoes the id back", () => {
+    renderScreen({ preview: { ...AO_PREVIEW, token: WAR, tokenTicker: WAR }, context: {} });
+    expect(screen.getAllByText("WWWWWW…WWWW").length).toBeGreaterThan(0);
   });
+});
 
-  it("surfaces a signing failure inline rather than closing the screen", async () => {
-    const onSign = vi.fn().mockRejectedValue(new Error("Signing kind not implemented yet"));
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={onSign} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /sign and send/i }));
-
-    await screen.findByText(/signing kind not implemented yet/i);
-  });
-
-  it("calls onReject from the Reject button", () => {
-    const onReject = vi.fn();
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={onReject} onSign={vi.fn()} />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
-    expect(onReject).toHaveBeenCalledTimes(1);
-  });
-
-  it("transferAoTokens with no resolved denomination shows the raw atomic amount and a smallest-units label", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={AO_TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getAllByText(AO_TRANSFER_PREVIEW.amount!).length).toBeGreaterThan(0);
-    expect(screen.getByText(/smallest units/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
-  });
-
-  it("transferAoTokens with a resolved denomination but no ticker shows the scaled amount and a shortened process id", () => {
-    const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12 };
-    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-
-    expect(screen.getAllByText("0.15").length).toBeGreaterThan(0);
-    expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
-    expect(screen.queryByText(/smallest units/i)).toBeNull();
-  });
-
-  it("transferAoTokens with a resolved ticker shows it as the unit label instead of the process id", () => {
-    const preview: SigningApprovalPreview = {
-      ...AO_TRANSFER_PREVIEW,
-      amount: "150000000000",
-      tokenDenomination: 12,
-      tokenTicker: "AO",
-    };
-    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-
-    expect(screen.getAllByText("0.15").length).toBeGreaterThan(0);
-    expect(screen.getByText("AO")).toBeTruthy();
-    expect(screen.queryByText(/ao-pro.*1234/i)).toBeNull();
-  });
-
-  it("transferAoTokens whose ticker is just its own process id echoed back falls back to the shortened process id", () => {
-    const preview: SigningApprovalPreview = {
-      ...AO_TRANSFER_PREVIEW,
-      amount: "150000000000",
-      tokenDenomination: 12,
-      tokenTicker: AO_TRANSFER_PREVIEW.token,
-    };
-    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-
-    expect(screen.getByText(/ao-pro.*1234/i)).toBeTruthy();
-  });
-
-  it("transferAoTokens's Total row shows the scaled amount, matching the amount above it, once the denomination is known", () => {
-    const preview: SigningApprovalPreview = { ...AO_TRANSFER_PREVIEW, amount: "150000000000", tokenDenomination: 12 };
-    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-
-    expect(screen.getAllByText("0.15").length).toBeGreaterThan(1);
-  });
-
-  it("batchSignDataItem lists every item's decoded data, target and tags, not just the first", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={BATCH_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByText(/"Action":"Transfer"/)).toBeTruthy();
-    expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
-    expect(screen.getByText("Notify")).toBeTruthy();
-    expect(screen.getByText(addressText(BATCH_PREVIEW.items![1]!.target!))).toBeTruthy();
-  });
-
-  it("batchSignDataItem shows the item count in the heading and the sign action", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={BATCH_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByText(/2 items to sign/i)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
-  });
-
-  it("a sign/dispatch preview with no token shows no token-identity line", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.queryByText(/…/)).toBeNull();
-  });
-
-  it("formats a sign/dispatch preview's raw Winston amount and fee as AR, and totals them", () => {
-    render(
-      <SigningApprovalScreen origin="https://bazar.arweave.net" preview={TRANSFER_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    // amount: 50000000000000 Winston -> "50", fee: 800000000 Winston -> "0.0008"
+describe("SigningApprovalScreen transfer layout: AR", () => {
+  it("says AR for the token, the fee in AR, and takes amount and fee off the balance", () => {
+    renderScreen({ preview: AR_PREVIEW });
     expect(screen.getByText("50")).toBeTruthy();
-    expect(screen.getByText("0.0008")).toBeTruthy();
-    // Total = 50 + 0.0008 = 50.0008 AR
-    expect(screen.getByText("50.0008")).toBeTruthy();
+    expect(screen.getAllByText("AR").length).toBeGreaterThan(1);
+    expect(screen.getByText("0.0008 AR")).toBeTruthy();
+    expect(screen.getByText("49.9992 AR")).toBeTruthy();
+    expect(screen.getByText(`≈ ${formatCurrencyValue(50 * 8.7, "USD")}`)).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: /^Details/ })).getByText(exactGroup("50000000000000"))).toBeTruthy();
   });
 
   it("shows a tiny amount and fee exactly, not rounded to 0", () => {
-    const preview: SigningApprovalPreview = { ...TRANSFER_PREVIEW, amount: "10000000", fee: "46409930" };
-    const { container } = render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-    expect(container.textContent).toContain("0.00001");
-    expect(container.textContent).toContain("0.00004640993");
-    expect(container.textContent).toContain("0.00005640993");
+    renderScreen({ preview: { ...AR_PREVIEW, amount: "10000000", fee: "46409930" } });
+    expect(screen.getByText("0.00001")).toBeTruthy();
+    expect(screen.getByText("0.00004640993 AR")).toBeTruthy();
   });
 
-  it("shows a placeholder rather than a raw Winston string when fee is unknown", () => {
-    const preview: SigningApprovalPreview = { ...TRANSFER_PREVIEW, fee: null };
-    render(<SigningApprovalScreen origin="https://bazar.arweave.net" preview={preview} onReject={vi.fn()} onSign={vi.fn()} />);
-
-    expect(screen.getByText("—")).toBeTruthy();
+  it("leaves out a fiat line priced in the token being sent", () => {
+    renderScreen({ preview: AR_PREVIEW, context: { ...CONTEXT, currency: "AR" } });
+    expect(screen.queryByText(/≈/)).toBeNull();
   });
-});
 
-describe("SigningApprovalScreen: a send from the wallet itself", () => {
-  const WALLET_SEND_PREVIEW: SigningApprovalPreview = {
-    ...TRANSFER_PREVIEW,
-    kind: "transfer",
-    decodedData: "",
-    tags: [],
-    payloadHash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  };
-
-  it("shows Gleam, the send's amount, recipient and fee, and no empty payload sections", () => {
-    render(
-      <SigningApprovalScreen origin={WALLET_APPROVAL_ORIGIN} preview={WALLET_SEND_PREVIEW} onReject={vi.fn()} onSign={vi.fn()} />,
-    );
-
-    expect(screen.getByText("Gleam")).toBeTruthy();
-    expect(screen.getAllByText("Send").length).toBeGreaterThan(0);
-    expect(screen.getByText(addressText(WALLET_SEND_PREVIEW.recipient!))).toBeTruthy();
-    expect(screen.getByText("Fee")).toBeTruthy();
-    expect(screen.queryByText("Decoded data")).toBeNull();
-    expect(screen.queryByText("Tags")).toBeNull();
-    expect(screen.queryByText(/Signing payload/)).toBeNull();
-    expect(screen.queryByText(WALLET_SEND_PREVIEW.payloadHash)).toBeNull();
+  it("names the method in Details", () => {
+    renderScreen({ preview: AR_PREVIEW });
+    openDetails();
+    expect(screen.getByText("dispatch")).toBeTruthy();
+    expect(screen.getByText(AR_PREVIEW.payloadHash)).toBeTruthy();
   });
 });
 
-describe("SigningApprovalScreen recipient warnings", () => {
-  const known = "xU9zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk3kLp";
-
-  function renderWith(assessment: { firstTime: boolean; lookalikeOf: string | null }) {
-    render(
-      <SigningApprovalScreen
-        origin="https://dapp.example"
-        preview={TRANSFER_PREVIEW}
-        assessment={assessment}
-        onReject={vi.fn()}
-        onSign={vi.fn()}
-      />,
-    );
-  }
-
-  it("names the address a lookalike recipient imitates", () => {
-    renderWith({ firstTime: true, lookalikeOf: known });
-    expect(screen.getByText(/looks familiar, but is different/)).toBeTruthy();
-    expect(screen.getByText(addressText(known))).toBeTruthy();
-    expect(screen.getByRole("button", { name: /sign and send/i }).hasAttribute("disabled")).toBe(false);
+describe("SigningApprovalScreen primary action and warning", () => {
+  it("is black, with no warning box, for a recipient sent to before", () => {
+    renderScreen({ preview: AO_PREVIEW });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(primary("Sign").className).toContain("bg-foreground");
+    expect(primary("Sign").className).not.toContain("bg-warning");
   });
 
-  it("flags a first-time recipient", () => {
-    renderWith({ firstTime: true, lookalikeOf: null });
-    expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+  it("is red under the warning box for a first-time recipient", () => {
+    renderScreen({ preview: AO_PREVIEW, assessment: { firstTime: true, lookalikeOf: null } });
+    expect(screen.getByRole("alert").textContent).toMatch(/haven't sent to this address before/);
+    expect(primary("Sign").className).toContain("bg-warning");
   });
 
-  it("folds every reason into one notice that says \"cannot be undone\" once", () => {
-    renderWith({ firstTime: true, lookalikeOf: known });
+  it("still warns, in red, when the recipient lookup failed", () => {
+    renderScreen({ preview: AO_PREVIEW, assessment: null });
+    expect(screen.getByRole("alert").textContent).toMatch(/cannot be undone/i);
+    expect(primary("Sign").className).toContain("bg-warning");
+  });
+
+  it("names the address a lookalike recipient imitates, in one notice that says \"cannot be undone\" once", () => {
+    const known = "xU9zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk3kL";
+    renderScreen({ preview: AO_PREVIEW, assessment: { firstTime: true, lookalikeOf: known } });
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const text = screen.getByRole("alert").textContent ?? "";
     expect(text.match(/cannot be undone/gi)).toHaveLength(1);
-    expect(text).toMatch(/haven't sent to this address before/);
     expect(text).toMatch(/looks familiar, but is different/);
+    expect(screen.getByText(addressText(known))).toBeTruthy();
+    expect(primary("Sign").hasAttribute("disabled")).toBe(false);
   });
 
-  it("shows no recipient warning for a known recipient", () => {
-    renderWith({ firstTime: false, lookalikeOf: null });
-    expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
-    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+  it("calls onSign on click, and shows a failure inline", async () => {
+    const onSign = vi.fn().mockRejectedValue(new Error("Signing kind not implemented yet"));
+    renderScreen({ preview: AO_PREVIEW, onSign });
+    fireEvent.click(primary("Sign"));
+    expect(onSign).toHaveBeenCalledWith();
+    await screen.findByText(/signing kind not implemented yet/i);
+  });
+
+  it("calls onReject from Reject", () => {
+    const props = renderScreen({ preview: AO_PREVIEW });
+    fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+    expect(props.onReject).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SigningApprovalScreen transfer layout: unknown scale", () => {
+  const UNKNOWN: SigningApprovalPreview = { ...AO_PREVIEW, token: WAR, tokenDenomination: null, tokenTicker: "wAR" };
+
+  it("shows the amount in raw units, a ? glyph and the full token id", () => {
+    renderScreen({ preview: UNKNOWN });
+    expect(screen.getAllByText(exactGroup("1500000000000")).length).toBe(2);
+    expect(screen.getByText("raw units")).toBeTruthy();
+    expect(screen.getByText("?")).toBeTruthy();
+    expect(screen.getByText(WAR)).toBeTruthy();
+    expect(screen.queryByText("wAR")).toBeNull();
+    expect(screen.queryByText(/≈/)).toBeNull();
+  });
+
+  it("warns that the token states no decimals, even for a known recipient, and turns Sign red", () => {
+    renderScreen({ preview: UNKNOWN });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/doesn't say how many decimals it uses/);
+    expect(alert.textContent).not.toMatch(/haven't sent to this address before/);
+    expect(primary("Sign").className).toContain("bg-warning");
+  });
+
+  it("shows the balance after unscaled", () => {
+    renderScreen({ preview: UNKNOWN, context: { balances: { arBalance: "0", tokenBalances: [balance(WAR, "wAR", "5000000000000")] } } });
+    expect(screen.getByText(exactGroup("3500000000000"))).toBeTruthy();
+  });
+});
+
+describe("SigningApprovalScreen transfer layout: collectible and Gleam's own send", () => {
+  const WALLET_SEND: SigningApprovalPreview = {
+    ...AR_PREVIEW,
+    kind: "transfer",
+    amount: "0",
+    fee: "654321",
+    decodedData: "",
+    collectible: { id: "N".repeat(43), name: "Beam #1", imageUrl: "https://arweave.net/asset" },
+  };
+
+  it("shows the thumbnail, name and 1 item instead of an amount, under Gleam's header", () => {
+    renderScreen({ origin: WALLET_APPROVAL_ORIGIN, preview: WALLET_SEND });
+    expect(screen.getByText("Gleam")).toBeTruthy();
+    expect(screen.getByText("Send collectible")).toBeTruthy();
+    expect(screen.getByText("Beam #1")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    expect(screen.getByText("1 item")).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
+    expect(screen.getByText("NNNNNN…NNNN")).toBeTruthy();
+    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: /^Details/ })).getByText("1")).toBeTruthy();
+  });
+
+  it("offers Cancel and Send, and calls the method a wallet send with no payload hash", () => {
+    renderScreen({ origin: WALLET_APPROVAL_ORIGIN, preview: { ...AR_PREVIEW, kind: "transfer" } });
+    expect(screen.getByText("Gleam")).toBeTruthy();
+    expect(screen.getAllByText("Send").length).toBe(2);
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+    openDetails();
+    expect(screen.getByText("Wallet send")).toBeTruthy();
+    expect(screen.queryByText(/Signing payload/)).toBeNull();
+  });
+});
+
+describe("SigningApprovalScreen transfer layout: data items", () => {
+  const ITEM_TRANSFER = {
+    decodedData: null,
+    tags: [{ name: "Action", value: "Transfer" }],
+    target: AO,
+    payloadHash: "2b8e5f0a3c6d9b2e5a8f1c4d7b0e3a6c9f2b5d8e1a4c7f0b3d6e9a2c1a9d4f7c",
+    transfer: { token: AO, recipient: RECIPIENT, amount: "1500000000000", tokenDenomination: 12, tokenTicker: "AO" },
+  };
+
+  it("reads a single signDataItem that carries a transfer as that transfer", () => {
+    renderScreen({ preview: { ...MESSAGE_PREVIEW, items: [ITEM_TRANSFER] } });
+    expect(screen.getByText("Transfer request")).toBeTruthy();
+    expect(screen.getByText("1.5")).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
+    expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
+    openDetails();
+    expect(screen.getByText("signDataItem")).toBeTruthy();
+    expect(screen.getByText(ITEM_TRANSFER.payloadHash)).toBeTruthy();
+    expect(primary("Sign")).toBeTruthy();
+  });
+
+  it("shows a batch as one card per transfer, the total value, and plain cards for the rest", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [
+        ITEM_TRANSFER,
+        {
+          ...ITEM_TRANSFER,
+          target: WAR,
+          transfer: { token: WAR, recipient: SECOND_RECIPIENT, amount: "250000000000", tokenDenomination: 12, tokenTicker: "wAR" },
+        },
+        { decodedData: '{"Action":"Notify"}', tags: [{ name: "Action", value: "Notify" }], target: null, payloadHash: "f".repeat(64), transfer: null },
+      ],
+    };
+    renderScreen({ preview });
+    expect(screen.getByText("2 transfers")).toBeTruthy();
+    expect(screen.getByText(`≈ ${formatCurrencyValue(1.5 * 8.4 + 0.25 * 8.72, "USD")}`)).toBeTruthy();
+    expect(screen.getByText("Total value")).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
+    expect(screen.getByText(addressText(SECOND_RECIPIENT))).toBeTruthy();
+    expect(screen.getByText("0.25")).toBeTruthy();
+    expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
+    expect(screen.getByText("Main")).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
+    expect(screen.getByText("10.75 AO · 1.2 wAR")).toBeTruthy();
+    expect(within(screen.getByRole("button", { name: /^Details/ })).getByText("batchSignDataItem · 3 items")).toBeTruthy();
+    expect(primary("Sign 3")).toBeTruthy();
+  });
+
+  it("leaves out the total value unless every transfer is priced", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [
+        ITEM_TRANSFER,
+        { ...ITEM_TRANSFER, transfer: { ...ITEM_TRANSFER.transfer, token: "U".repeat(43), tokenTicker: "UNP" } },
+      ],
+    };
+    renderScreen({ preview });
+    expect(screen.queryByText("Total value")).toBeNull();
+    expect(screen.getByText(`≈ ${formatCurrencyValue(1.5 * 8.4, "USD")}`)).toBeTruthy();
+  });
+});
+
+describe("SigningApprovalScreen: requests that move nothing", () => {
+  it("shows decoded data, tags and the payload hash under the same header, without a warning", () => {
+    renderScreen({ preview: MESSAGE_PREVIEW });
+    expect(screen.getByText("dapp.example")).toBeTruthy();
+    expect(screen.getAllByText("Sign message").length).toBe(2);
+    expect(screen.getByText(/"Action":"Eval"/)).toBeTruthy();
+    expect(screen.getByText("Eval")).toBeTruthy();
+    expect(screen.getByText(MESSAGE_PREVIEW.payloadHash)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("button", { name: "Sign message" }).className).not.toContain("bg-warning");
+    expect(screen.queryByText("Network fee")).toBeNull();
+  });
+
+  it("lists every item of a batch with no transfer in it", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [
+        { decodedData: '{"Action":"Eval"}', tags: [], target: null, payloadHash: "a".repeat(64), transfer: null },
+        { decodedData: '{"Action":"Notify"}', tags: [{ name: "Action", value: "Notify" }], target: RECIPIENT, payloadHash: "b".repeat(64), transfer: null },
+      ],
+    };
+    renderScreen({ preview });
+    expect(screen.getByText(/2 items to sign/i)).toBeTruthy();
+    expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
+    expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
+    expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
+  });
+
+  it.each(["sign", "dispatch"] as const)("shows the fee of a %s with no recipient", (kind) => {
+    renderScreen({ preview: { ...AR_PREVIEW, kind, recipient: null, amount: null, fee: "900000000000000" } });
+    expect(screen.getByText("Network fee")).toBeTruthy();
+    expect(screen.getByText("900 AR")).toBeTruthy();
   });
 });

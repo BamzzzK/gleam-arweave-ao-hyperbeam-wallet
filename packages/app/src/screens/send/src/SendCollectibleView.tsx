@@ -13,19 +13,20 @@ import {
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { CollectibleThumbnail, RecipientCard, RecipientWarning } from "@gleam/ui/src/components/wallet/index.ts";
+import { CollectibleThumbnail } from "@gleam/ui/src/components/wallet/index.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { t, useT } from "../../../i18n";
-import { formatWinstonAsAr } from "../../main-screen/src/formatWinston";
 import { useActivity } from "../../activity/src/useActivity";
 import { useContacts, useSaveContact } from "../../activity/src/useContacts";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
-import { namedSuggestions, RecipientField, ReviewRow, SavedAddressesStep, SuccessStep } from "./SendView";
+import { namedSuggestions, RecipientField, SavedAddressesStep, SuccessStep } from "./SendView";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
+import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
+import type { TransferRequest } from "../../../transfer-review/model";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
@@ -60,9 +61,6 @@ const composeStep = (recipient = ""): Extract<Step, { kind: "compose" }> => ({
   showSaveAddress: false,
   saveAddressName: "",
 });
-
-/** Fees are often below 0.0001 AR, which the default four digits would show as 0. */
-const FEE_DIGITS = 12;
 
 function recipientError(recipient: string, ownAddress: string, assetId: string): string | undefined {
   const result = recipientSchema.safeParse(recipient);
@@ -100,10 +98,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     contactsQuery.data ?? [],
     otherWalletsQuery.data ?? [],
   );
-  const reviewRecipient = step.kind === "review" ? step.recipient : null;
   const lookalikeOf = step.kind === "review" ? (step.estimate.lookalikeOf ?? null) : null;
-  const avatarSvg = reviewRecipient ? identity.avatarSvg(reviewRecipient) : "";
-  const lookalikeAvatarSvg = lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined;
 
   if (step.kind === "compose") {
     const unsupported = capabilityRefusal(wallet.method, "signTransaction", "send collectibles");
@@ -219,7 +214,6 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
   if (step.kind === "review") {
     const known = contactFor(step.recipient) ?? ownWalletFor(step.recipient);
     const shownLookalikeOf = known ? null : lookalikeOf;
-    const irreversible = (step.estimate.firstSeenRecipient && !known) || shownLookalikeOf !== null;
     const signsOnDevice = isHardwareWalletMethod(wallet.method);
 
     const handleSign = async () => {
@@ -237,71 +231,62 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
       }
     };
 
+    const request: TransferRequest = {
+      transfers: [
+        {
+          token: collectible.id,
+          ticker: null,
+          denomination: 0,
+          amount: "1",
+          recipient: step.recipient,
+          collectible: refOf(collectible),
+          part: { tags: [], decodedData: null, payloadHash: null },
+          index: 0,
+        },
+      ],
+      others: [],
+      fee: step.estimate.fee,
+      method: null,
+      itemCount: 1,
+    };
+
     return (
-      <div className="flex min-h-full flex-col">
-        <ScreenHeader title={t("send.reviewSend")} onBack={() => setStep(composeStep(step.recipient))} busy={step.submitting} />
-        <div className="flex flex-1 flex-col gap-6 px-5 py-5 phone:pb-0">
-          <div className="flex flex-col items-center gap-2 pt-2 text-center">
-            <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-28" />
-            <span className="break-words text-body font-semibold text-foreground">{collectible.name}</span>
+      <TransferReview
+        header={<ScreenHeader title={t("send.reviewSend")} onBack={() => setStep(composeStep(step.recipient))} busy={step.submitting} />}
+        request={request}
+        from={{ name: wallet.name, address: wallet.address }}
+        toName={known?.name ?? null}
+        context={{}}
+        risk={{ firstTime: step.estimate.firstSeenRecipient && !known, lookalikeOf: shownLookalikeOf }}
+        footer={(warned) => (
+          <div className="mt-auto flex flex-col px-6 phone:px-5">
+            <ScreenFooter pinned={false} className="pb-6 pt-5">
+              <ReviewButtons
+                secondaryLabel={t("transferReview.cancel")}
+                onSecondary={() => setStep(composeStep(step.recipient))}
+                primaryLabel={
+                  step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("transferReview.send")
+                }
+                onPrimary={() => void handleSign()}
+                warned={warned}
+                busy={step.submitting}
+                className="mt-0 p-0 phone:px-0"
+              />
+            </ScreenFooter>
           </div>
-
-          {irreversible ? (
-            <RecipientWarning
-              firstTime={step.estimate.firstSeenRecipient && !known}
-              lookalikeOf={shownLookalikeOf}
-              lookalikeAvatarSvg={lookalikeAvatarSvg}
-              emphasisPick={emphasisPick}
-            />
-          ) : (
-            <p className="text-label leading-relaxed text-muted">
-              {t("send.sendingCollectible", { name: collectible.name })}
-            </p>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-label font-semibold text-muted">{t("send.to")}</span>
-            <RecipientCard
-              address={step.recipient}
-              name={known?.name ?? null}
-              avatarSvg={avatarSvg}
-              emphasisPick={emphasisPick}
-              tone="confirm"
-            />
+        )}
+      >
+        {step.error ? (
+          <div role="alert" className="text-label leading-snug text-warning">
+            {step.error}
           </div>
-
-          <div className="flex flex-col">
-            <ReviewRow
-              label={t("send.networkFee")}
-              value={step.estimate.fee === null ? "—" : `${formatWinstonAsAr(step.estimate.fee, FEE_DIGITS)} AR`}
-            />
-          </div>
-
-          {step.error ? (
-            <div role="alert" className="text-label leading-snug text-warning">
-              {step.error}
-            </div>
-          ) : null}
-
-          {step.submitting && signsOnDevice ? (
-            <p role="status" className="text-label leading-snug text-muted">
-              {t("send.approveOnDevice")}
-            </p>
-          ) : null}
-
-          <ScreenFooter pinned={false}>
-            <Button
-              type="button"
-              variant={irreversible ? "destructive" : "primary"}
-              disabled={step.submitting}
-              aria-busy={step.submitting}
-              onClick={() => void handleSign()}
-            >
-              {step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("send.sendCollectible")}
-            </Button>
-          </ScreenFooter>
-        </div>
-      </div>
+        ) : null}
+        {step.submitting && signsOnDevice ? (
+          <p role="status" className="text-label leading-snug text-muted">
+            {t("send.approveOnDevice")}
+          </p>
+        ) : null}
+      </TransferReview>
     );
   }
 

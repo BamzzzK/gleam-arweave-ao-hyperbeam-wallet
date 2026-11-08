@@ -91,7 +91,23 @@ export interface SigningApprovalPreview {
     tags: Array<{ name: string; value: string }>;
     target: string | null;
     payloadHash: string;
+    /** Set when the item is an AO `Transfer` message, read from its own target and tags. */
+    transfer: DataItemTransferPreview | null;
   }> | null;
+}
+
+/**
+ * An AO token transfer carried by a data item. `token`, `recipient` and
+ * `amount` come from the signed item; `tokenDenomination` and
+ * `tokenTicker` are the same best-effort metadata a `transferAoTokens`
+ * preview carries, `null` when unresolved.
+ */
+export interface DataItemTransferPreview {
+  token: string;
+  recipient: string;
+  amount: string;
+  tokenDenomination: number | null;
+  tokenTicker: string | null;
 }
 
 /**
@@ -223,6 +239,8 @@ export interface ApprovalRequest {
   origin: string;
   createdAt: number;
   preview: ApprovalPreview;
+  /** The site's icon from its grant, saved and checked when it connected; absent for Gleam's own requests. */
+  siteIcon?: string | null;
   /** Set once a hardware wallet's request is approved and waits for the device's signatures. */
   device?: DeviceSigningRequest;
 }

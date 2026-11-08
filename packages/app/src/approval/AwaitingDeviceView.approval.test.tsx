@@ -69,7 +69,7 @@ describe("AwaitingDeviceView", () => {
     expect(panel.last().wallet).toEqual({ method: "ledger", device: { kind: "ledger" }, address: DEVICE.address, publicKey: "pub" });
   });
 
-  it("shows what the payloads actually sign above the panel", () => {
+  it("shows payloads that move value in the transfer layout, one card per transfer, under the device strip", () => {
     renderView({
       device: {
         ...DEVICE,
@@ -83,16 +83,40 @@ describe("AwaitingDeviceView", () => {
         ],
       },
       token: { processId: "p".repeat(43), denomination: 6, ticker: "ARDRIVE" },
+      from: { name: "Ledger", address: DEVICE.address },
     });
-    expect(screen.getByText("Item 1")).toBeTruthy();
+    expect(screen.getByText("Confirm on your Ledger")).toBeTruthy();
+    expect(screen.getByText("2 transfers")).toBeTruthy();
     expect(screen.getByText(addressText("r".repeat(43)))).toBeTruthy();
-    expect(screen.getByText("1 AR")).toBeTruthy();
+    expect(screen.getByText(addressText("q".repeat(43)))).toBeTruthy();
+    expect(screen.getByText("2.5")).toBeTruthy();
+    expect(screen.getByText("ARDRIVE")).toBeTruthy();
     expect(screen.getByText("0.002 AR")).toBeTruthy();
-    expect(screen.getByText(addressText("p".repeat(43)))).toBeTruthy();
-    expect(screen.getByText("2.5 ARDRIVE")).toBeTruthy();
+    expect(screen.getByText("Ledger")).toBeTruthy();
+    expect(screen.getByText("Test panel")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Sign/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Details/ }));
+    expect(screen.getByText("p".repeat(43))).toBeTruthy();
   });
 
-  it("shows an L1 token transfer's AR fee, and calls a target the preview didn't resolve an unknown token", () => {
+  it("shows a single AR send's amount, recipient and fee, with Cancel only and no warning box", () => {
+    renderView({
+      origin: WALLET_APPROVAL_ORIGIN,
+      device: {
+        ...DEVICE,
+        summaries: [{ kind: "transaction", recipient: "r".repeat(43), quantity: "2500000000000", fee: "123000000", dataSize: "0" }],
+      },
+    });
+    expect(screen.getByText("Send")).toBeTruthy();
+    expect(screen.getByText("2.5")).toBeTruthy();
+    expect(screen.getByText(addressText("r".repeat(43)))).toBeTruthy();
+    expect(screen.getByText("0.000123 AR")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).not.toContain("Send");
+  });
+
+  it("shows an L1 token transfer's AR fee, and leaves a target the preview didn't resolve unscaled", () => {
     renderView({
       device: {
         ...DEVICE,
@@ -101,9 +125,17 @@ describe("AwaitingDeviceView", () => {
       },
       token: { processId: "p".repeat(43), denomination: 6, ticker: "ARDRIVE" },
     });
-    expect(screen.getByText("Unknown token")).toBeTruthy();
-    expect(screen.getByText("311 smallest units")).toBeTruthy();
+    expect(screen.getAllByText("311").length).toBeGreaterThan(0);
+    expect(screen.getByText("raw units")).toBeTruthy();
+    expect(screen.getByText("z".repeat(43))).toBeTruthy();
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+    expect(screen.queryByText("ARDRIVE")).toBeNull();
+  });
+
+  it("keeps the decoded rows for a payload that moves nothing", () => {
+    renderView();
+    expect(screen.getByText("Sign message")).toBeTruthy();
+    expect(screen.getByText("3 bytes")).toBeTruthy();
   });
 
   it("shows Gleam, not a hostname, for a send from the wallet itself", () => {

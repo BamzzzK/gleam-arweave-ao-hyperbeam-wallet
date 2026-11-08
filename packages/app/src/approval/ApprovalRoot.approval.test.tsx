@@ -391,3 +391,58 @@ describe("ApprovalRoot reset", () => {
     await waitFor(() => expect(queryCache.entries.size).toBe(0));
   });
 });
+
+describe("ApprovalRoot transfer review", () => {
+  const RECIPIENT = "q".repeat(43);
+  const TOKEN = "t".repeat(43);
+  const ITEM_TRANSFER_REQUEST: ApprovalRequest = {
+    requestId: "req-item",
+    origin: "https://dapp.example",
+    kind: "signDataItem",
+    preview: {
+      kind: "signDataItem",
+      recipient: null,
+      amount: null,
+      fee: null,
+      token: null,
+      tokenDenomination: null,
+      tokenTicker: null,
+      decodedData: null,
+      tags: [],
+      payloadHash: "ab".repeat(32),
+      items: [
+        {
+          decodedData: null,
+          tags: [{ name: "Action", value: "Transfer" }],
+          target: TOKEN,
+          payloadHash: "cd".repeat(32),
+          transfer: { token: TOKEN, recipient: RECIPIENT, amount: "3000000", tokenDenomination: 6, tokenTicker: "TOK" },
+        },
+      ],
+    },
+    createdAt: 0,
+  };
+
+  it("checks a data item transfer's recipient, and shows From and the balance after", async () => {
+    const send = vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "getApproval") return ITEM_TRANSFER_REQUEST;
+      if (message.type === "getState") return UNLOCKED_STATE;
+      if (message.type === "assessRecipient") return { firstTime: true, lookalikeOf: null };
+      if (message.type === "getBalance") return "0";
+      if (message.type === "getTokenBalances") {
+        return [{ address: "addr-1", processId: TOKEN, ticker: "TOK", denomination: 6, name: "Tok", quantity: "10000000" }];
+      }
+      if (message.type === "getPendingTransfers") return [];
+      throw new Error(`unexpected message ${message.type}`);
+    });
+
+    render(<ApprovalRoot requestId="req-item" runtime={fakeRuntime({ send: send as never })} />);
+
+    expect(await screen.findByText("Transfer request")).toBeTruthy();
+    expect(send).toHaveBeenCalledWith({ type: "assessRecipient", payload: { walletId: "wallet-1", recipient: RECIPIENT } });
+    expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
+    expect(screen.getByText("Main")).toBeTruthy();
+    expect(await screen.findByText("7 TOK")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign" }).className).toContain("bg-warning");
+  });
+});

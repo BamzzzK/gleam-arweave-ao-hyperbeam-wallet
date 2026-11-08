@@ -54,8 +54,6 @@ import {
   APPROVAL_MAX_MS,
   APPROVAL_TIMEOUT_MS,
   SCAN_ATTESTATION_TIMEOUT_MS,
-  decodeTaggedBinary,
-  encodeTaggedBinary,
 } from "@gleam/messaging/src/page-protocol.ts";
 import {
   buildAttestMessage,
@@ -73,6 +71,7 @@ import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
 import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
+import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
 import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
 import type { OwnershipProof } from "./points";
@@ -143,6 +142,13 @@ import { safeSiteIconUrl } from "./site-wallet";
  * every read and pruned on the next write, unless it is being resolved.
  */
 const GRANTS_KEY = "local:grants";
+
+function activeGrant(grants: readonly Grant[], origin: string): Grant | null {
+  const grant = grants.find((candidate) => candidate.origin === origin);
+  if (!grant) return null;
+  if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) return null;
+  return grant;
+}
 
 /** How long a request waits for its first answer. */
 function reviewTimeoutMs(kind: ApprovalRequest["kind"]): number {
@@ -238,6 +244,12 @@ export interface SigningRequestInput {
   last_tx?: string;
   /** `signDataItem`/`batchSignDataItem`'s items. `payload` and `tags` above are the first item's, for the preview. */
   dataItems?: DataItemInput[];
+  /**
+   * Display-only token metadata for each `dataItems` entry that is an AO
+   * transfer, by index; never signed. The transfer itself is read from
+   * the item.
+   */
+  itemTokenMetadata?: Array<{ tokenDenomination: number | null; tokenTicker: string | null } | null>;
   /** `encrypt`/`decrypt`'s WebCrypto algorithm parameter. */
   encryptAlgorithm?: EncryptAlgorithm;
   /** `signMessage`'s hash digest selection. */
@@ -364,9 +376,9 @@ export type CreateApprovalInput =
   | ({ origin: string; walletId: string } & AddTokenRequestInput);
 
 /**
- * `result` and `signingInput` hold bytes (payloads, AES IVs, signatures),
- * and `chrome.storage` serializes a `Uint8Array` as a plain object. Both
- * are stored through the tagged-binary codec and decoded when read.
+ * `result`, `signingInput` and `device.payloads` hold bytes (payloads, AES
+ * IVs, signatures), and `chrome.storage` serializes a `Uint8Array` as a
+ * plain object. They are written with `toStored` and read with `fromStored`.
  */
 interface ApprovalOutcome {
   approved: boolean;
@@ -391,6 +403,78 @@ interface PendingApprovalRecord {
   /** Set once a hardware wallet's request is approved and waits for the device. */
   device?: PendingDeviceSigning;
 }
+
+/** A byte array in a pending record. */
+interface StoredBinary {
+  __gleamStored: "ArrayBuffer" | "Uint8Array";
+  base64: string;
+}
+
+function isStoredBinary(value: unknown): value is StoredBinary {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Partial<StoredBinary>;
+  return (
+    (candidate.__gleamStored === "ArrayBuffer" || candidate.__gleamStored === "Uint8Array") &&
+    typeof candidate.base64 === "string"
+  );
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Bytes go in as base64 rather than the tagged-binary codec's number
+ * arrays: `chrome.storage.session` charges every array element as a value
+ * of its own, about 32 bytes per byte.
+ */
+function toStored(value: unknown): unknown {
+  // `instanceof` is avoided: WebCrypto results and page values can come from another realm.
+  if (Object.prototype.toString.call(value) === "[object ArrayBuffer]") {
+    return { __gleamStored: "ArrayBuffer", base64: bytesToBase64(new Uint8Array(value as ArrayBuffer)) } satisfies StoredBinary;
+  }
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return { __gleamStored: "Uint8Array", base64: bytesToBase64(bytes) } satisfies StoredBinary;
+  }
+  if (Array.isArray(value)) return value.map(toStored);
+  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, toStored(entry)]));
+  return value;
+}
+
+function fromStored(value: unknown): unknown {
+  if (isStoredBinary(value)) {
+    const bytes = base64ToBytes(value.base64);
+    return value.__gleamStored === "ArrayBuffer" ? bytes.buffer : bytes;
+  }
+  if (Array.isArray(value)) return value.map(fromStored);
+  if (isPlainRecord(value)) return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, fromStored(entry)]));
+  return value;
+}
+
+const STORED_VALUE_BYTES = 32;
+
+/**
+ * Roughly what `chrome.storage.session` charges for `value`: it counts the
+ * memory of the stored value tree, a fixed cost per value plus each
+ * string's length.
+ */
+function storedSize(value: unknown): number {
+  if (typeof value === "string") return STORED_VALUE_BYTES + value.length;
+  if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + storedSize(entry), STORED_VALUE_BYTES);
+  if (isPlainRecord(value)) {
+    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + key.length + storedSize(entry), STORED_VALUE_BYTES);
+  }
+  return STORED_VALUE_BYTES;
+}
+
+/*
+ * `chrome.storage.session` holds 10 MiB. Pending requests may use 4 MiB of
+ * it and one site 2 MiB, so one site can't fill it, and the outcomes and
+ * device payloads written onto records before they are dropped still fit.
+ */
+const PENDING_BYTES_LIMIT = 4 * 1024 * 1024;
+const PENDING_BYTES_PER_ORIGIN = 2 * 1024 * 1024;
 
 interface PendingDeviceSigning {
   /** Tagged-binary encoded `UnsignedPayload[]`. */
@@ -418,6 +502,24 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
   "scanAttestation",
   "signMessage",
 ]);
+
+const WALLET_SWITCHED = "The active wallet changed.";
+
+/**
+ * A dApp's signing request signs with the wallet that was active when it
+ * was made, and its approval shows no account, so it must not outlive that
+ * wallet being active. Connect and addToken don't sign, a scan attestation
+ * shows and unlocks its own wallet, and Gleam's own requests name theirs.
+ */
+function signsForActiveWallet(entry: PendingApprovalRecord): boolean {
+  const kind = entry.request.kind;
+  return (
+    kind !== "connect" &&
+    kind !== "addToken" &&
+    kind !== "scanAttestation" &&
+    entry.request.origin !== WALLET_APPROVAL_ORIGIN
+  );
+}
 
 const TIMED_OUT = userErrorMessage("approvalTimedOut");
 
@@ -449,10 +551,6 @@ function decodeTransactionTag(tag: { name: string; value: string }): { name: str
   return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
 }
 
-function tagValue(tags: Array<{ name: string; value: string }>, name: string): string | undefined {
-  return tags.find((tag) => tag.name === name)?.value;
-}
-
 function summarize(payload: UnsignedPayload): DeviceSigningSummary {
   if (payload.kind === "message") {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
@@ -476,10 +574,9 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
-  const recipient = tagValue(tags, "Recipient");
-  const quantity = tagValue(tags, "Quantity");
-  if (tagValue(tags, "Data-Protocol") === "ao" && tagValue(tags, "Action") === "Transfer" && target && recipient && quantity) {
-    return { kind: "aoTransfer", process: target, recipient, quantity };
+  const transfer = readAoTransferMessage({ target, tags });
+  if (transfer) {
+    return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
   }
   return { kind: "dataItem", target: target || null, dataSize: data.byteLength };
 }
@@ -746,15 +843,28 @@ function buildConnectPreview(
  */
 async function buildDataItemPreviews(
   dataItems: NonNullable<SigningRequestInput["dataItems"]>,
+  tokenMetadata: SigningRequestInput["itemTokenMetadata"],
 ): Promise<SigningApprovalPreview["items"]> {
   return Promise.all(
-    dataItems.map(async (item) => {
+    dataItems.map(async (item, index) => {
       const bytes = base64ToBytes(item.data);
+      const tags = item.tags ?? [];
+      const transfer = readAoTransferMessage({ target: item.target, tags });
+      const metadata = tokenMetadata?.[index] ?? null;
       return {
         decodedData: decodeDataPreview(bytes),
-        tags: item.tags ?? [],
+        tags,
         target: item.target ?? null,
         payloadHash: await sha256Hex(bytes),
+        transfer: transfer
+          ? {
+              token: transfer.processId,
+              recipient: transfer.recipient,
+              amount: transfer.quantity,
+              tokenDenomination: metadata?.tokenDenomination ?? null,
+              tokenTicker: metadata?.tokenTicker ?? null,
+            }
+          : null,
       };
     }),
   );
@@ -763,7 +873,12 @@ async function buildDataItemPreviews(
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
   if (input.kind === "scanAttestation") throw new Error("A scan attestation has its own preview.");
   const payloadHash = await sha256Hex(input.payload);
-  const isBatch = input.kind === "batchSignDataItem";
+  const signedItems =
+    input.kind === "signDataItem"
+      ? input.dataItems?.slice(0, 1)
+      : input.kind === "batchSignDataItem"
+        ? input.dataItems
+        : undefined;
   return {
     kind: input.kind,
     recipient: input.recipient ?? null,
@@ -776,7 +891,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
-    items: isBatch && input.dataItems ? await buildDataItemPreviews(input.dataItems) : null,
+    items: signedItems ? await buildDataItemPreviews(signedItems, input.itemTokenMetadata) : null,
   };
 }
 
@@ -793,6 +908,9 @@ export class ApprovalHandler {
    * once would each write back an array missing the other's change.
    */
   private pendingQueue: Promise<void> = Promise.resolve();
+
+  /** The same for `local:grants`: a revoke written from a stale read would restore another origin's grant. */
+  private grantsQueue: Promise<void> = Promise.resolve();
 
   /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
   private attesting = false;
@@ -818,8 +936,19 @@ export class ApprovalHandler {
     return raw.filter(isValidGrant);
   }
 
-  private async saveGrants(grants: Grant[]): Promise<void> {
-    await this.storage.set(GRANTS_KEY, grants);
+  /** The only way to write grants. `update` sees the current grants and returns the new ones. */
+  private updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
+    const run = this.grantsQueue.then(async () => {
+      const { next, result } = update(await this.loadGrants());
+      if (next === null) await this.storage.remove(GRANTS_KEY);
+      else await this.storage.set(GRANTS_KEY, next);
+      return result;
+    });
+    this.grantsQueue = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
   }
 
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
@@ -875,11 +1004,7 @@ export class ApprovalHandler {
    * letting it expire) ends all access it covered.
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
-    const grants = await this.loadGrants();
-    const grant = grants.find((candidate) => candidate.origin === origin);
-    if (!grant) return null;
-    if (grant.expiresAt !== null && grant.expiresAt <= Date.now()) return null;
-    return grant;
+    return activeGrant(await this.loadGrants(), origin);
   }
 
   /**
@@ -911,16 +1036,60 @@ export class ApprovalHandler {
     const record: PendingApprovalRecord = {
       request,
       walletId: input.walletId,
-      signingInput: input.kind === "connect" ? null : encodeTaggedBinary(input),
+      signingInput: input.kind === "connect" ? null : toStored(input),
       ...(input.kind === "connect"
         ? { siteIcon: safeSiteIconUrl(input.appInfo?.logo) ?? safeSiteIconUrl(input.favIconUrl) }
         : {}),
     };
-    await this.updatePending((pending) => [...pending, record]);
+    // Gleam's own requests sit outside the dApp pool, so sites filling it
+    // can't block a hardware send or a scan attestation.
+    const fromSite = input.origin !== WALLET_APPROVAL_ORIGIN;
+    const size = fromSite ? storedSize(record) : 0;
+    if (size > PENDING_BYTES_PER_ORIGIN) {
+      throw new Error("Gleam refused this request because it is too large to hold for approval.");
+    }
+    await this.updatePending((pending) => {
+      if (!fromSite) return [...pending, record];
+      const live = pending.filter((entry) => !this.isStale(entry) && entry.request.origin !== WALLET_APPROVAL_ORIGIN);
+      const total = live.reduce((sum, entry) => sum + storedSize(entry), size);
+      const fromOrigin = live
+        .filter((entry) => entry.request.origin === input.origin)
+        .reduce((sum, entry) => sum + storedSize(entry), size);
+      if (total > PENDING_BYTES_LIMIT || fromOrigin > PENDING_BYTES_PER_ORIGIN) {
+        throw new Error("Gleam refused this request because too many requests are waiting for approval.");
+      }
+      return [...pending, record];
+    });
+    // The preview is built after the caller read the active wallet, so a
+    // switch can land in between. `switchWallet` sets the new wallet before
+    // `rejectSwitchedApprovals` scans, so a record stored too late for that
+    // scan sees the new wallet here. No active wallet means none is left,
+    // which already rejects every pending request.
+    if (signsForActiveWallet(record)) {
+      let active: string | null;
+      try {
+        active = await this.activeWalletId();
+      } catch (error) {
+        await this.dropPending(requestId);
+        throw error;
+      }
+      if (active !== null && active !== record.walletId) {
+        await this.dropPending(requestId);
+        throw new Error(WALLET_SWITCHED);
+      }
+    }
 
-    await this.presenter.present(requestId);
-
-    return this.awaitResolution(requestId, input.kind);
+    // Watch before presenting: a switch landing while the window opens
+    // writes its rejection then, and a later watcher would miss it.
+    const resolution = this.awaitResolution(requestId, input.kind);
+    try {
+      await this.presenter.present(requestId);
+    } catch (error) {
+      resolution.catch(() => {});
+      await this.dropPending(requestId);
+      throw error;
+    }
+    return resolution;
   }
 
   /**
@@ -968,7 +1137,7 @@ export class ApprovalHandler {
         } else if (outcome.error) {
           reject(new Error(outcome.error));
         } else {
-          resolve(decodeTaggedBinary(outcome.result));
+          resolve(fromStored(outcome.result));
         }
       });
     });
@@ -1038,11 +1207,15 @@ export class ApprovalHandler {
 
   /** The request as the approval UI sees it: with the device's payloads once it waits on one. */
   private async requestView(entry: PendingApprovalRecord): Promise<ApprovalRequest> {
-    if (!entry.device || !entry.walletId) return entry.request;
+    const { origin, kind } = entry.request;
+    const siteIcon =
+      origin === WALLET_APPROVAL_ORIGIN || kind === "connect" ? null : ((await this.findActiveGrant(origin))?.icon ?? null);
+    const request = siteIcon ? { ...entry.request, siteIcon } : entry.request;
+    if (!entry.device || !entry.walletId) return request;
     const wallet = await this.hardwareWallet(entry.walletId);
-    const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+    const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
     return {
-      ...entry.request,
+      ...request,
       device: {
         ...wallet,
         payloads: payloads.map(toWirePayload),
@@ -1085,7 +1258,7 @@ export class ApprovalHandler {
         try {
           if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
           result = await this.finalizeApproval(entry);
-          outcome = { approved: true, result: encodeTaggedBinary(result) };
+          outcome = { approved: true, result: toStored(result) };
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
@@ -1148,7 +1321,7 @@ export class ApprovalHandler {
     const payloads = await this.prepareDevicePayloads(walletId, wallet, input);
     assertPreparedMatches(input, payloads, wallet.address);
     const device: PendingDeviceSigning = {
-      payloads: encodeTaggedBinary(payloads),
+      payloads: toStored(payloads),
       deadline: this.deviceDeadline(entry.request),
     };
     const requestId = entry.request.requestId;
@@ -1209,7 +1382,7 @@ export class ApprovalHandler {
         throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
       const walletId = entry.walletId;
-      const payloads = decodeTaggedBinary(entry.device.payloads) as UnsignedPayload[];
+      const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
       const wallet = await this.hardwareWallet(walletId);
       const signatures = await this.verifiedSignatures(payloads, req.signatures, wallet.publicKey);
 
@@ -1217,7 +1390,7 @@ export class ApprovalHandler {
       let result: unknown;
       try {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
-        outcome = { approved: true, result: encodeTaggedBinary(result) };
+        outcome = { approved: true, result: toStored(result) };
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -1252,7 +1425,7 @@ export class ApprovalHandler {
   }
 
   private signingInputOf(entry: PendingApprovalRecord): SigningRequestInput {
-    const input = decodeTaggedBinary(entry.signingInput) as SigningRequestInput | null;
+    const input = fromStored(entry.signingInput) as SigningRequestInput | null;
     if (!input) {
       throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
     }
@@ -1529,29 +1702,29 @@ export class ApprovalHandler {
     if ((await this.keySession.getWalletMethod(grantWalletId)) === "watch") {
       throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
     }
-    const grants = await this.loadGrants();
-    const withoutExisting = grants.filter((grant) => grant.origin !== origin);
-    // A connect from an already-connected origin only asks for what the
-    // grant lacks, so approving it adds to the grant instead of narrowing it.
-    const existing = await this.findActiveGrant(origin);
-    const permissions = [...(existing?.permissions ?? [])];
-    for (const permission of requested) {
-      if (!permissions.includes(permission)) permissions.push(permission);
-    }
+    return this.updateGrants((grants) => {
+      const withoutExisting = grants.filter((grant) => grant.origin !== origin);
+      // A connect from an already-connected origin only asks for what the
+      // grant lacks, so approving it adds to the grant instead of narrowing it.
+      const existing = activeGrant(grants, origin);
+      const permissions = [...(existing?.permissions ?? [])];
+      for (const permission of requested) {
+        if (!permissions.includes(permission)) permissions.push(permission);
+      }
 
-    const grant: Grant = {
-      origin,
-      walletId: grantWalletId,
-      permissions,
-      createdAt: Date.now(),
-      expiresAt: null,
-      budget: null,
-      icon: site.icon ?? existing?.icon ?? null,
-      name: site.name ?? existing?.name ?? null,
-    };
+      const grant: Grant = {
+        origin,
+        walletId: grantWalletId,
+        permissions,
+        createdAt: Date.now(),
+        expiresAt: null,
+        budget: null,
+        icon: site.icon ?? existing?.icon ?? null,
+        name: site.name ?? existing?.name ?? null,
+      };
 
-    await this.saveGrants([...withoutExisting, grant]);
-    return { granted: grant.permissions };
+      return { next: [...withoutExisting, grant], result: { granted: grant.permissions } };
+    });
   }
 
   /**
@@ -1563,7 +1736,7 @@ export class ApprovalHandler {
     if (!this.tokens) {
       throw new Error("addToken is not wired to a token list. ApprovalHandler was constructed without one.");
     }
-    const input = decodeTaggedBinary(entry.signingInput) as AddTokenRequestInput | null;
+    const input = fromStored(entry.signingInput) as AddTokenRequestInput | null;
     if (!input || input.kind !== "addToken") {
       throw new Error(`Approval request "${entry.request.requestId}" has no token to add.`);
     }
@@ -1710,16 +1883,20 @@ export class ApprovalHandler {
     await this.rejectPendingWhere((entry) => entry.walletId === walletId, "The wallet was removed.");
   }
 
+  /** Rejects the dApp signing requests made for another wallet than `walletId`, which just became active. */
+  async rejectSwitchedApprovals(walletId: string): Promise<void> {
+    await this.rejectPendingWhere((entry) => signsForActiveWallet(entry) && entry.walletId !== walletId, WALLET_SWITCHED);
+  }
+
   /**
    * Revokes every Grant and rejects every pending approval, for when no
    * wallet is left (a reset, or removing the last one). Returns the revoked
    * origins, which should be told they're disconnected.
    */
   async revokeAllAccess(reason = "The wallet was reset."): Promise<string[]> {
-    const grants = await this.loadGrants();
-    await this.storage.remove(GRANTS_KEY);
+    const origins = await this.updateGrants((grants) => ({ next: null, result: grants.map((grant) => grant.origin) }));
     await this.rejectPendingWhere(() => true, reason);
-    return grants.map((grant) => grant.origin);
+    return origins;
   }
 
   /**
@@ -1750,8 +1927,10 @@ export class ApprovalHandler {
 
   /** Revokes a Grant — ends all access it covered immediately. */
   async revokeGrant(req: { origin: string }): Promise<void> {
-    const grants = await this.loadGrants();
-    await this.saveGrants(grants.filter((grant) => grant.origin !== req.origin));
+    await this.updateGrants((grants) => ({
+      next: grants.filter((grant) => grant.origin !== req.origin),
+      result: undefined,
+    }));
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */

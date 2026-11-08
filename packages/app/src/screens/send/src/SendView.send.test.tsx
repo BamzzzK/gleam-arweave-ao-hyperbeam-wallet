@@ -290,8 +290,10 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Send 2.5 ARDRIVE" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Send 2.5 ARDRIVE" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeTruthy());
+    expect(screen.getByText("2.5")).toBeTruthy();
+    expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() =>
       expect(send).toHaveBeenCalledWith({
@@ -467,7 +469,7 @@ describe("SendView AR Max and balance check account for the network fee", () => 
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toContain("This address is new to Arweave, so the network fee is 0.2 AR");
-    expect(screen.queryByRole("button", { name: /^Send \d/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   });
 
   it("does not apply the AR fee to an AO token's Max or balance check", async () => {
@@ -875,11 +877,11 @@ describe("SendView with a hardware wallet", () => {
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
     fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
     fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe("The network fee changed to 0.0003 AR. Check it and sign again.");
     expect(submitted).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Send 0.1 AR" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(submitted).toHaveLength(2));
     expect(submitted[1]).toMatchObject({ fee: "300000000" });
   });
@@ -895,7 +897,7 @@ describe("SendView with a hardware wallet", () => {
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
     fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
     fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe("Gateway unavailable");
   });
@@ -911,7 +913,7 @@ describe("SendView with a hardware wallet", () => {
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
     fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.1" } });
     fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Send 0.1 AR" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Send" }));
 
     expect((await screen.findByRole("status")).textContent).toBe("Approve on your device in the window that opened.");
     expect(screen.getByRole("button", { name: "Waiting for approval…" })).toBeTruthy();
@@ -947,13 +949,32 @@ describe("SendView recipient lookalike warning", () => {
     await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
     expect(screen.getByText(/looks familiar, but is different/)).toBeTruthy();
     expect(screen.getByText(addressText(LOOKALIKE_OF))).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Send \d/ }).hasAttribute("disabled")).toBe(false);
+    expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("shows the first-time notice when there is no lookalike", async () => {
     await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
     expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+  });
+
+  it("shows the shared transfer review: From, amount, AR token, fee, a red Send under the warning", async () => {
+    await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
+    expect(screen.getByText(WALLET.name)).toBeTruthy();
+    expect(screen.getByText("0.5")).toBeTruthy();
+    expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
+    expect(screen.getByText("0.0001 AR")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Details/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-warning");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+  });
+
+  it("keeps Send black for a recipient sent to before, and Cancel goes back to compose", async () => {
+    await reviewWith({ firstSeenRecipient: false, lookalikeOf: null });
+    expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-foreground");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Review send")).toBeNull();
   });
 });
 
