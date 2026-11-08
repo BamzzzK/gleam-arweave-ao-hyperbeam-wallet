@@ -457,15 +457,39 @@ function fromStored(value: unknown): unknown {
 const STORED_VALUE_BYTES = 32;
 
 /**
+ * `string`'s length once encoded as UTF-8, counted without encoding it.
+ * A lone surrogate counts as the 3-byte U+FFFD it is replaced with.
+ */
+export function utf8ByteLength(string: string): number {
+  let bytes = 0;
+  for (let i = 0; i < string.length; i += 1) {
+    const code = string.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code < 0xdc00 && i + 1 < string.length) {
+      const next = string.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next < 0xe000) {
+        bytes += 4;
+        i += 1;
+      } else bytes += 3;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/**
  * Roughly what `chrome.storage.session` charges for `value`: it counts the
  * memory of the stored value tree, a fixed cost per value plus each
- * string's length.
+ * string's (and key's) UTF-8 length, since Chrome stores strings as UTF-8.
  */
 function storedSize(value: unknown): number {
-  if (typeof value === "string") return STORED_VALUE_BYTES + value.length;
+  if (typeof value === "string") return STORED_VALUE_BYTES + utf8ByteLength(value);
   if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + storedSize(entry), STORED_VALUE_BYTES);
   if (isPlainRecord(value)) {
-    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + key.length + storedSize(entry), STORED_VALUE_BYTES);
+    return Object.entries(value).reduce<number>(
+      (sum, [key, entry]) => sum + utf8ByteLength(key) + storedSize(entry),
+      STORED_VALUE_BYTES,
+    );
   }
   return STORED_VALUE_BYTES;
 }
