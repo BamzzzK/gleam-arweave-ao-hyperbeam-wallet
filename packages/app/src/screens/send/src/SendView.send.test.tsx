@@ -291,7 +291,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeTruthy());
-    expect(screen.getByText("2.5")).toBeTruthy();
+    expect(screen.getAllByText("2.5").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -947,7 +947,7 @@ describe("SendView recipient lookalike warning", () => {
 
   it("names the address a lookalike recipient imitates, and still lets the user send", async () => {
     await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
-    expect(screen.getByText(/looks familiar, but is different/)).toBeTruthy();
+    expect(screen.getByText(/looks like one you've used but it's different/)).toBeTruthy();
     expect(screen.getByText(addressText(LOOKALIKE_OF))).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(false);
   });
@@ -955,7 +955,7 @@ describe("SendView recipient lookalike warning", () => {
   it("shows the first-time notice when there is no lookalike", async () => {
     await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
-    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+    expect(screen.queryByText(/looks like one you've used but it's different/)).toBeNull();
   });
 
   it("shows the shared transfer review: From, amount, AR token, fee, a red Send under the warning", async () => {
@@ -992,7 +992,7 @@ describe("SendView lookalike warning while composing", () => {
 
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: LOOKALIKE } });
 
-    expect(await screen.findByText(/looks familiar, but is different/)).toBeTruthy();
+    expect(await screen.findByText(/looks like one you've used but it's different/)).toBeTruthy();
     expect(screen.getByText(addressText(SENT_TO))).toBeTruthy();
     expect(screen.queryByText("Save this address")).toBeNull();
   });
@@ -1006,6 +1006,6 @@ describe("SendView lookalike warning while composing", () => {
 
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: `BBBB${"2".repeat(39)}` } });
     await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getActivity" })));
-    expect(screen.queryByText(/looks familiar, but is different/)).toBeNull();
+    expect(screen.queryByText(/looks like one you've used but it's different/)).toBeNull();
   });
 });

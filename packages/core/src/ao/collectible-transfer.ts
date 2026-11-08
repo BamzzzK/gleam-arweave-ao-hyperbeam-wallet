@@ -28,8 +28,9 @@ export async function prepareCollectibleTransfer(
 }
 
 /**
- * The asset and recipient of a transaction shaped exactly like
- * `prepareCollectibleTransfer`'s output, or null. `tags` are plain text.
+ * The asset and recipient of a transaction that reads cleanly as
+ * `prepareCollectibleTransfer`'s output (`readL1TokenTransfer`), or null.
+ * `tags` are plain text.
  */
 export function readCollectibleTransfer(transaction: {
   target: string;
@@ -38,7 +39,7 @@ export function readCollectibleTransfer(transaction: {
   tags: Tag[];
 }): { assetId: string; recipient: string } | null {
   const transfer = readL1TokenTransfer(transaction);
-  if (!transfer || transfer.quantity !== COLLECTIBLE_TRANSFER_QUANTITY) return null;
+  if (transfer?.kind !== "transfer" || transfer.quantity !== COLLECTIBLE_TRANSFER_QUANTITY) return null;
   return { assetId: transfer.processId, recipient: transfer.recipient };
 }
 

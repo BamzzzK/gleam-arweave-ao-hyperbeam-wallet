@@ -43,7 +43,7 @@ export const USER_ERRORS = {
     "Gleam couldn't run its password check on this device, so it can't tell whether the password is right. Close other tabs or restart the browser, then try again.",
   keyringLocked: "This wallet is locked. Unlock Gleam and try again.",
   sessionKeyStorageFailed: "Gleam couldn't keep the wallet unlocked. Restart the browser and try again.",
-  keyfileReadBackFailed: "A re-encrypted keyfile didn't read back.",
+  keyfileReadBackFailed: "Gleam couldn't check the re-encrypted keyfile. Try again.",
 
   keyfileInvalid: "That file isn't a valid Arweave keyfile.",
   keyfileMissingField: 'That file isn\'t a valid Arweave keyfile. Missing required field "{key}".',
@@ -78,8 +78,8 @@ export const USER_ERRORS = {
   transactionOwnerMismatch: "This transaction names a different owner than the signing key.",
   dataItemSignatureMismatch: "The signature doesn't match this data item or its owner.",
   dataItemOwnerMismatch: "This data item names a different owner than the signing key.",
-  storedKeySigningMismatch: "This wallet's stored public key doesn't match its address. Signing was refused.",
-  storedKeyEncryptionMismatch: "This wallet's stored public key doesn't match its address. Encryption was refused.",
+  storedKeySigningMismatch: "This wallet's stored public key doesn't match its address, so Gleam won't sign with it.",
+  storedKeyEncryptionMismatch: "This wallet's stored public key doesn't match its address, so Gleam won't encrypt with it.",
   noStoredPublicKey: 'No public key stored for wallet "{wallet}".',
 
   collectibleIdInvalid: "This collectible's process id isn't a valid Arweave id.",
@@ -122,7 +122,7 @@ export const USER_ERRORS = {
 
   approvalNotPending: 'No pending approval request with id "{id}".',
   approvalResolving: 'Approval request "{id}" is already being resolved.',
-  approvalTimedOut: "Approval request timed out — the approval was not resolved in time.",
+  approvalTimedOut: "The approval request timed out.",
   approvalAwaitingDevice: "This request is already approved. Sign it on your device.",
   approvalEndedPreparing: "This request ended while it was being prepared for your device. Start again from the app.",
   approvalNotWaitingForDevice: 'Approval request "{id}" isn\'t waiting for a device.',

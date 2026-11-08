@@ -11,9 +11,11 @@ export interface CollectibleThumbnailProps {
   name: string;
   imageUrl?: string;
   className?: string;
+  /** Empty alt text where the name is already shown beside the image, as escaped untrusted text. */
+  decorative?: boolean;
 }
 
-export function CollectibleThumbnail({ name, imageUrl, className }: CollectibleThumbnailProps) {
+export function CollectibleThumbnail({ name, imageUrl, className, decorative = false }: CollectibleThumbnailProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   useEffect(() => setFailedUrl(null), [imageUrl]);
 
@@ -24,7 +26,7 @@ export function CollectibleThumbnail({ name, imageUrl, className }: CollectibleT
       {showImage ? (
         <img
           src={imageUrl}
-          alt={name}
+          alt={decorative ? "" : name}
           loading="lazy"
           referrerPolicy="no-referrer"
           onError={() => setFailedUrl(imageUrl)}

@@ -94,7 +94,8 @@ describe("SendCollectibleView", () => {
     });
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    // The image is decorative on the review; its name shows as escaped text.
+    expect(screen.getAllByText("Beam #1").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 

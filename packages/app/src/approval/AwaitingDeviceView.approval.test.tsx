@@ -20,6 +20,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const EVIL_TICKER = "\u202EXYZ";
+
 const DEVICE: DeviceSigningRequest = {
   method: "ledger",
   device: { kind: "ledger" },
@@ -116,6 +118,31 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getAllByRole("button").map((button) => button.textContent)).not.toContain("Send");
   });
 
+  it("warns about a token transfer the background couldn't read", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        summaries: [
+          { kind: "transaction", recipient: "p".repeat(43), quantity: "0", fee: "1", dataSize: "0", unreadableTokenTransfer: true },
+        ],
+      },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+  });
+
+  it("warns about a data item that may be a token transfer the background couldn't read", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        summaries: [
+          { kind: "dataItem", target: "p".repeat(43), dataSize: 1 },
+          { kind: "dataItem", target: "p".repeat(43), dataSize: 1, unreadableTokenTransfer: true },
+        ],
+      },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+  });
+
   it("shows an L1 token transfer's AR fee, and leaves a target the preview didn't resolve unscaled", () => {
     renderView({
       device: {
@@ -130,6 +157,71 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getByText("z".repeat(43))).toBeTruthy();
     expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
     expect(screen.queryByText("ARDRIVE")).toBeNull();
+  });
+
+  it("escapes and isolates a hostile ticker in the balance after", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        summaries: [
+          { kind: "transaction", recipient: "r".repeat(43), quantity: "1000000000000", fee: "2000000000", dataSize: "0" },
+          { kind: "aoTransfer", process: "p".repeat(43), recipient: "q".repeat(43), quantity: "2500000" },
+        ],
+      },
+      token: { processId: "p".repeat(43), denomination: 6, ticker: EVIL_TICKER },
+      context: {
+        balances: {
+          arBalance: "100000000000000",
+          tokenBalances: [
+            { address: DEVICE.address, processId: "p".repeat(43), ticker: EVIL_TICKER, denomination: 6, name: "X", quantity: "5000000", source: "watched" },
+          ],
+        },
+      },
+    });
+    const value = screen.getByText("Balance after").nextElementSibling!;
+    expect(value.textContent).toBe("98.998 AR · 2.5 <U+202E>XYZ");
+    expect(value.textContent).not.toContain("\u202E");
+    expect(value.querySelectorAll("bdi")).toHaveLength(2);
+  });
+
+  it("escapes and isolates a hostile ticker in a decoded amount row", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        payloads: [
+          { kind: "dataItem", raw: "AQID" },
+          { kind: "dataItem", raw: "BAUG" },
+        ],
+        summaries: [
+          { kind: "aoTransfer", process: "p".repeat(43), recipient: "q".repeat(43), quantity: "2500000" },
+          { kind: "message", text: "\u202Ehello", size: 6 },
+        ],
+      },
+      token: { processId: "p".repeat(43), denomination: 6, ticker: EVIL_TICKER },
+    });
+    const amount = screen.getByText("Amount").nextElementSibling!;
+    expect(amount.textContent).toBe("2.5 <U+202E>XYZ");
+    expect(amount.querySelector("bdi")).not.toBeNull();
+    const message = screen.getByText("Message").nextElementSibling!;
+    expect(message.textContent).toBe("<U+202E>hello");
+  });
+
+  it("leaves a blank ticker out of a decoded amount row", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        payloads: [
+          { kind: "dataItem", raw: "AQID" },
+          { kind: "dataItem", raw: "BAUG" },
+        ],
+        summaries: [
+          { kind: "aoTransfer", process: "p".repeat(43), recipient: "q".repeat(43), quantity: "2500000" },
+          { kind: "dataItem", target: null, dataSize: 3 },
+        ],
+      },
+      token: { processId: "p".repeat(43), denomination: 6, ticker: "   " },
+    });
+    expect(screen.getByText("Amount").nextElementSibling!.textContent).toBe("2.5");
   });
 
   it("keeps the decoded rows for a payload that moves nothing", () => {

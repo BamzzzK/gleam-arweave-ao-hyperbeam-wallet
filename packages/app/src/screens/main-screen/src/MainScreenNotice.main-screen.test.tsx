@@ -146,7 +146,7 @@ describe("MainScreenNotice", () => {
     );
 
     expect(await screen.findByText("Enjoying Gleam?")).toBeTruthy();
-    expect(screen.getByText("Leave a review to help others discover us.")).toBeTruthy();
+    expect(screen.getByText("A review helps other people find Gleam.")).toBeTruthy();
     expect(screen.queryByText(INFO.text)).toBeNull();
     const feedback = screen.getByRole("link", { name: "Send us feedback" });
     expect(feedback.getAttribute("href")).toBe("https://gleamwallet.app/feedback.html?v=1.2.3");

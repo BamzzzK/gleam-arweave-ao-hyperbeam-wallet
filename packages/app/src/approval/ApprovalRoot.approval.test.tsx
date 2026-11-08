@@ -442,7 +442,7 @@ describe("ApprovalRoot transfer review", () => {
     expect(send).toHaveBeenCalledWith({ type: "assessRecipient", payload: { walletId: "wallet-1", recipient: RECIPIENT } });
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
     expect(screen.getByText("Main")).toBeTruthy();
-    expect(await screen.findByText("7 TOK")).toBeTruthy();
+    expect((await screen.findByText("Balance after")).nextElementSibling?.textContent).toBe("7 TOK");
     expect(screen.getByRole("button", { name: "Sign" }).className).toContain("bg-warning");
   });
 });

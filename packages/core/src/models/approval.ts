@@ -78,6 +78,12 @@ export interface SigningApprovalPreview {
   tokenTicker: string | null;
   /** Set for a wallet `transfer` that sends this collectible; `amount` is then 0 AR. */
   collectible?: CollectibleRef | null;
+  /**
+   * Set when a transaction looks like a token transfer (`ao/l1-transfer.ts`)
+   * that can't be read cleanly, so it shows as the plain transaction with a
+   * warning to check its tags.
+   */
+  unreadableTokenTransfer?: boolean;
   decodedData: string | null;
   tags: Array<{ name: string; value: string }>;
   payloadHash: string;
@@ -93,6 +99,12 @@ export interface SigningApprovalPreview {
     payloadHash: string;
     /** Set when the item is an AO `Transfer` message, read from its own target and tags. */
     transfer: DataItemTransferPreview | null;
+    /**
+     * Set when the item looks like an AO `Transfer` (`ao/transfer-message.ts`)
+     * that can't be read cleanly, so it shows as the plain item with a
+     * warning to check its tags.
+     */
+    unreadableTokenTransfer?: boolean;
   }> | null;
 }
 
@@ -197,7 +209,15 @@ export type DeviceSigningPayload =
  * transfer.
  */
 export type DeviceSigningSummary =
-  | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
+  | {
+      kind: "transaction";
+      recipient: string | null;
+      quantity: string;
+      fee: string;
+      dataSize: string;
+      /** As `SigningApprovalPreview.unreadableTokenTransfer`. */
+      unreadableTokenTransfer?: boolean;
+    }
   | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
   /**
    * A zero-AR L1 transaction whose tags move `quantity` of an
@@ -207,7 +227,13 @@ export type DeviceSigningSummary =
   | { kind: "l1TokenTransfer"; process: string; recipient: string; quantity: string; fee: string }
   /** A zero-AR L1 transaction whose tags move one collectible (`ao/collectible-transfer.ts`). */
   | { kind: "collectibleTransfer"; asset: string; recipient: string; fee: string }
-  | { kind: "dataItem"; target: string | null; dataSize: number }
+  | {
+      kind: "dataItem";
+      target: string | null;
+      dataSize: number;
+      /** As the preview item's `unreadableTokenTransfer`. */
+      unreadableTokenTransfer?: boolean;
+    }
   /** `text` is the message as UTF-8, or null when it isn't valid text. */
   | { kind: "message"; text: string | null; size: number };
 

@@ -9,8 +9,8 @@ export interface RecipientWarningProps {
   /** The known address's avatar, so its picture can be set against the recipient's. */
   lookalikeAvatarSvg?: string;
   emphasisPick?: number | null;
-  /** One more reason the send is risky, listed before the closing "double-check" line. */
-  extraReason?: string;
+  /** More reasons the send is risky, listed before the closing "double-check" line. */
+  extraReasons?: readonly string[];
   /** Notice text; English unless the caller passes its own. */
   labels?: RecipientWarningLabels;
   className?: string;
@@ -36,7 +36,7 @@ export function RecipientWarning({
   lookalikeOf,
   lookalikeAvatarSvg,
   emphasisPick = null,
-  extraReason,
+  extraReasons = [],
   labels: labelsProp,
   className,
 }: RecipientWarningProps) {
@@ -65,7 +65,9 @@ export function RecipientWarning({
           </li>
         ) : null}
         {firstTime ? <li>{labels.firstTime}</li> : null}
-        {extraReason ? <li>{extraReason}</li> : null}
+        {extraReasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
         <li>{labels.doubleCheck}</li>
       </ul>
     </RiskNotice>

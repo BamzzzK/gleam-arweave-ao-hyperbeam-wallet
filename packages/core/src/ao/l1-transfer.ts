@@ -45,29 +45,49 @@ export async function prepareL1TokenTransfer(
 }
 
 /**
- * The process, recipient and quantity of a transaction shaped exactly
- * like `prepareL1TokenTransfer`'s output, or null. `tags` are plain text.
+ * How a transaction to a token process reads as a token transfer.
+ * `unreadable` is one that looks like a transfer (an `action` tag of
+ * `transfer`) but has no single clean reading, so it must be shown as the
+ * plain transaction it is, with a warning, rather than as zero AR alone.
+ */
+export type L1TokenTransferReading =
+  | { kind: "transfer"; processId: string; recipient: string; quantity: string }
+  | { kind: "unreadable" };
+
+/**
+ * Reads a transaction as `prepareL1TokenTransfer`'s output, or null when
+ * it doesn't look like a token transfer at all. `tags` are plain text.
+ * Tags are matched by name, case-insensitively and in any order, with
+ * other tags allowed, because the scheduler and HyperBEAM's `dev_token`
+ * read them that way. A name given twice is unreadable: the token could
+ * act on either copy.
  */
 export function readL1TokenTransfer(transaction: {
   target: string;
   quantity: string;
   data_size: string;
-  tags: Tag[];
-}): { processId: string; recipient: string; quantity: string } | null {
-  const [action, recipient, quantity, ...rest] = transaction.tags;
+  tags: readonly Tag[];
+}): L1TokenTransferReading | null {
+  if (!ADDRESS.test(transaction.target)) return null;
+  const named = (name: string) => transaction.tags.filter((tag) => tag.name.toLowerCase() === name);
+  const actions = named("action");
+  if (!actions.some((tag) => tag.value.toLowerCase() === "transfer")) return null;
+  const only = (name: string): string | null => {
+    const matches = named(name);
+    return matches.length === 1 ? matches[0]!.value : null;
+  };
+  const recipient = only("recipient");
+  const quantity = only("quantity");
   if (
-    !ADDRESS.test(transaction.target) ||
+    actions.length !== 1 ||
     (transaction.quantity || "0") !== "0" ||
     transaction.data_size !== "0" ||
-    rest.length > 0 ||
-    action?.name !== "action" ||
-    action.value !== "transfer" ||
-    recipient?.name !== "recipient" ||
-    !ADDRESS.test(recipient.value) ||
-    quantity?.name !== "quantity" ||
-    !ATOMIC.test(quantity.value)
+    recipient === null ||
+    !ADDRESS.test(recipient) ||
+    quantity === null ||
+    !ATOMIC.test(quantity)
   ) {
-    return null;
+    return { kind: "unreadable" };
   }
-  return { processId: transaction.target, recipient: recipient.value, quantity: quantity.value };
+  return { kind: "transfer", processId: transaction.target, recipient, quantity };
 }

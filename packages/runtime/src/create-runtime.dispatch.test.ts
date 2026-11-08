@@ -164,6 +164,49 @@ describe("createRuntime", () => {
       await runtime.dispatch("resolveApproval", { requestId, approved: false }, EXTENSION);
     });
 
+    async function previewOfSign(transaction: Record<string, unknown>) {
+      stubLyingGateway();
+      const { runtime, present } = await setupGranted();
+      const pending = runtime.dispatch("providerCall", { method: "sign", params: { transaction } }, CONTENT_SCRIPT);
+      void (pending as Promise<unknown>).catch(() => {});
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      const requestId = present.mock.calls[0]![0];
+      const request = (await runtime.dispatch("getApproval", { requestId }, EXTENSION)) as { preview: Record<string, unknown> };
+      await runtime.dispatch("resolveApproval", { requestId, approved: false }, EXTENSION);
+      return request.preview;
+    }
+
+    const b64u = (text: string) => Buffer.from(text).toString("base64url");
+    const tag = (name: string, value: string) => ({ name: b64u(name), value: b64u(value) });
+
+    it("a dApp's L1 token transfer reads by tag name, beside other tags and in any order or case", async () => {
+      const token = "t".repeat(43);
+      const recipient = "r".repeat(43);
+      const preview = await previewOfSign({
+        target: token,
+        quantity: "0",
+        tags: [tag("Quantity", "5000000"), tag("App-Name", "Dex"), tag("RECIPIENT", recipient), tag("Action", "Transfer")],
+      });
+      expect(preview).toMatchObject({ recipient, amount: "5000000", token });
+      expect(preview.unreadableTokenTransfer).toBeUndefined();
+    });
+
+    it("a dApp's transfer-looking transaction it can't read shows as the plain transaction, flagged", async () => {
+      const token = "t".repeat(43);
+      const recipient = "r".repeat(43);
+      const preview = await previewOfSign({
+        target: token,
+        quantity: "7",
+        tags: [tag("action", "transfer"), tag("recipient", recipient), tag("quantity", "5000000")],
+      });
+      expect(preview).toMatchObject({ recipient: token, amount: "7", token: null, unreadableTokenTransfer: true });
+    });
+
+    it("a dApp's ordinary transaction to an address carries no flag", async () => {
+      const preview = await previewOfSign({ target: "t".repeat(43), quantity: "7", tags: [tag("action", "eval")] });
+      expect(preview.unreadableTokenTransfer).toBeUndefined();
+    });
+
     it("a dApp's L1 token transfer shows the fee and pays exactly that", async () => {
       const posted = stubLyingGateway();
       const { runtime, storage, present } = await setupGranted();

@@ -136,7 +136,7 @@ describe("GatedOnboarding", () => {
     await screen.findByText("You're early.");
     type("GLEAMDROP7");
     submit();
-    expect(await screen.findByText("That code is full. Its seats have all been taken.")).toBeTruthy();
+    expect(await screen.findByText("That code has no seats left.")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Ask for an invite on X" }).className).toContain("bg-foreground");
     expect(field().value).toBe("GLEAMDROP7");
   });
@@ -166,7 +166,7 @@ describe("GatedOnboarding", () => {
 
   it("opens on a stored full verdict with the code filled in", async () => {
     setup({ unlock: result("FULLCODE1", "full") });
-    expect(await screen.findByText("That code is full. Its seats have all been taken.")).toBeTruthy();
+    expect(await screen.findByText("That code has no seats left.")).toBeTruthy();
     expect(field().value).toBe("FULLCODE1");
   });
 

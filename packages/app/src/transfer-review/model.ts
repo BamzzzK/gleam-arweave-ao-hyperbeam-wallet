@@ -14,6 +14,7 @@ import type { WalletBalances } from "../screens/activity/src/useBalances";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { shownTokenLogo, type RowVisibility } from "../token-visibility";
 import type { TFunction } from "../i18n";
+import { escapeHiddenCharacters } from "../approval/UntrustedText";
 
 const AR_DENOMINATION = 12;
 
@@ -54,6 +55,11 @@ export interface TransferRequest {
   /** The provider method that asked; `null` for the wallet's own send, `undefined` when not known. */
   method?: string | null;
   itemCount: number;
+  /**
+   * Looks like a token transfer the wallet couldn't read, so it shows as the
+   * plain transaction, warned. For a batch, set when any item is.
+   */
+  unreadableTokenTransfer?: boolean;
 }
 
 /**
@@ -113,7 +119,15 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
         others.push({ ...part, target: item.target, payloadHash: item.payloadHash, index });
       }
     });
-    return { transfers, others, fee: null, method: preview.kind, itemCount: items.length };
+    const unreadable = items.some((item) => item.unreadableTokenTransfer === true);
+    return {
+      transfers,
+      others,
+      fee: null,
+      method: preview.kind,
+      itemCount: items.length,
+      ...(unreadable ? { unreadableTokenTransfer: true } : {}),
+    };
   }
   if (preview.recipient === null || items) return null;
   const transfer = line(
@@ -141,6 +155,7 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
     fee: preview.fee,
     method: walletSend ? null : preview.kind,
     itemCount: 1,
+    ...(preview.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
   };
 }
 
@@ -183,7 +198,14 @@ export function transferRequestFromDevice(
     }
   }
   if (transfers.length === 0) return null;
-  return { transfers, others: [], fee: fee === null ? null : String(fee), itemCount: summaries.length };
+  const unreadable = summaries.some((summary) => summary.kind === "transaction" && summary.unreadableTokenTransfer === true);
+  return {
+    transfers,
+    others: [],
+    fee: fee === null ? null : String(fee),
+    itemCount: summaries.length,
+    ...(unreadable ? { unreadableTokenTransfer: true } : {}),
+  };
 }
 
 /** Every transfer's distinct recipient, for the recipient checks. */
@@ -226,7 +248,9 @@ export function unitText(transfer: TransferLine, t: TFunction): string {
 export function glyphLabel(transfer: TransferLine): string {
   if (transfer.token === null) return "AR";
   if (transfer.denomination === null || transfer.ticker === null || transfer.ticker === transfer.token) return "?";
-  return displayTicker(transfer.ticker).slice(0, 2).toUpperCase();
+  // Initials have no room for the `<U+XXXX>` form, so hidden characters are dropped instead.
+  const visible = escapeHiddenCharacters(displayTicker(transfer.ticker)).filter((part) => typeof part === "string").join("");
+  return visible.trim() === "" ? "?" : visible.slice(0, 2).toUpperCase();
 }
 
 /** A logo only for a token the wallet already lists, under the same rules as the token list. */
@@ -276,12 +300,18 @@ export function feeText(fee: string | null, t: TFunction): string {
   return fee === null ? t("transferReview.none") : `${formatWinstonAsAr(fee, AR_DENOMINATION)} AR`;
 }
 
+/** One token's balance after the request; `ticker` is the token's own, so it renders as untrusted text. */
+export interface BalanceAfterPart {
+  amount: string;
+  ticker: string | null;
+}
+
 /**
  * What each sent token's balance will be once the request lands: AR also
  * pays the fee. A token whose balance isn't known is left out, and so is
  * one the request would overdraw, which the signing step refuses anyway.
  */
-export function balanceAfterText(context: TransferContext, request: TransferRequest): string | undefined {
+export function balanceAfterParts(context: TransferContext, request: TransferRequest): BalanceAfterPart[] | undefined {
   const balances = context.balances;
   if (!balances) return undefined;
   const spent = new Map<string | null, { transfer: TransferLine; total: bigint }>();
@@ -293,26 +323,34 @@ export function balanceAfterText(context: TransferContext, request: TransferRequ
   if (request.fee !== null && spent.has(null)) {
     spent.get(null)!.total += BigInt(request.fee);
   }
-  const parts: string[] = [];
+  const parts: BalanceAfterPart[] = [];
   for (const [token, { transfer, total }] of spent) {
     const held = token === null ? balances.arBalance : tokenBalance(context, token)?.quantity;
     if (held === undefined || !/^\d+$/.test(held)) continue;
     const left = BigInt(held) - total;
     if (left < 0n) continue;
     if (context.balancesHidden) {
-      parts.push(HIDDEN_AMOUNT);
+      parts.push({ amount: HIDDEN_AMOUNT, ticker: null });
     } else if (transfer.denomination === null) {
-      parts.push(groupDigits(left.toString()));
+      parts.push({ amount: groupDigits(left.toString()), ticker: null });
     } else {
-      const ticker = token === null ? "AR" : transfer.ticker !== null && transfer.ticker !== token ? displayTicker(transfer.ticker) : "";
-      parts.push(`${formatAtomicCompact(left.toString(), transfer.denomination)} ${ticker}`.trim());
+      const ticker = token === null ? "AR" : transfer.ticker !== null && transfer.ticker !== token ? displayTicker(transfer.ticker) : null;
+      parts.push({ amount: formatAtomicCompact(left.toString(), transfer.denomination), ticker: ticker?.trim() ? ticker : null });
     }
   }
-  return parts.length > 0 ? parts.join(" · ") : undefined;
+  return parts.length > 0 ? parts : undefined;
+}
+
+/** The reasons the warning box lists beyond the recipient's own. */
+export function warningReasons(request: TransferRequest, t: TFunction): string[] {
+  const reasons: string[] = [];
+  if (request.unreadableTokenTransfer) reasons.push(t("transferReview.unreadableTokenTransfer"));
+  if (request.transfers.some(isUnknownScale)) reasons.push(t("transferReview.unknownDecimals"));
+  return reasons;
 }
 
 export function showsWarning(request: TransferRequest, risk: RecipientRisk | null): boolean {
-  if (request.transfers.some(isUnknownScale)) return true;
+  if (request.unreadableTokenTransfer || request.transfers.some(isUnknownScale)) return true;
   if (!risk) return false;
   return risk.firstTime || risk.lookalikeOf !== null || risk.unchecked === true;
 }

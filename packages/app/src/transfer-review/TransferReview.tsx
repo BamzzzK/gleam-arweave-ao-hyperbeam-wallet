@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
@@ -15,7 +15,7 @@ import { UntrustedText } from "../approval/UntrustedText";
 import { DataItemCard } from "./DataItemCard";
 import {
   amountText,
-  balanceAfterText,
+  balanceAfterParts,
   feeText,
   fiatText,
   glyphLabel,
@@ -26,6 +26,8 @@ import {
   showsWarning,
   totalFiatText,
   unitText,
+  warningReasons,
+  type BalanceAfterPart,
   type RecipientRisk,
   type SignedPart,
   type TransferContext,
@@ -59,8 +61,10 @@ const GUTTER = "px-6 phone:px-5";
  * amount, from and to, the token, fee and balance after, then the raw
  * details. Addresses are shown in full; the token is named by its id
  * as well as its self-chosen ticker. The warning box shows for a
- * first-time or lookalike recipient and for a token with no stated scale,
- * and only then is the primary action red.
+ * first-time or lookalike recipient, for a token with no stated scale and
+ * for a token transfer the wallet couldn't read, and only then is the
+ * primary action red. That last case opens Details and the tags, since
+ * the tags are what the token acts on.
  */
 export function TransferReview({
   header,
@@ -78,7 +82,7 @@ export function TransferReview({
   const warned = showsWarning(request, risk);
   const batch = request.transfers.length > 1 || request.others.length > 0;
   const first = request.transfers[0]!;
-  const balanceAfter = balanceAfterText(context, request);
+  const balanceAfter = balanceAfterParts(context, request);
   const lookalikeOf = risk?.lookalikeOf ?? null;
 
   const warning = warned ? (
@@ -88,7 +92,7 @@ export function TransferReview({
         lookalikeOf={lookalikeOf}
         lookalikeAvatarSvg={lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined}
         emphasisPick={identity.emphasisPick}
-        extraReason={request.transfers.some(isUnknownScale) ? t("transferReview.unknownDecimals") : undefined}
+        extraReasons={warningReasons(request, t)}
       />
     </div>
   ) : null;
@@ -120,7 +124,7 @@ export function TransferReview({
           <div className={`flex flex-col gap-3.5 pt-6 ${GUTTER}`}>
             {from ? <SummaryRow label={t("transferReview.from")} value={<FromValue from={from} />} /> : null}
             <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
-            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={balanceAfter} /> : null}
+            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
       ) : (
@@ -131,7 +135,7 @@ export function TransferReview({
           <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
             <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
             <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
-            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={balanceAfter} /> : null}
+            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
       )}
@@ -201,7 +205,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
     const name = transfer.collectible.name ?? truncateAddress(transfer.collectible.id, 6);
     return (
       <div className={`flex flex-col items-center gap-3 pb-8 pt-8 text-center ${GUTTER}`}>
-        <CollectibleThumbnail name={name} imageUrl={transfer.collectible.imageUrl} className="w-40 rounded-[14px]" />
+        <CollectibleThumbnail name={name} imageUrl={transfer.collectible.imageUrl} decorative className="w-40 rounded-[14px]" />
         <div className="flex flex-col items-center gap-0.5">
           <span className="break-words text-h3 font-semibold text-foreground"><UntrustedText text={name} /></span>
           <span className="text-label text-muted">{t("transferReview.oneItem")}</span>
@@ -345,9 +349,24 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function BalanceAfter({ parts }: { parts: BalanceAfterPart[] }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? " · " : null}
+          {part.amount}
+          {part.ticker !== null ? <> <UntrustedText text={part.ticker} /></> : null}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 function Details({ request, batch }: { request: TransferRequest; batch: boolean }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  const showTags = request.unreadableTokenTransfer === true;
+  const [open, setOpen] = useState(showTags);
   const first = request.transfers[0]!;
   const method = methodText(request, t);
   const count = t("transferReview.itemsCount", { count: request.itemCount });
@@ -379,10 +398,10 @@ function Details({ request, batch }: { request: TransferRequest; batch: boolean 
                     <span className="text-label font-semibold text-foreground">
                       {t("transferReview.itemNumber", { number: transfer.index + 1 })}
                     </span>
-                    <TransferDetails transfer={transfer} part={transfer.part} />
+                    <TransferDetails transfer={transfer} part={transfer.part} showTags={showTags} />
                   </div>
                 ))
-              : <TransferDetails transfer={first} part={first.part} />}
+              : <TransferDetails transfer={first} part={first.part} showTags={showTags} />}
           </div>
         ) : null}
       </div>
@@ -390,9 +409,9 @@ function Details({ request, batch }: { request: TransferRequest; batch: boolean 
   );
 }
 
-function TransferDetails({ transfer, part }: { transfer: TransferLine; part: SignedPart }) {
+function TransferDetails({ transfer, part, showTags }: { transfer: TransferLine; part: SignedPart; showTags: boolean }) {
   const t = useT();
-  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(showTags);
   return (
     <>
       <DetailRow label={t("transferReview.rawUnitsLabel")} value={groupDigits(transfer.amount)} />

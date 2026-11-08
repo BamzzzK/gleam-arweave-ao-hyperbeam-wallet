@@ -224,6 +224,8 @@ export interface SigningRequestInput {
   tokenTicker?: string | null;
   /** A wallet `transfer` of this collectible: an L1 transaction to its process carrying the transfer tags. */
   collectible?: CollectibleRef | null;
+  /** See `SigningApprovalPreview.unreadableTokenTransfer`. */
+  unreadableTokenTransfer?: boolean;
   /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
   payload: Uint8Array;
   tags?: Array<{ name: string; value: string }>;
@@ -455,15 +457,39 @@ function fromStored(value: unknown): unknown {
 const STORED_VALUE_BYTES = 32;
 
 /**
+ * `string`'s length once encoded as UTF-8, counted without encoding it.
+ * A lone surrogate counts as the 3-byte U+FFFD it is replaced with.
+ */
+export function utf8ByteLength(string: string): number {
+  let bytes = 0;
+  for (let i = 0; i < string.length; i += 1) {
+    const code = string.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code < 0xdc00 && i + 1 < string.length) {
+      const next = string.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next < 0xe000) {
+        bytes += 4;
+        i += 1;
+      } else bytes += 3;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+/**
  * Roughly what `chrome.storage.session` charges for `value`: it counts the
  * memory of the stored value tree, a fixed cost per value plus each
- * string's length.
+ * string's (and key's) UTF-8 length, since Chrome stores strings as UTF-8.
  */
 function storedSize(value: unknown): number {
-  if (typeof value === "string") return STORED_VALUE_BYTES + value.length;
+  if (typeof value === "string") return STORED_VALUE_BYTES + utf8ByteLength(value);
   if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + storedSize(entry), STORED_VALUE_BYTES);
   if (isPlainRecord(value)) {
-    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + key.length + storedSize(entry), STORED_VALUE_BYTES);
+    return Object.entries(value).reduce<number>(
+      (sum, [key, entry]) => sum + utf8ByteLength(key) + storedSize(entry),
+      STORED_VALUE_BYTES,
+    );
   }
   return STORED_VALUE_BYTES;
 }
@@ -504,6 +530,29 @@ const DEVICE_SIGNED_KINDS: ReadonlySet<ApprovalKind> = new Set([
 ]);
 
 const WALLET_SWITCHED = "The active wallet changed.";
+
+const SITE_DISCONNECTED = "The site was disconnected.";
+const DISCONNECTED_OUTCOME: ApprovalOutcome = { approved: false, error: SITE_DISCONNECTED };
+
+/** Kinds whose only effect is the result handed back: nothing is posted or stored. */
+const RESULT_ONLY_KINDS: ReadonlySet<ApprovalKind> = new Set([
+  "sign",
+  "signDataItem",
+  "batchSignDataItem",
+  "signMessage",
+  "encrypt",
+  "decrypt",
+]);
+
+/**
+ * A dApp request the site's grant let through, so it must not outlive the
+ * grant. A connect makes a new grant from the user's own approval, and a
+ * scan attestation comes from the Gleam site, which holds none.
+ */
+function needsGrant(entry: PendingApprovalRecord): boolean {
+  const kind = entry.request.kind;
+  return kind !== "connect" && kind !== "scanAttestation" && entry.request.origin !== WALLET_APPROVAL_ORIGIN;
+}
 
 /**
  * A dApp's signing request signs with the wallet that was active when it
@@ -556,13 +605,14 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
   }
   if (payload.kind === "transaction") {
-    const { target, quantity, reward, data_size, tags } = payload.transaction;
-    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
+    const { target, quantity, reward, data_size } = payload.transaction;
+    const tags = payload.transaction.tags.map(decodeTransactionTag);
+    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags });
     if (collectible) {
       return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
     }
-    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
-    if (tokenTransfer) {
+    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags });
+    if (tokenTransfer?.kind === "transfer") {
       return {
         kind: "l1TokenTransfer",
         process: tokenTransfer.processId,
@@ -571,14 +621,26 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
         fee: reward,
       };
     }
-    return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
+    return {
+      kind: "transaction",
+      recipient: target || null,
+      quantity,
+      fee: reward,
+      dataSize: data_size,
+      ...(tokenTransfer ? { unreadableTokenTransfer: true } : {}),
+    };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
   const transfer = readAoTransferMessage({ target, tags });
-  if (transfer) {
+  if (transfer?.kind === "transfer") {
     return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
   }
-  return { kind: "dataItem", target: target || null, dataSize: data.byteLength };
+  return {
+    kind: "dataItem",
+    target: target || null,
+    dataSize: data.byteLength,
+    ...(transfer ? { unreadableTokenTransfer: true } : {}),
+  };
 }
 
 function sameTags(actual: Array<{ name: string; value: string }>, expected: Array<{ name: string; value: string }>): boolean {
@@ -856,15 +918,17 @@ async function buildDataItemPreviews(
         tags,
         target: item.target ?? null,
         payloadHash: await sha256Hex(bytes),
-        transfer: transfer
-          ? {
-              token: transfer.processId,
-              recipient: transfer.recipient,
-              amount: transfer.quantity,
-              tokenDenomination: metadata?.tokenDenomination ?? null,
-              tokenTicker: metadata?.tokenTicker ?? null,
-            }
-          : null,
+        transfer:
+          transfer?.kind === "transfer"
+            ? {
+                token: transfer.processId,
+                recipient: transfer.recipient,
+                amount: transfer.quantity,
+                tokenDenomination: metadata?.tokenDenomination ?? null,
+                tokenTicker: metadata?.tokenTicker ?? null,
+              }
+            : null,
+        ...(transfer?.kind === "unreadable" ? { unreadableTokenTransfer: true } : {}),
       };
     }),
   );
@@ -888,6 +952,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     tokenDenomination: input.tokenDenomination ?? null,
     tokenTicker: input.tokenTicker ?? null,
     ...(input.collectible ? { collectible: input.collectible } : {}),
+    ...(input.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,
@@ -1001,7 +1066,8 @@ export class ApprovalHandler {
    * Origin -> wallet permission lookup. A connected origin's Grant must
    * still be present and unexpired for a `PROVIDER_METHODS` call to
    * proceed without a fresh approval prompt — revoking a Grant (or
-   * letting it expire) ends all access it covered.
+   * letting it expire) ends all access it covered, including requests
+   * still waiting in an approval window (`revokeGrant`, `grantLapsed`).
    */
   async findActiveGrant(origin: string): Promise<Grant | null> {
     return activeGrant(await this.loadGrants(), origin);
@@ -1255,10 +1321,16 @@ export class ApprovalHandler {
       if (!req.approved) {
         outcome = { approved: false };
       } else {
+        if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
         try {
-          if (await this.signsOnDevice(entry)) return await this.startDeviceSigning(entry);
-          result = await this.finalizeApproval(entry);
-          outcome = { approved: true, result: toStored(result) };
+          if (await this.signsOnDevice(entry)) {
+            const view = await this.startDeviceSigning(entry);
+            if (!(await this.lapsedSince(entry))) return view;
+            outcome = DISCONNECTED_OUTCOME;
+          } else {
+            result = await this.finalizeApproval(entry);
+            outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
+          }
         } catch (error) {
           outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
         }
@@ -1288,11 +1360,43 @@ export class ApprovalHandler {
       current.map((candidate) => (candidate.request.requestId === requestId ? { ...candidate, outcome } : candidate)),
     );
     await this.dropPending(requestId);
-    if (outcome.error !== undefined) throw new Error(outcome.error);
+    if (outcome.error !== undefined) {
+      // Ended for the user rather than failed: nothing is left to show.
+      if (!outcome.approved) await this.presenter.dismiss(requestId);
+      throw new Error(outcome.error);
+    }
     if (outcome.approved && entry.request.kind === "scanAttestation") {
       return { shown: "scanAttestation", result: result as SiteAttestResponse };
     }
     await this.presenter.dismiss(requestId);
+  }
+
+  /** The site's grant was revoked or expired after it made this request. */
+  private async grantLapsed(entry: PendingApprovalRecord): Promise<boolean> {
+    return needsGrant(entry) && (await this.findActiveGrant(entry.request.origin)) === null;
+  }
+
+  /**
+   * `grantLapsed` once the request's work is done. A revoke landing during
+   * it skipped the record, since it was resolving. A failed read keeps
+   * what was done rather than leave the request without an outcome.
+   */
+  private async lapsedSince(entry: PendingApprovalRecord): Promise<boolean> {
+    try {
+      return await this.grantLapsed(entry);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Withholds a signature or plaintext from a site that lost its grant
+   * while it was made. A request that already posted or stored something
+   * keeps its real outcome, so the site doesn't retry and send twice.
+   */
+  private async withheldIfLapsed(entry: PendingApprovalRecord, outcome: ApprovalOutcome): Promise<ApprovalOutcome> {
+    if (!RESULT_ONLY_KINDS.has(entry.request.kind)) return outcome;
+    return (await this.lapsedSince(entry)) ? DISCONNECTED_OUTCOME : outcome;
   }
 
   private async signsOnDevice(entry: PendingApprovalRecord): Promise<boolean> {
@@ -1381,6 +1485,7 @@ export class ApprovalHandler {
       if (!entry.device || !entry.walletId) {
         throw new Error(userErrorMessage("approvalNotWaitingForSignature", { id: req.requestId }));
       }
+      if (await this.grantLapsed(entry)) return await this.complete(entry, DISCONNECTED_OUTCOME, undefined);
       const walletId = entry.walletId;
       const payloads = fromStored(entry.device.payloads) as UnsignedPayload[];
       const wallet = await this.hardwareWallet(walletId);
@@ -1390,7 +1495,7 @@ export class ApprovalHandler {
       let result: unknown;
       try {
         result = await this.finishDeviceSigning(walletId, wallet, this.signingInputOf(entry), payloads, signatures);
-        outcome = { approved: true, result: toStored(result) };
+        outcome = await this.withheldIfLapsed(entry, { approved: true, result: toStored(result) });
       } catch (error) {
         outcome = { approved: true, error: error instanceof Error ? error.message : String(error) };
       }
@@ -1925,12 +2030,19 @@ export class ApprovalHandler {
     await Promise.all([...rejected].map((requestId) => this.presenter.dismiss(requestId)));
   }
 
-  /** Revokes a Grant — ends all access it covered immediately. */
+  /**
+   * Revokes a Grant — ends all access it covered immediately: the site's
+   * requests still waiting for approval are rejected and their windows
+   * closed. A pending connect stays, since approving it is a fresh grant.
+   * One already being resolved is caught by `lapsedSince` once its work
+   * is done (`withheldIfLapsed`).
+   */
   async revokeGrant(req: { origin: string }): Promise<void> {
     await this.updateGrants((grants) => ({
       next: grants.filter((grant) => grant.origin !== req.origin),
       result: undefined,
     }));
+    await this.rejectPendingWhere((entry) => needsGrant(entry) && entry.request.origin === req.origin, SITE_DISCONNECTED);
   }
 
   /** Read-only list of connected origins, for the `connected-apps` popup view. */

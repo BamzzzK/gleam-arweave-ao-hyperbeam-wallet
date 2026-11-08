@@ -7,6 +7,7 @@ import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
+import { UntrustedText } from "./UntrustedText";
 import { DeviceBanner, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromDevice, type TransferContext } from "../transfer-review/model";
 
@@ -178,6 +179,11 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   if (summary.kind === "transaction") {
     return (
       <>
+        {summary.unreadableTokenTransfer ? (
+          <p role="alert" className="pb-1 text-caption leading-snug text-warning">
+            {t("transferReview.unreadableTokenTransfer")}
+          </p>
+        ) : null}
         {summary.recipient !== null ? <Row label={t("approval.amount")} value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
         {summary.recipient !== null ? <AddressRow label={t("approval.recipient")} address={summary.recipient} /> : null}
         <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />
@@ -190,9 +196,14 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
     // shown as unknown rather than trusted to be a token at all.
     const scale = token?.processId === summary.process ? token : undefined;
     const quantity =
-      scale?.denomination != null
-        ? `${formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)} ${scale.ticker ?? ""}`.trim()
-        : t("approval.amountSmallestUnits", { quantity: summary.quantity });
+      scale?.denomination != null ? (
+        <>
+          {formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)}
+          {scale.ticker?.trim() ? <> <UntrustedText text={scale.ticker} /></> : null}
+        </>
+      ) : (
+        t("approval.amountSmallestUnits", { quantity: summary.quantity })
+      );
     return (
       <>
         {/* A resolved ticker already names the token in the amount. */}
@@ -215,20 +226,25 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   }
   if (summary.kind === "message") {
     return summary.text !== null ? (
-      <Row label={t("approval.message")} value={summary.text} />
+      <Row label={t("approval.message")} value={<UntrustedText text={summary.text} />} />
     ) : (
       <Row label={t("approval.message")} value={t("approval.bytes", { size: summary.size })} />
     );
   }
   return (
     <>
+      {summary.unreadableTokenTransfer ? (
+        <p role="alert" className="pb-1 text-caption leading-snug text-warning">
+          {t("transferReview.unreadableTokenTransfer")}
+        </p>
+      ) : null}
       {summary.target !== null ? <AddressRow label={t("approval.target")} address={summary.target} /> : null}
       <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} />
     </>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line py-2 text-caption last:border-b-0">
       <span className="flex-shrink-0 text-muted">{label}</span>

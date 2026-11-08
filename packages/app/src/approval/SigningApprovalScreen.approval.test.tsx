@@ -12,6 +12,11 @@ afterEach(() => {
   cleanup();
 });
 
+/** The ticker is its own isolated run, so the row is read as a whole. */
+function balanceAfterText(): string | null | undefined {
+  return screen.getByText("Balance after").nextElementSibling?.textContent;
+}
+
 const RECIPIENT = "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kL";
 const SECOND_RECIPIENT = "Lm8sQe3Rt5Yu7Io9Pa1Sd3Fg5Hj7Kl9Zx1Cv3Bn5Mq";
 const FROM = { name: "Main", address: "Gx7cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk2Qa" };
@@ -132,7 +137,7 @@ describe("SigningApprovalScreen transfer layout: AO token", () => {
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
-    expect(screen.getByText("10.75 AO")).toBeTruthy();
+    expect(balanceAfterText()).toBe("10.75 AO");
   });
 
   it("shows the site's icon when its grant has one, and the letter tile otherwise", () => {
@@ -191,7 +196,7 @@ describe("SigningApprovalScreen transfer layout: AR", () => {
     expect(screen.getByText("50")).toBeTruthy();
     expect(screen.getAllByText("AR").length).toBeGreaterThan(1);
     expect(screen.getByText("0.0008 AR")).toBeTruthy();
-    expect(screen.getByText("49.9992 AR")).toBeTruthy();
+    expect(balanceAfterText()).toBe("49.9992 AR");
     expect(screen.getByText(`≈ ${formatCurrencyValue(50 * 8.7, "USD")}`)).toBeTruthy();
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText(exactGroup("50000000000000"))).toBeTruthy();
   });
@@ -241,7 +246,7 @@ describe("SigningApprovalScreen primary action and warning", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const text = screen.getByRole("alert").textContent ?? "";
     expect(text.match(/cannot be undone/gi)).toHaveLength(1);
-    expect(text).toMatch(/looks familiar, but is different/);
+    expect(text).toMatch(/looks like one you've used but it's different/);
     expect(screen.getByText(addressText(known))).toBeTruthy();
     expect(primary("Sign").hasAttribute("disabled")).toBe(false);
   });
@@ -258,6 +263,30 @@ describe("SigningApprovalScreen primary action and warning", () => {
     const props = renderScreen({ preview: AO_PREVIEW });
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
     expect(props.onReject).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SigningApprovalScreen transfer layout: unreadable token transfer", () => {
+  const UNREADABLE: SigningApprovalPreview = {
+    ...AR_PREVIEW,
+    kind: "sign",
+    amount: "7",
+    tags: [
+      { name: "action", value: "transfer" },
+      { name: "recipient", value: SECOND_RECIPIENT },
+      { name: "quantity", value: "5000000" },
+    ],
+    unreadableTokenTransfer: true,
+  };
+
+  it("warns, even for a known recipient, turns Sign red and shows the tags", () => {
+    renderScreen({ preview: UNREADABLE });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(alert.textContent).not.toMatch(/haven't sent to this address before/);
+    expect(primary("Sign").className).toContain("bg-warning");
+    expect(screen.getByRole("button", { name: "Hide tags" })).toBeTruthy();
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
   });
 });
 
@@ -303,7 +332,8 @@ describe("SigningApprovalScreen transfer layout: collectible and Gleam's own sen
     expect(screen.getByText("Gleam")).toBeTruthy();
     expect(screen.getByText("Send collectible")).toBeTruthy();
     expect(screen.getByText("Beam #1")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    // The name already shows escaped beside it, so the image carries no alt text of its own.
+    expect(document.querySelector('img[src="https://arweave.net/asset"]')!.getAttribute("alt")).toBe("");
     expect(screen.getByText("1 item")).toBeTruthy();
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText("NNNNNN…NNNN")).toBeTruthy();
@@ -368,7 +398,7 @@ describe("SigningApprovalScreen transfer layout: data items", () => {
     expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
     expect(screen.getByText("Main")).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
-    expect(screen.getByText("10.75 AO · 1.2 wAR")).toBeTruthy();
+    expect(balanceAfterText()).toBe("10.75 AO · 1.2 wAR");
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText("batchSignDataItem · 3 items")).toBeTruthy();
     expect(primary("Sign 3")).toBeTruthy();
   });
@@ -415,6 +445,54 @@ describe("SigningApprovalScreen: requests that move nothing", () => {
     expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
+  });
+
+  const UNREADABLE_ITEM = {
+    decodedData: null,
+    tags: [
+      { name: "action", value: "transfer" },
+      { name: "recipient", value: SECOND_RECIPIENT },
+      { name: "quantity", value: "5000000" },
+    ],
+    target: AO,
+    payloadHash: "c".repeat(64),
+    transfer: null,
+    unreadableTokenTransfer: true,
+  };
+
+  it("warns about a single data item that may be a token transfer it can't read, turns Sign red and shows its tags", () => {
+    renderScreen({ preview: { ...MESSAGE_PREVIEW, items: [UNREADABLE_ITEM] } });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(screen.getByRole("button", { name: "Sign message" }).className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+    expect(screen.getByText("5000000")).toBeTruthy();
+  });
+
+  it("warns about a batch with no transfer when any item may be one it can't read", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [{ decodedData: null, tags: [], target: null, payloadHash: "a".repeat(64), transfer: null }, UNREADABLE_ITEM],
+    };
+    renderScreen({ preview });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(screen.getByRole("button", { name: /sign messages \(2\)/i }).className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+  });
+
+  it("warns about a batch with transfers when another item may be one it can't read", () => {
+    const transferItem = {
+      decodedData: null,
+      tags: [{ name: "Action", value: "Transfer" }],
+      target: AO,
+      payloadHash: "d".repeat(64),
+      transfer: { token: AO, recipient: RECIPIENT, amount: "1500000000000", tokenDenomination: 12, tokenTicker: "AO" },
+    };
+    renderScreen({ preview: { ...MESSAGE_PREVIEW, kind: "batchSignDataItem", items: [transferItem, UNREADABLE_ITEM] } });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(primary("Sign 2").className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
   });
 
   it.each(["sign", "dispatch"] as const)("shows the fee of a %s with no recipient", (kind) => {

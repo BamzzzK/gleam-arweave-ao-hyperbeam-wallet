@@ -3,6 +3,7 @@ import {
   addressFromOwner,
   decrypt,
   verifyMessage,
+  WALLET_APPROVAL_ORIGIN,
   type JWKInterface,
   type StoragePort,
   type ApprovalPresenterPort,
@@ -150,6 +151,15 @@ async function seedWallet(storage: StoragePort) {
       updatedAt: 0,
       encryptedKeyfile: { version: 1, algorithm: "AES-GCM", kdf: "PBKDF2-HMAC-SHA256", iterations: 600000, salt: "s", iv: "i", ciphertext: "c" },
     },
+  ]);
+}
+
+/** The grant a dApp's signing request needs to still hold when it is approved. */
+async function seedGrant(storage: StoragePort, origin = "https://bazar.arweave.net") {
+  const grants = (await storage.get<unknown[]>("local:grants")) ?? [];
+  await storage.set("local:grants", [
+    ...grants,
+    { origin, walletId: WALLET_ID, permissions: ["ACCESS_ADDRESS", "SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
   ]);
 }
 
@@ -501,6 +511,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
+    await seedGrant(storage);
     presenter = createFakePresenter();
     handler = new ApprovalHandler(storage, keySession, presenter, transfers);
 
@@ -532,6 +543,7 @@ describe("ApprovalHandler: an abandoned approval window", () => {
       submitTransfer: vi.fn(() => new Promise<{ txId: string }>((resolve) => (finishTransfer = resolve))),
     };
     await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
+    await seedGrant(storage);
     presenter = createFakePresenter();
     handler = new ApprovalHandler(storage, keySession, presenter, transfers);
 
@@ -649,6 +661,162 @@ describe("ApprovalHandler: revocation ends access", () => {
   });
 });
 
+describe("ApprovalHandler: a site's pending requests end with its grant", () => {
+  const ORIGIN = "https://bazar.arweave.net";
+  let storage: StoragePort;
+  let presenter: ReturnType<typeof createFakePresenter>;
+  let submitTransfer: ReturnType<typeof vi.fn<() => Promise<{ txId: string }>>>;
+  let handler: ApprovalHandler;
+
+  beforeEach(async () => {
+    storage = createWatchableStorage();
+    presenter = createFakePresenter();
+    submitTransfer = vi.fn<() => Promise<{ txId: string }>>().mockResolvedValue({ txId: "tx-1" });
+    handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
+    await seedWallet(storage);
+    await seedGrant(storage);
+    await cacheKey(WALLET_ID, await sharedJwk(), "abc-address");
+  });
+
+  afterEach(async () => {
+    await clearKeyCache();
+  });
+
+  async function requestTransfer(origin = ORIGIN) {
+    const before = presenter.presented.length;
+    const pending = handler.requestApproval({
+      kind: "transferAoTokens",
+      origin,
+      walletId: WALLET_ID,
+      recipient: "recipient",
+      amount: "1",
+      token: "token-process",
+      payload: new Uint8Array(),
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(before + 1));
+    return { pending, requestId: presenter.presented[before]! };
+  }
+
+  it("revokeGrant rejects the site's pending request and closes its window, so approving it signs nothing", async () => {
+    const { pending, requestId } = await requestTransfer();
+
+    await handler.revokeGrant({ origin: ORIGIN });
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toEqual([requestId]);
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(/No pending approval/);
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("revokeGrant leaves another site's requests, Gleam's own, and the site's pending connect alone", async () => {
+    await seedGrant(storage, "https://other.example");
+    const other = await requestTransfer("https://other.example");
+    const own = handler.requestApproval({
+      kind: "pointsProof",
+      origin: WALLET_APPROVAL_ORIGIN,
+      walletId: WALLET_ID,
+      payload: new Uint8Array([1]),
+      tags: [],
+    });
+    own.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(2));
+    const ownId = presenter.presented[1]!;
+    const connect = handler.requestApproval({
+      kind: "connect",
+      origin: ORIGIN,
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+    });
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(3));
+    const connectId = presenter.presented[2]!;
+
+    await handler.revokeGrant({ origin: ORIGIN });
+
+    expect(presenter.dismissed).toEqual([]);
+    await expect(handler.getApproval({ requestId: ownId })).resolves.toMatchObject({ requestId: ownId });
+    await handler.resolveApproval({ requestId: other.requestId, approved: true });
+    await expect(other.pending).resolves.toEqual({ id: "tx-1" });
+    await handler.resolveApproval({ requestId: connectId, approved: true });
+    await expect(connect).resolves.toEqual({ granted: ["ACCESS_ADDRESS"] });
+  });
+
+  it("approving after the grant is gone rejects the request and closes its window instead of signing", async () => {
+    const { pending, requestId } = await requestTransfer();
+    // Gone without `revokeGrant` reaching the pending request, as when it expires.
+    await storage.set("local:grants", []);
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The site was disconnected.");
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toEqual([requestId]);
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("approving after the grant expired mid-window rejects the request", async () => {
+    const { pending, requestId } = await requestTransfer();
+    await storage.set("local:grants", [
+      { origin: ORIGIN, walletId: WALLET_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: Date.now() - 1, budget: null },
+    ]);
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The site was disconnected.");
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(submitTransfer).not.toHaveBeenCalled();
+  });
+
+  it("a revoke landing after a transfer posted still hands the site its id, so it doesn't send again", async () => {
+    let finish: (value: { txId: string }) => void = () => {};
+    submitTransfer.mockImplementation(() => new Promise<{ txId: string }>((resolve) => (finish = resolve)));
+    const { pending, requestId } = await requestTransfer();
+
+    const resolving = handler.resolveApproval({ requestId, approved: true });
+    await vi.waitFor(() => expect(submitTransfer).toHaveBeenCalled());
+    await handler.revokeGrant({ origin: ORIGIN });
+    finish({ txId: "tx-1" });
+
+    await resolving;
+    await expect(pending).resolves.toEqual({ id: "tx-1" });
+    expect(presenter.dismissed).toEqual([requestId]);
+  });
+
+  /** Opens a signMessage request whose grant reads as given: first at approval, then once signed. */
+  async function signMessageWithGrantReads(afterSigning: () => Promise<null>) {
+    const grant = await handler.findActiveGrant(ORIGIN);
+    vi.spyOn(handler, "findActiveGrant").mockResolvedValueOnce(grant).mockImplementationOnce(afterSigning);
+    const pending = handler.requestApproval({
+      kind: "signMessage",
+      origin: ORIGIN,
+      walletId: WALLET_ID,
+      payload: new TextEncoder().encode("hello"),
+      hashAlgorithm: "SHA-256",
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    return { pending, requestId: presenter.presented[0]! };
+  }
+
+  it("a revoke landing while a message is signed withholds the signature", async () => {
+    const { pending, requestId } = await signMessageWithGrantReads(async () => null);
+
+    await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow("The site was disconnected.");
+
+    await expect(pending).rejects.toThrow("The site was disconnected.");
+    expect(presenter.dismissed).toEqual([requestId]);
+  });
+
+  it("a grant read that fails once the message is signed still settles the request", async () => {
+    const { pending, requestId } = await signMessageWithGrantReads(async () => {
+      throw new Error("storage unavailable");
+    });
+
+    await handler.resolveApproval({ requestId, approved: true });
+
+    await expect(pending).resolves.toBeInstanceOf(Uint8Array);
+    expect(presenter.dismissed).toEqual([requestId]);
+  });
+});
+
 describe("ApprovalHandler: removing wallets", () => {
   const OTHER_WALLET_ID = "wallet-2";
   let storage: StoragePort;
@@ -746,6 +914,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     presenter = createFakePresenter();
     handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
+    await seedGrant(storage);
   });
 
   afterEach(async () => {
@@ -989,7 +1158,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await vi.waitFor(() => expect(presenter.presented.length).toBeGreaterThan(0));
     const requestId = presenter.presented.pop()!;
 
-    const message = "This wallet's stored public key doesn't match its address. Encryption was refused.";
+    const message = "This wallet's stored public key doesn't match its address, so Gleam won't encrypt with it.";
     const dappRejected = expect(pending).rejects.toThrow(message);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(message);
     await dappRejected;
@@ -1183,6 +1352,49 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await handler.resolveApproval({ requestId, approved: false });
       await expect(pending).rejects.toThrow();
     });
+
+    it("flags each item that looks like an AO Transfer it can't read, and only that item", async () => {
+      const target = "Z".repeat(43);
+      const recipient = "R".repeat(43);
+      const lowercase = [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: recipient },
+        { name: "quantity", value: "7" },
+      ];
+      const clean = [
+        { name: "Action", value: "Transfer" },
+        { name: "Recipient", value: recipient },
+        { name: "Quantity", value: "7" },
+      ];
+      const pending = handler.requestApproval({
+        kind: "batchSignDataItem",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode(" "),
+        tags: lowercase,
+        dataItems: [
+          { data: toBase64(" "), tags: lowercase, target },
+          { data: toBase64(" "), tags: clean, target },
+          { data: toBase64(" "), tags: [{ name: "Action", value: "Eval" }], target },
+        ],
+      });
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
+
+      const request = await handler.getApproval({ requestId });
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+        throw new Error("expected a signing preview");
+      }
+      const [unreadable, transfer, plain] = request.preview.items!;
+      expect(unreadable).toMatchObject({ transfer: null, unreadableTokenTransfer: true });
+      expect(transfer!.transfer).toMatchObject({ token: target, recipient, amount: "7" });
+      expect(transfer!.unreadableTokenTransfer).toBeUndefined();
+      expect(plain!.transfer).toBeNull();
+      expect(plain!.unreadableTokenTransfer).toBeUndefined();
+
+      await handler.resolveApproval({ requestId, approved: false });
+      await expect(pending).rejects.toThrow();
+    });
   });
 });
 
@@ -1196,6 +1408,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("finalizes an approved transferAoTokens request via the injected AoTransferSubmitter, returning { id }", async () => {
     storage = createWatchableStorage();
+    await seedGrant(storage);
     presenter = createFakePresenter();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "ao-message-id-123" });
     const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
@@ -1238,6 +1451,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("rejecting a transferAoTokens request never calls the submitter", async () => {
     storage = createWatchableStorage();
+    await seedGrant(storage);
     presenter = createFakePresenter();
     const submitTransfer = vi.fn().mockResolvedValue({ txId: "should-not-be-called" });
     const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
@@ -1265,6 +1479,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("a locked wallet is rejected before the submitter is ever reached", async () => {
     storage = createWatchableStorage();
+    await seedGrant(storage);
     presenter = createFakePresenter();
     const submitTransfer = vi.fn();
     const handler = new ApprovalHandler(storage, keySession, presenter, { submitTransfer });
@@ -1292,6 +1507,7 @@ describe("ApprovalHandler: transferAoTokens signing approval", () => {
 
   it("without an injected AoTransferSubmitter, throws a named wiring error rather than silently succeeding", async () => {
     storage = createWatchableStorage();
+    await seedGrant(storage);
     presenter = createFakePresenter();
     const handler = new ApprovalHandler(storage, keySession, presenter);
     await seedWallet(storage);
@@ -1336,6 +1552,7 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("previews the token and the address it joins, without needing a signing key", async () => {
     const storage = createWatchableStorage();
+    await seedGrant(storage);
     const presenter = createFakePresenter();
     const addWatchedToken = vi.fn().mockResolvedValue(undefined);
     const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
@@ -1362,6 +1579,7 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("adds nothing when rejected", async () => {
     const storage = createWatchableStorage();
+    await seedGrant(storage);
     const presenter = createFakePresenter();
     const addWatchedToken = vi.fn();
     const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });
@@ -1376,6 +1594,7 @@ describe("ApprovalHandler: addToken approval", () => {
 
   it("rejects the dApp with the error when the token can't be stored", async () => {
     const storage = createWatchableStorage();
+    await seedGrant(storage);
     const presenter = createFakePresenter();
     const addWatchedToken = vi.fn().mockRejectedValue(new Error("No HyperBEAM peer configured."));
     const handler = new ApprovalHandler(storage, keySession, presenter, undefined, undefined, undefined, { addWatchedToken });

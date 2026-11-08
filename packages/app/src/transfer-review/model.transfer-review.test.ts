@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SigningApprovalPreview } from "@gleam/core";
+import { HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
+import { t } from "../i18n";
 import {
-  balanceAfterText,
+  balanceAfterParts,
+  glyphLabel,
   groupDigits,
   recipientsOf,
   showsWarning,
   transferRequestFromDevice,
+  warningReasons,
   transferRequestFromPreview,
   type TransferRequest,
 } from "./model";
@@ -93,15 +97,49 @@ describe("transferRequestFromDevice", () => {
   });
 });
 
-describe("balanceAfterText", () => {
+describe("balanceAfterParts", () => {
   it("takes the amount and the fee off an AR balance", () => {
-    expect(balanceAfterText({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"))).toBe(
-      "0.5 AR",
-    );
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"))).toEqual([
+      { amount: "0.5", ticker: "AR" },
+    ]);
+  });
+
+  it("keeps a token's ticker apart from its amount, and leaves a ticker that echoes the id out", () => {
+    const context = {
+      balances: {
+        arBalance: "0",
+        tokenBalances: [
+          { address: R, processId: P, ticker: "\u202EXYZ", denomination: 6, name: "X", quantity: "5000000", source: "watched" as const },
+        ],
+      },
+    };
+    expect(balanceAfterParts(context, request({ token: P, ticker: "\u202EXYZ", denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: "\u202EXYZ" },
+    ]);
+    expect(balanceAfterParts(context, request({ token: P, ticker: P, denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: null },
+    ]);
+    expect(balanceAfterParts(context, request({ token: P, ticker: "  ", denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: null },
+    ]);
+  });
+
+  it("masks every amount while balances are hidden", () => {
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] }, balancesHidden: true }, request())).toEqual([
+      { amount: HIDDEN_AMOUNT, ticker: null },
+    ]);
   });
 
   it("leaves out a balance the request would overdraw", () => {
-    expect(balanceAfterText({ balances: { arBalance: "5", tokenBalances: [] } }, request())).toBeUndefined();
+    expect(balanceAfterParts({ balances: { arBalance: "5", tokenBalances: [] } }, request())).toBeUndefined();
+  });
+});
+
+describe("glyphLabel", () => {
+  it("drops hidden characters from a ticker's initials", () => {
+    expect(glyphLabel({ token: P, ticker: "\u202Exyz", denomination: 6, amount: "1", recipient: R })).toBe("XY");
+    expect(glyphLabel({ token: P, ticker: "\u202E\u200B", denomination: 6, amount: "1", recipient: R })).toBe("?");
+    expect(glyphLabel({ token: P, ticker: " \u202E ", denomination: 6, amount: "1", recipient: R })).toBe("?");
   });
 });
 
@@ -110,5 +148,35 @@ describe("showsWarning", () => {
     expect(showsWarning(request({ token: P, denomination: null }), null)).toBe(true);
     expect(showsWarning(request(), null)).toBe(false);
     expect(showsWarning(request(), { firstTime: false, lookalikeOf: null, unchecked: true })).toBe(true);
+  });
+
+  it("warns for a token transfer the wallet couldn't read, from the preview or the device", () => {
+    const fromPreview = transferRequestFromPreview({ ...BASE, unreadableTokenTransfer: true })!;
+    expect(showsWarning(fromPreview, null)).toBe(true);
+    expect(warningReasons(fromPreview, t)).toEqual(["This may be a token transfer Gleam can't read. Check the tags."]);
+    const fromDevice = transferRequestFromDevice(
+      [{ kind: "transaction", recipient: P, quantity: "0", fee: "1", dataSize: "0", unreadableTokenTransfer: true }],
+      undefined,
+      null,
+    )!;
+    expect(showsWarning(fromDevice, null)).toBe(true);
+    expect(showsWarning(transferRequestFromPreview(BASE)!, null)).toBe(false);
+  });
+
+  it("warns for a batch when any data item is a token transfer the wallet couldn't read", () => {
+    const item = { decodedData: null, tags: [], target: P, payloadHash: "h" };
+    const transfer = { token: P, recipient: R, amount: "5", tokenDenomination: 12, tokenTicker: "T" };
+    const batch = (unreadable: boolean): SigningApprovalPreview => ({
+      ...BASE,
+      kind: "batchSignDataItem",
+      items: [
+        { ...item, transfer },
+        { ...item, transfer: null, ...(unreadable ? { unreadableTokenTransfer: true } : {}) },
+      ],
+    });
+    const warned = transferRequestFromPreview(batch(true))!;
+    expect(warned.unreadableTokenTransfer).toBe(true);
+    expect(showsWarning(warned, null)).toBe(true);
+    expect(showsWarning(transferRequestFromPreview(batch(false))!, null)).toBe(false);
   });
 });

@@ -72,10 +72,16 @@ describe("readCollectibleTransfer", () => {
     expect(readCollectibleTransfer(shape)).toEqual({ assetId: ASSET, recipient: RECIPIENT });
   });
 
-  it("ignores anything that moves AR, carries data or has other tags", () => {
+  it("reads a send that carries other tags too", () => {
+    expect(readCollectibleTransfer({ ...shape, tags: [...shape.tags, { name: "x", value: "y" }] })).toEqual({
+      assetId: ASSET,
+      recipient: RECIPIENT,
+    });
+  });
+
+  it("ignores anything that moves AR, carries data or has no transfer tags", () => {
     expect(readCollectibleTransfer({ ...shape, quantity: "5" })).toBeNull();
     expect(readCollectibleTransfer({ ...shape, data_size: "3" })).toBeNull();
-    expect(readCollectibleTransfer({ ...shape, tags: [...shape.tags, { name: "x", value: "y" }] })).toBeNull();
     expect(readCollectibleTransfer({ ...shape, tags: [] })).toBeNull();
   });
 });

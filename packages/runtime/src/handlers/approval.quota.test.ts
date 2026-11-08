@@ -1,20 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import { bytesToBase64, WALLET_APPROVAL_ORIGIN, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
 import { generateJWK, Keyring } from "@gleam/core/signer";
-import { ApprovalHandler } from "./approval";
+import { ApprovalHandler, utf8ByteLength } from "./approval";
 import { createKeySession } from "./key-session";
 
 const QUOTA_BYTES = 10 * 1024 * 1024;
 
+const encoder = new TextEncoder();
+const utf8 = (string: string) => encoder.encode(string).length;
+
 /**
  * Charges what `chrome.storage.session` does: the memory of the stored
- * value tree, a fixed cost for every value plus each string's length.
+ * value tree, a fixed cost for every value plus each string's UTF-8 length.
  */
 function chargedBytes(value: unknown): number {
-  if (typeof value === "string") return 32 + value.length;
+  if (typeof value === "string") return 32 + utf8(value);
   if (Array.isArray(value)) return value.reduce<number>((sum, entry) => sum + chargedBytes(entry), 32);
   if (value !== null && typeof value === "object") {
-    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + key.length + chargedBytes(entry), 32);
+    return Object.entries(value).reduce<number>((sum, [key, entry]) => sum + utf8(key) + chargedBytes(entry), 32);
   }
   return 32;
 }
@@ -22,7 +25,7 @@ function chargedBytes(value: unknown): number {
 function createQuotaStorage(): StoragePort {
   const store = new Map<string, unknown>();
   const watchers = new Map<string, Set<(value: unknown) => void>>();
-  const used = () => [...store].reduce((sum, [key, value]) => sum + key.length + chargedBytes(value), 0);
+  const used = () => [...store].reduce((sum, [key, value]) => sum + utf8(key) + chargedBytes(value), 0);
   return {
     async get<T>(key: string) {
       return store.has(key) ? (store.get(key) as T) : null;
@@ -82,14 +85,14 @@ function setup() {
   return { storage, presenter, keySession, handler };
 }
 
-function signDataItem(handler: ApprovalHandler, origin: string, bytes: number): Promise<unknown> {
+function signDataItem(handler: ApprovalHandler, origin: string, bytes: number, tagValue?: string): Promise<unknown> {
   const payload = new Uint8Array(bytes);
   const pending = handler.requestApproval({
     kind: "signDataItem",
     origin,
     walletId: WALLET_ID,
     payload,
-    dataItems: [{ data: bytesToBase64(payload), tags: [] }],
+    dataItems: [{ data: bytesToBase64(payload), tags: tagValue === undefined ? [] : [{ name: "Note", value: tagValue }] }],
   });
   pending.catch(() => {});
   return pending;
@@ -159,6 +162,9 @@ describe("ApprovalHandler: pending requests stay within session storage", () => 
       unlockedWalletIds: [WALLET_ID],
     });
     await keySession.cacheKey(WALLET_ID, await generateJWK(), "abc-address");
+    await storage.set("local:grants", [
+      { origin: SITE_A, walletId: WALLET_ID, permissions: ["SIGNATURE"], createdAt: 0, expiresAt: null, budget: null },
+    ]);
 
     const pending = signDataItem(handler, SITE_A, 400_000);
     await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
@@ -167,5 +173,55 @@ describe("ApprovalHandler: pending requests stay within session storage", () => 
     expect(raw.byteLength).toBeGreaterThan(400_000);
 
     expect(await storage.get("session:pendingApprovals")).toEqual([]);
+  });
+});
+
+describe("utf8ByteLength", () => {
+  it("counts each string's UTF-8 bytes", () => {
+    expect(utf8ByteLength("")).toBe(0);
+    expect(utf8ByteLength("abc")).toBe(3);
+    expect(utf8ByteLength("\u00e9")).toBe(2);
+    expect(utf8ByteLength("\u07ff")).toBe(2);
+    expect(utf8ByteLength("\u20ac")).toBe(3);
+    expect(utf8ByteLength("\uffff")).toBe(3);
+    expect(utf8ByteLength("\u{1f600}")).toBe(4);
+    expect(utf8ByteLength("\ud800")).toBe(3);
+    expect(utf8ByteLength("\udc00x")).toBe(4);
+    expect(utf8ByteLength("\ud800\ud800\udc00")).toBe(7);
+  });
+
+  it("matches TextEncoder", () => {
+    const sample = "a\u00e9\u20ac\u{1f600}\ud800z\udfff\ud83d";
+    expect(utf8ByteLength(sample)).toBe(utf8(sample));
+  });
+});
+
+describe("ApprovalHandler: pending requests are measured in UTF-8", () => {
+  // Each data item's tags are stored more than once in a record, so these
+  // values fit under 2 MiB by UTF-16 count but not by UTF-8 bytes.
+  it("refuses a request whose 3-byte characters exceed a site's share", async () => {
+    const { handler, presenter } = setup();
+
+    await expect(signDataItem(handler, SITE_A, 10, "\u20ac".repeat(600_000))).rejects.toThrow(/too large/);
+    await expect(signDataItem(handler, SITE_A, 10, "\uffff".repeat(600_000))).rejects.toThrow(/too large/);
+    expect(presenter.presented).toHaveLength(0);
+  });
+
+  it("refuses a site's second 3-byte request that UTF-16 would let through", async () => {
+    const { handler, presenter } = setup();
+
+    void signDataItem(handler, SITE_A, 10, "\u20ac".repeat(300_000));
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
+    await expect(signDataItem(handler, SITE_A, 10, "\u20ac".repeat(300_000))).rejects.toThrow(/waiting for approval/);
+    expect(presenter.presented).toHaveLength(1);
+  });
+
+  it("still holds the same requests in ASCII", async () => {
+    const { handler, presenter } = setup();
+
+    void signDataItem(handler, SITE_A, 10, "e".repeat(600_000));
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
+    void signDataItem(handler, SITE_A, 10, "e".repeat(300_000));
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(2));
   });
 });
