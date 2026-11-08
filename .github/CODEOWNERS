@@ -36,6 +36,9 @@
 /packages/app/src/screens/onboarding/src/Import.tsx                        @skyf0xx
 /packages/app/src/screens/onboarding/src/OnboardingView.tsx                @skyf0xx
 /packages/app/src/screens/wallet-detail/src/WalletDetailView.tsx           @skyf0xx
+/apps/extension/src/adapters/downloads.ts                           @skyf0xx
+/packages/app/src/screens/onboarding/src/                           @skyf0xx
+/packages/app/src/screens/lock-settings/src/                        @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -49,6 +52,9 @@
 /packages/keystone/src/decode-account.ts                                   @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
+/packages/core/src/models/capabilities.ts                           @skyf0xx
+/apps/extension/src/hardware/keystone/                              @skyf0xx
+/apps/extension/src/hardware/ledger/                                @skyf0xx
 
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
@@ -70,6 +76,10 @@
 /packages/core/src/policy/signing-origin.ts                                @skyf0xx
 /packages/runtime/src/dispatch/methods.ts                                  @skyf0xx
 /packages/messaging/                                                       @skyf0xx
+/packages/core/src/models/method-permissions.ts                     @skyf0xx
+/packages/core/src/models/method-privileges.ts                      @skyf0xx
+/packages/runtime/src/handlers/announcements.ts                      @skyf0xx
+/packages/runtime/src/handlers/site-wallet.ts                       @skyf0xx
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
@@ -84,6 +94,7 @@
 /packages/core/src/models/user-errors.ts                                   @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
 /apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
+/apps/extension/src/adapters/windows.ts                             @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
@@ -127,3 +138,11 @@
 /apps/site-open/.well-known/apple-app-site-association              @skyf0xx
 /apps/site-open/.well-known/assetlinks.json                         @skyf0xx
 /apps/site-open/vercel.json                                         @skyf0xx
+/apps/extension/src/csp.ts                                          @skyf0xx
+/packages/core/src/scan/                                            @skyf0xx
+/packages/core/src/points/messages.ts                               @skyf0xx
+/packages/core/src/points/identity.ts                               @skyf0xx
+/apps/extension/src/adapters/app-platform.ts                        @skyf0xx
+/scripts/well-known.mjs                                            @skyf0xx
+/scripts/release-all.mjs                                           @skyf0xx
+/scripts/pack-release.sh                                            @skyf0xx
