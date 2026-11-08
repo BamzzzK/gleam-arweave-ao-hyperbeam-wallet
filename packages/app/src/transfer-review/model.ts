@@ -8,7 +8,7 @@ import {
   type TokenPrice,
 } from "@gleam/core";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
-import { formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
+import { currencyStep, formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import type { WalletBalances } from "../screens/activity/src/useBalances";
 import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
@@ -284,7 +284,13 @@ function fiatNumber(context: TransferContext, transfer: TransferLine): number | 
 
 export function fiatText(context: TransferContext, transfer: TransferLine): string | undefined {
   const value = fiatNumber(context, transfer);
-  return value === undefined || !context.currency ? undefined : `≈ ${formatCurrencyValue(value, context.currency)}`;
+  return value === undefined || !context.currency ? undefined : approxCurrency(value, context.currency);
+}
+
+/** "≈ $1.20", or "< $0.01" for a value that would otherwise round to zero and read as worthless. */
+function approxCurrency(value: number, currency: NonNullable<TransferContext["currency"]>): string {
+  const step = currencyStep(value, currency);
+  return value > 0 && value < step ? `< ${formatCurrencyValue(step, currency)}` : `≈ ${formatCurrencyValue(value, currency)}`;
 }
 
 /** The batch's total value, only when every transfer is priced. */
@@ -292,12 +298,30 @@ export function totalFiatText(context: TransferContext, transfers: TransferLine[
   const values = transfers.map((transfer) => fiatNumber(context, transfer));
   if (!context.currency || values.some((value) => value === undefined)) return undefined;
   const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  return `≈ ${formatCurrencyValue(total, context.currency)}`;
+  return approxCurrency(total, context.currency);
 }
 
-/** The fee in AR, or "None" for a request that pays none. */
+const FEE_SIGNIFICANT_DIGITS = 3n;
+
+/**
+ * The fee in AR to three significant digits, rounded up so it never reads
+ * lower than what is paid; "None" for a request that pays none.
+ */
 export function feeText(fee: string | null, t: TFunction): string {
-  return fee === null ? t("transferReview.none") : `${formatWinstonAsAr(fee, AR_DENOMINATION)} AR`;
+  if (fee === null) return t("transferReview.none");
+  const winston = BigInt(fee);
+  const digits = BigInt(winston.toString().length);
+  const unit = digits > FEE_SIGNIFICANT_DIGITS ? 10n ** (digits - FEE_SIGNIFICANT_DIGITS) : 1n;
+  const rounded = ((winston + unit - 1n) / unit) * unit;
+  return `${formatWinstonAsAr(String(rounded), AR_DENOMINATION)} AR`;
+}
+
+/** The fee's value in the display currency, when AR is priced and isn't itself the display currency. */
+export function feeFiatText(fee: string | null, context: TransferContext): string | undefined {
+  if (fee === null || !context.currency || context.currency === "AR") return undefined;
+  const price = context.prices?.find((entry) => entry.processId === null)?.price;
+  if (typeof price !== "number") return undefined;
+  return approxCurrency(Number(formatAtomicAsDisplay(fee, AR_DENOMINATION, AR_DENOMINATION)) * price, context.currency);
 }
 
 /** One token's balance after the request; `ticker` is the token's own, so it renders as untrusted text. */

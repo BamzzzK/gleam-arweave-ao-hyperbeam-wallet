@@ -54,7 +54,7 @@ export function MemorableAddress({
         translate="no"
         className={cn(
           "grid min-w-0 grid-cols-[repeat(7,max-content)] text-left font-mono leading-[1.75] phone:grid-cols-[repeat(4,max-content)]",
-          confirm ? "text-[13px]" : "text-label",
+          confirm ? "text-[12.5px]" : "text-label",
         )}
       >
         {chunks.map((chunk) => (

@@ -155,7 +155,7 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getAllByText("311").length).toBeGreaterThan(0);
     expect(screen.getByText("raw units")).toBeTruthy();
     expect(screen.getByText("z".repeat(43))).toBeTruthy();
-    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+    expect(screen.getByText("0.000000655 AR")).toBeTruthy();
     expect(screen.queryByText("ARDRIVE")).toBeNull();
   });
 
