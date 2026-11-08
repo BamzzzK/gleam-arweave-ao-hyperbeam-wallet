@@ -178,6 +178,11 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   if (summary.kind === "transaction") {
     return (
       <>
+        {summary.unreadableTokenTransfer ? (
+          <p role="alert" className="pb-1 text-caption leading-snug text-warning">
+            {t("transferReview.unreadableTokenTransfer")}
+          </p>
+        ) : null}
         {summary.recipient !== null ? <Row label={t("approval.amount")} value={`${formatWinstonAsAr(summary.quantity, 12)} AR`} /> : null}
         {summary.recipient !== null ? <AddressRow label={t("approval.recipient")} address={summary.recipient} /> : null}
         <Row label={t("approval.fee")} value={`${formatWinstonAsAr(summary.fee, 12)} AR`} />

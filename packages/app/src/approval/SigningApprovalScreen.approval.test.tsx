@@ -261,6 +261,30 @@ describe("SigningApprovalScreen primary action and warning", () => {
   });
 });
 
+describe("SigningApprovalScreen transfer layout: unreadable token transfer", () => {
+  const UNREADABLE: SigningApprovalPreview = {
+    ...AR_PREVIEW,
+    kind: "sign",
+    amount: "7",
+    tags: [
+      { name: "action", value: "transfer" },
+      { name: "recipient", value: SECOND_RECIPIENT },
+      { name: "quantity", value: "5000000" },
+    ],
+    unreadableTokenTransfer: true,
+  };
+
+  it("warns, even for a known recipient, turns Sign red and shows the tags", () => {
+    renderScreen({ preview: UNREADABLE });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(alert.textContent).not.toMatch(/haven't sent to this address before/);
+    expect(primary("Sign").className).toContain("bg-warning");
+    expect(screen.getByRole("button", { name: "Hide tags" })).toBeTruthy();
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+  });
+});
+
 describe("SigningApprovalScreen transfer layout: unknown scale", () => {
   const UNKNOWN: SigningApprovalPreview = { ...AO_PREVIEW, token: WAR, tokenDenomination: null, tokenTicker: "wAR" };
 

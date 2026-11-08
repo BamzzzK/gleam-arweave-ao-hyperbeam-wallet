@@ -783,6 +783,45 @@ describe("ApprovalHandler: what the device signs is what was approved", () => {
     ]);
   });
 
+  function signL1Transfer(tags: Array<{ name: string; value: string }>, quantity = "0") {
+    return approveOnDevice({
+      kind: "sign",
+      payload: new Uint8Array(),
+      tags,
+      gatewayUrl: GATEWAY,
+      target: PROCESS_ID,
+      quantity,
+      reward: "5000",
+      last_tx: "b".repeat(64),
+    });
+  }
+
+  it("summarizes a token transfer by its tag names, whatever their order or case", async () => {
+    const { view } = await signL1Transfer([
+      { name: "Quantity", value: "7" },
+      { name: "App-Name", value: "Dex" },
+      { name: "Recipient", value: RECIPIENT },
+      { name: "Action", value: "Transfer" },
+    ]);
+    expect(view.device!.summaries).toEqual([
+      { kind: "l1TokenTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "7", fee: "5000" },
+    ]);
+  });
+
+  it("flags a transfer-looking transaction it can't read", async () => {
+    const { view } = await signL1Transfer(
+      [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: RECIPIENT },
+        { name: "quantity", value: "7" },
+      ],
+      "3",
+    );
+    expect(view.device!.summaries).toEqual([
+      { kind: "transaction", recipient: PROCESS_ID, quantity: "3", fee: "5000", dataSize: "0", unreadableTokenTransfer: true },
+    ]);
+  });
+
   it.each([
     ["recipient", (transaction: Record<string, unknown>) => ({ ...transaction, target: "x".repeat(43) })],
     ["amount", (transaction: Record<string, unknown>) => ({ ...transaction, quantity: "999999" })],

@@ -78,6 +78,12 @@ export interface SigningApprovalPreview {
   tokenTicker: string | null;
   /** Set for a wallet `transfer` that sends this collectible; `amount` is then 0 AR. */
   collectible?: CollectibleRef | null;
+  /**
+   * Set when a transaction looks like a token transfer (`ao/l1-transfer.ts`)
+   * that can't be read cleanly, so it shows as the plain transaction with a
+   * warning to check its tags.
+   */
+  unreadableTokenTransfer?: boolean;
   decodedData: string | null;
   tags: Array<{ name: string; value: string }>;
   payloadHash: string;
@@ -197,7 +203,15 @@ export type DeviceSigningPayload =
  * transfer.
  */
 export type DeviceSigningSummary =
-  | { kind: "transaction"; recipient: string | null; quantity: string; fee: string; dataSize: string }
+  | {
+      kind: "transaction";
+      recipient: string | null;
+      quantity: string;
+      fee: string;
+      dataSize: string;
+      /** As `SigningApprovalPreview.unreadableTokenTransfer`. */
+      unreadableTokenTransfer?: boolean;
+    }
   | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
   /**
    * A zero-AR L1 transaction whose tags move `quantity` of an

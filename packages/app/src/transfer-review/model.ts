@@ -54,6 +54,8 @@ export interface TransferRequest {
   /** The provider method that asked; `null` for the wallet's own send, `undefined` when not known. */
   method?: string | null;
   itemCount: number;
+  /** Looks like a token transfer the wallet couldn't read, so it shows as the plain transaction, warned. */
+  unreadableTokenTransfer?: boolean;
 }
 
 /**
@@ -141,6 +143,7 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
     fee: preview.fee,
     method: walletSend ? null : preview.kind,
     itemCount: 1,
+    ...(preview.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
   };
 }
 
@@ -183,7 +186,14 @@ export function transferRequestFromDevice(
     }
   }
   if (transfers.length === 0) return null;
-  return { transfers, others: [], fee: fee === null ? null : String(fee), itemCount: summaries.length };
+  const unreadable = summaries.some((summary) => summary.kind === "transaction" && summary.unreadableTokenTransfer === true);
+  return {
+    transfers,
+    others: [],
+    fee: fee === null ? null : String(fee),
+    itemCount: summaries.length,
+    ...(unreadable ? { unreadableTokenTransfer: true } : {}),
+  };
 }
 
 /** Every transfer's distinct recipient, for the recipient checks. */
@@ -311,8 +321,16 @@ export function balanceAfterText(context: TransferContext, request: TransferRequ
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+/** The reasons the warning box lists beyond the recipient's own. */
+export function warningReasons(request: TransferRequest, t: TFunction): string[] {
+  const reasons: string[] = [];
+  if (request.unreadableTokenTransfer) reasons.push(t("transferReview.unreadableTokenTransfer"));
+  if (request.transfers.some(isUnknownScale)) reasons.push(t("transferReview.unknownDecimals"));
+  return reasons;
+}
+
 export function showsWarning(request: TransferRequest, risk: RecipientRisk | null): boolean {
-  if (request.transfers.some(isUnknownScale)) return true;
+  if (request.unreadableTokenTransfer || request.transfers.some(isUnknownScale)) return true;
   if (!risk) return false;
   return risk.firstTime || risk.lookalikeOf !== null || risk.unchecked === true;
 }

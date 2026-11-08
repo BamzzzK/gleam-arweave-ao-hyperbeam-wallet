@@ -5,7 +5,7 @@ export type { LegacyTokenInfo } from "./legacy-token";
 export { readTokenStateLogo, readTokenSwapHeight } from "./token-state";
 export { discoverTokens } from "./token-discovery";
 export type { DiscoverTokensOptions } from "./token-discovery";
-export { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer } from "./l1-transfer";
+export { l1TransferTags, prepareL1TokenTransfer, readL1TokenTransfer, type L1TokenTransferReading } from "./l1-transfer";
 export { readAoTransferMessage, type AoTransferMessage } from "./transfer-message";
 export { submitTransfer, AO_TRANSFER_HAS_NO_FEE } from "./transfer";
 export type { SubmittedAoTransfer } from "./transfer";

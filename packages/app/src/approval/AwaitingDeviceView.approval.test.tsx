@@ -116,6 +116,18 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getAllByRole("button").map((button) => button.textContent)).not.toContain("Send");
   });
 
+  it("warns about a token transfer the background couldn't read", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        summaries: [
+          { kind: "transaction", recipient: "p".repeat(43), quantity: "0", fee: "1", dataSize: "0", unreadableTokenTransfer: true },
+        ],
+      },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+  });
+
   it("shows an L1 token transfer's AR fee, and leaves a target the preview didn't resolve unscaled", () => {
     renderView({
       device: {

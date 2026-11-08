@@ -26,6 +26,7 @@ import {
   showsWarning,
   totalFiatText,
   unitText,
+  warningReasons,
   type RecipientRisk,
   type SignedPart,
   type TransferContext,
@@ -59,8 +60,10 @@ const GUTTER = "px-6 phone:px-5";
  * amount, from and to, the token, fee and balance after, then the raw
  * details. Addresses are shown in full; the token is named by its id
  * as well as its self-chosen ticker. The warning box shows for a
- * first-time or lookalike recipient and for a token with no stated scale,
- * and only then is the primary action red.
+ * first-time or lookalike recipient, for a token with no stated scale and
+ * for a token transfer the wallet couldn't read, and only then is the
+ * primary action red. That last case opens Details and the tags, since
+ * the tags are what the token acts on.
  */
 export function TransferReview({
   header,
@@ -88,7 +91,7 @@ export function TransferReview({
         lookalikeOf={lookalikeOf}
         lookalikeAvatarSvg={lookalikeOf ? identity.avatarSvg(lookalikeOf) : undefined}
         emphasisPick={identity.emphasisPick}
-        extraReason={request.transfers.some(isUnknownScale) ? t("transferReview.unknownDecimals") : undefined}
+        extraReasons={warningReasons(request, t)}
       />
     </div>
   ) : null;
@@ -347,7 +350,8 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
 
 function Details({ request, batch }: { request: TransferRequest; batch: boolean }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  const showTags = request.unreadableTokenTransfer === true;
+  const [open, setOpen] = useState(showTags);
   const first = request.transfers[0]!;
   const method = methodText(request, t);
   const count = t("transferReview.itemsCount", { count: request.itemCount });
@@ -379,10 +383,10 @@ function Details({ request, batch }: { request: TransferRequest; batch: boolean 
                     <span className="text-label font-semibold text-foreground">
                       {t("transferReview.itemNumber", { number: transfer.index + 1 })}
                     </span>
-                    <TransferDetails transfer={transfer} part={transfer.part} />
+                    <TransferDetails transfer={transfer} part={transfer.part} showTags={showTags} />
                   </div>
                 ))
-              : <TransferDetails transfer={first} part={first.part} />}
+              : <TransferDetails transfer={first} part={first.part} showTags={showTags} />}
           </div>
         ) : null}
       </div>
@@ -390,9 +394,9 @@ function Details({ request, batch }: { request: TransferRequest; batch: boolean 
   );
 }
 
-function TransferDetails({ transfer, part }: { transfer: TransferLine; part: SignedPart }) {
+function TransferDetails({ transfer, part, showTags }: { transfer: TransferLine; part: SignedPart; showTags: boolean }) {
   const t = useT();
-  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(showTags);
   return (
     <>
       <DetailRow label={t("transferReview.rawUnitsLabel")} value={groupDigits(transfer.amount)} />

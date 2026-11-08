@@ -224,6 +224,8 @@ export interface SigningRequestInput {
   tokenTicker?: string | null;
   /** A wallet `transfer` of this collectible: an L1 transaction to its process carrying the transfer tags. */
   collectible?: CollectibleRef | null;
+  /** See `SigningApprovalPreview.unreadableTokenTransfer`. */
+  unreadableTokenTransfer?: boolean;
   /** Raw bytes this request will sign/encrypt/decrypt, for the payload hash and decoded preview. */
   payload: Uint8Array;
   tags?: Array<{ name: string; value: string }>;
@@ -556,13 +558,14 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
   }
   if (payload.kind === "transaction") {
-    const { target, quantity, reward, data_size, tags } = payload.transaction;
-    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
+    const { target, quantity, reward, data_size } = payload.transaction;
+    const tags = payload.transaction.tags.map(decodeTransactionTag);
+    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags });
     if (collectible) {
       return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
     }
-    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags: tags.map(decodeTransactionTag) });
-    if (tokenTransfer) {
+    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags });
+    if (tokenTransfer?.kind === "transfer") {
       return {
         kind: "l1TokenTransfer",
         process: tokenTransfer.processId,
@@ -571,7 +574,14 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
         fee: reward,
       };
     }
-    return { kind: "transaction", recipient: target || null, quantity, fee: reward, dataSize: data_size };
+    return {
+      kind: "transaction",
+      recipient: target || null,
+      quantity,
+      fee: reward,
+      dataSize: data_size,
+      ...(tokenTransfer ? { unreadableTokenTransfer: true } : {}),
+    };
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
   const transfer = readAoTransferMessage({ target, tags });
@@ -888,6 +898,7 @@ async function buildSigningPreview(input: SigningRequestInput): Promise<SigningA
     tokenDenomination: input.tokenDenomination ?? null,
     tokenTicker: input.tokenTicker ?? null,
     ...(input.collectible ? { collectible: input.collectible } : {}),
+    ...(input.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
     decodedData: decodeDataPreview(input.payload),
     tags: input.tags ?? [],
     payloadHash,

@@ -626,7 +626,8 @@ export function createRuntime(platform: Platform): Runtime {
     const { gatewayUrl } = await reads.getNetworkSettings();
     // A token transfer to an arweave-scheduler process moves no AR, so it
     // shows as the token it sends, read from the transaction's own tags.
-    const tokenTransfer = transaction.target
+    // One that can't be read cleanly shows as the plain transaction, warned.
+    const reading = transaction.target
       ? readL1TokenTransfer({
           target: transaction.target,
           quantity: transaction.quantity ?? "0",
@@ -634,6 +635,7 @@ export function createRuntime(platform: Platform): Runtime {
           tags: transaction.tags,
         })
       : null;
+    const tokenTransfer = reading?.kind === "transfer" ? reading : null;
     const tokenMetadata =
       tokenTransfer && wallet ? await resolveTokenDenominationAndTicker(wallet.address, tokenTransfer.processId) : null;
     // The dApp's reward is the fee actually charged. Without one, the quote
@@ -656,6 +658,7 @@ export function createRuntime(platform: Platform): Runtime {
         : {
             recipient: transaction.target ?? null,
             amount: transaction.target ? (transaction.quantity ?? "0") : null,
+            ...(reading ? { unreadableTokenTransfer: true } : {}),
           }),
       fee,
       payload: transaction.data,

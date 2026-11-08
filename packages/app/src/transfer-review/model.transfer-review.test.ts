@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { SigningApprovalPreview } from "@gleam/core";
+import { t } from "../i18n";
 import {
   balanceAfterText,
   groupDigits,
   recipientsOf,
   showsWarning,
   transferRequestFromDevice,
+  warningReasons,
   transferRequestFromPreview,
   type TransferRequest,
 } from "./model";
@@ -110,5 +112,18 @@ describe("showsWarning", () => {
     expect(showsWarning(request({ token: P, denomination: null }), null)).toBe(true);
     expect(showsWarning(request(), null)).toBe(false);
     expect(showsWarning(request(), { firstTime: false, lookalikeOf: null, unchecked: true })).toBe(true);
+  });
+
+  it("warns for a token transfer the wallet couldn't read, from the preview or the device", () => {
+    const fromPreview = transferRequestFromPreview({ ...BASE, unreadableTokenTransfer: true })!;
+    expect(showsWarning(fromPreview, null)).toBe(true);
+    expect(warningReasons(fromPreview, t)).toEqual(["This may be a token transfer Gleam can't read. Check the tags."]);
+    const fromDevice = transferRequestFromDevice(
+      [{ kind: "transaction", recipient: P, quantity: "0", fee: "1", dataSize: "0", unreadableTokenTransfer: true }],
+      undefined,
+      null,
+    )!;
+    expect(showsWarning(fromDevice, null)).toBe(true);
+    expect(showsWarning(transferRequestFromPreview(BASE)!, null)).toBe(false);
   });
 });
