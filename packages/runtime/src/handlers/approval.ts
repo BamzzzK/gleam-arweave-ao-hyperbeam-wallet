@@ -632,10 +632,15 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
   }
   const { target, tags, data } = readDataItemFields(payload.raw);
   const transfer = readAoTransferMessage({ target, tags });
-  if (transfer) {
+  if (transfer?.kind === "transfer") {
     return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
   }
-  return { kind: "dataItem", target: target || null, dataSize: data.byteLength };
+  return {
+    kind: "dataItem",
+    target: target || null,
+    dataSize: data.byteLength,
+    ...(transfer ? { unreadableTokenTransfer: true } : {}),
+  };
 }
 
 function sameTags(actual: Array<{ name: string; value: string }>, expected: Array<{ name: string; value: string }>): boolean {
@@ -913,15 +918,17 @@ async function buildDataItemPreviews(
         tags,
         target: item.target ?? null,
         payloadHash: await sha256Hex(bytes),
-        transfer: transfer
-          ? {
-              token: transfer.processId,
-              recipient: transfer.recipient,
-              amount: transfer.quantity,
-              tokenDenomination: metadata?.tokenDenomination ?? null,
-              tokenTicker: metadata?.tokenTicker ?? null,
-            }
-          : null,
+        transfer:
+          transfer?.kind === "transfer"
+            ? {
+                token: transfer.processId,
+                recipient: transfer.recipient,
+                amount: transfer.quantity,
+                tokenDenomination: metadata?.tokenDenomination ?? null,
+                tokenTicker: metadata?.tokenTicker ?? null,
+              }
+            : null,
+        ...(transfer?.kind === "unreadable" ? { unreadableTokenTransfer: true } : {}),
       };
     }),
   );

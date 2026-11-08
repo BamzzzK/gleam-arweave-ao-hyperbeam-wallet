@@ -130,6 +130,19 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
   });
 
+  it("warns about a data item that may be a token transfer the background couldn't read", () => {
+    renderView({
+      device: {
+        ...DEVICE,
+        summaries: [
+          { kind: "dataItem", target: "p".repeat(43), dataSize: 1 },
+          { kind: "dataItem", target: "p".repeat(43), dataSize: 1, unreadableTokenTransfer: true },
+        ],
+      },
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+  });
+
   it("shows an L1 token transfer's AR fee, and leaves a target the preview didn't resolve unscaled", () => {
     renderView({
       device: {

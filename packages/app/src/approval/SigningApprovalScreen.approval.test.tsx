@@ -447,6 +447,54 @@ describe("SigningApprovalScreen: requests that move nothing", () => {
     expect(screen.getByRole("button", { name: /sign messages \(2\)/i })).toBeTruthy();
   });
 
+  const UNREADABLE_ITEM = {
+    decodedData: null,
+    tags: [
+      { name: "action", value: "transfer" },
+      { name: "recipient", value: SECOND_RECIPIENT },
+      { name: "quantity", value: "5000000" },
+    ],
+    target: AO,
+    payloadHash: "c".repeat(64),
+    transfer: null,
+    unreadableTokenTransfer: true,
+  };
+
+  it("warns about a single data item that may be a token transfer it can't read, turns Sign red and shows its tags", () => {
+    renderScreen({ preview: { ...MESSAGE_PREVIEW, items: [UNREADABLE_ITEM] } });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(screen.getByRole("button", { name: "Sign message" }).className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+    expect(screen.getByText("5000000")).toBeTruthy();
+  });
+
+  it("warns about a batch with no transfer when any item may be one it can't read", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [{ decodedData: null, tags: [], target: null, payloadHash: "a".repeat(64), transfer: null }, UNREADABLE_ITEM],
+    };
+    renderScreen({ preview });
+    expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(screen.getByRole("button", { name: /sign messages \(2\)/i }).className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+  });
+
+  it("warns about a batch with transfers when another item may be one it can't read", () => {
+    const transferItem = {
+      decodedData: null,
+      tags: [{ name: "Action", value: "Transfer" }],
+      target: AO,
+      payloadHash: "d".repeat(64),
+      transfer: { token: AO, recipient: RECIPIENT, amount: "1500000000000", tokenDenomination: 12, tokenTicker: "AO" },
+    };
+    renderScreen({ preview: { ...MESSAGE_PREVIEW, kind: "batchSignDataItem", items: [transferItem, UNREADABLE_ITEM] } });
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/may be a token transfer Gleam can't read/);
+    expect(primary("Sign 2").className).toContain("bg-warning");
+    expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+  });
+
   it.each(["sign", "dispatch"] as const)("shows the fee of a %s with no recipient", (kind) => {
     renderScreen({ preview: { ...AR_PREVIEW, kind, recipient: null, amount: null, fee: "900000000000000" } });
     expect(screen.getByText("Network fee")).toBeTruthy();

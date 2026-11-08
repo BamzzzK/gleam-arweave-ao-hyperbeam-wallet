@@ -683,7 +683,7 @@ export function createRuntime(platform: Platform): Runtime {
     const itemTokenMetadata = await Promise.all(
       signed.map((item) => {
         const transfer = readAoTransferMessage({ target: item.target, tags: item.tags });
-        return transfer && wallet ? resolveTokenDenominationAndTicker(wallet.address, transfer.processId) : null;
+        return transfer?.kind === "transfer" && wallet ? resolveTokenDenominationAndTicker(wallet.address, transfer.processId) : null;
       }),
     );
     return approval.requestApproval({

@@ -162,4 +162,21 @@ describe("showsWarning", () => {
     expect(showsWarning(fromDevice, null)).toBe(true);
     expect(showsWarning(transferRequestFromPreview(BASE)!, null)).toBe(false);
   });
+
+  it("warns for a batch when any data item is a token transfer the wallet couldn't read", () => {
+    const item = { decodedData: null, tags: [], target: P, payloadHash: "h" };
+    const transfer = { token: P, recipient: R, amount: "5", tokenDenomination: 12, tokenTicker: "T" };
+    const batch = (unreadable: boolean): SigningApprovalPreview => ({
+      ...BASE,
+      kind: "batchSignDataItem",
+      items: [
+        { ...item, transfer },
+        { ...item, transfer: null, ...(unreadable ? { unreadableTokenTransfer: true } : {}) },
+      ],
+    });
+    const warned = transferRequestFromPreview(batch(true))!;
+    expect(warned.unreadableTokenTransfer).toBe(true);
+    expect(showsWarning(warned, null)).toBe(true);
+    expect(showsWarning(transferRequestFromPreview(batch(false))!, null)).toBe(false);
+  });
 });

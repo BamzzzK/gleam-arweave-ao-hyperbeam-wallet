@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { WALLET_APPROVAL_ORIGIN, type RecipientAssessment, type SigningApprovalPreview } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
+import { RiskNotice } from "@gleam/ui/src/primitives/risk-notice.tsx";
 import { useT, type MessageKey, type TFunction } from "../i18n";
 import { formatWinstonAsAr } from "../screens/main-screen/src/formatWinston";
 import { errorText } from "../i18n/errors";
@@ -81,6 +82,9 @@ export function SigningApprovalScreen({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
   const transfer = transferRequestFromPreview(preview);
+  // A data item that looks like a token transfer the wallet can't read
+  // shows as the plain item, its tags in full, under a warning.
+  const unreadable = preview.items?.some((item) => item.unreadableTokenTransfer === true) ?? false;
 
   const handleSign = async () => {
     setSubmitting(true);
@@ -141,6 +145,8 @@ export function SigningApprovalScreen({
           </div>
         ) : null}
 
+        {unreadable ? <RiskNotice>{t("transferReview.unreadableTokenTransfer")}</RiskNotice> : null}
+
         {preview.items ? (
           <div className="flex flex-col gap-3">
             <span className="text-caption font-semibold uppercase tracking-wide text-muted">
@@ -192,7 +198,7 @@ export function SigningApprovalScreen({
           </Button>
           <Button
             type="button"
-            variant="primary"
+            variant={unreadable ? "destructive" : "primary"}
             disabled={submitting}
             aria-busy={submitting}
             onClick={() => void handleSign()}

@@ -309,6 +309,28 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     expect(new TextDecoder().decode(new Uint8Array(raw).slice(-5))).toBe("hello");
   });
 
+  it("summarizes an AO Transfer item, and flags one it can't read", async () => {
+    const tags = (action: string, recipient: string, quantity: string) => [
+      { name: action, value: action === "Action" ? "Transfer" : "transfer" },
+      { name: recipient, value: RECIPIENT },
+      { name: quantity, value: "7" },
+    ];
+    const { view } = await approveOnDevice({
+      kind: "batchSignDataItem",
+      payload: new TextEncoder().encode(" "),
+      dataItems: [
+        { data: btoa(" "), tags: tags("Action", "Recipient", "Quantity"), target: PROCESS_ID },
+        { data: btoa(" "), tags: tags("action", "recipient", "quantity"), target: PROCESS_ID },
+        { data: btoa(" "), tags: [{ name: "Action", value: "Eval" }], target: PROCESS_ID },
+      ],
+    });
+    expect(view.device!.summaries).toEqual([
+      { kind: "aoTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "7" },
+      { kind: "dataItem", target: PROCESS_ID, dataSize: 1, unreadableTokenTransfer: true },
+      { kind: "dataItem", target: PROCESS_ID, dataSize: 1 },
+    ]);
+  });
+
   it("batchSignDataItem: needs one signature per item, and resolves to every item in order", async () => {
     const { pending, requestId, device } = await approveOnDevice({
       kind: "batchSignDataItem",

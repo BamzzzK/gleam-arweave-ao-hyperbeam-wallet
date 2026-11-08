@@ -233,6 +233,11 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   }
   return (
     <>
+      {summary.unreadableTokenTransfer ? (
+        <p role="alert" className="pb-1 text-caption leading-snug text-warning">
+          {t("transferReview.unreadableTokenTransfer")}
+        </p>
+      ) : null}
       {summary.target !== null ? <AddressRow label={t("approval.target")} address={summary.target} /> : null}
       <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} />
     </>

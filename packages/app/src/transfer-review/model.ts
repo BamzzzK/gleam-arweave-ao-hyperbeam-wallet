@@ -55,7 +55,10 @@ export interface TransferRequest {
   /** The provider method that asked; `null` for the wallet's own send, `undefined` when not known. */
   method?: string | null;
   itemCount: number;
-  /** Looks like a token transfer the wallet couldn't read, so it shows as the plain transaction, warned. */
+  /**
+   * Looks like a token transfer the wallet couldn't read, so it shows as the
+   * plain transaction, warned. For a batch, set when any item is.
+   */
   unreadableTokenTransfer?: boolean;
 }
 
@@ -116,7 +119,15 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
         others.push({ ...part, target: item.target, payloadHash: item.payloadHash, index });
       }
     });
-    return { transfers, others, fee: null, method: preview.kind, itemCount: items.length };
+    const unreadable = items.some((item) => item.unreadableTokenTransfer === true);
+    return {
+      transfers,
+      others,
+      fee: null,
+      method: preview.kind,
+      itemCount: items.length,
+      ...(unreadable ? { unreadableTokenTransfer: true } : {}),
+    };
   }
   if (preview.recipient === null || items) return null;
   const transfer = line(

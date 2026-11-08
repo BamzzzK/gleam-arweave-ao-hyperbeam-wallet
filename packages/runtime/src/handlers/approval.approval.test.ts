@@ -1352,6 +1352,49 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
       await handler.resolveApproval({ requestId, approved: false });
       await expect(pending).rejects.toThrow();
     });
+
+    it("flags each item that looks like an AO Transfer it can't read, and only that item", async () => {
+      const target = "Z".repeat(43);
+      const recipient = "R".repeat(43);
+      const lowercase = [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: recipient },
+        { name: "quantity", value: "7" },
+      ];
+      const clean = [
+        { name: "Action", value: "Transfer" },
+        { name: "Recipient", value: recipient },
+        { name: "Quantity", value: "7" },
+      ];
+      const pending = handler.requestApproval({
+        kind: "batchSignDataItem",
+        origin: "https://bazar.arweave.net",
+        walletId: WALLET_ID,
+        payload: new TextEncoder().encode(" "),
+        tags: lowercase,
+        dataItems: [
+          { data: toBase64(" "), tags: lowercase, target },
+          { data: toBase64(" "), tags: clean, target },
+          { data: toBase64(" "), tags: [{ name: "Action", value: "Eval" }], target },
+        ],
+      });
+      await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+      const requestId = presenter.presented[0]!;
+
+      const request = await handler.getApproval({ requestId });
+      if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+        throw new Error("expected a signing preview");
+      }
+      const [unreadable, transfer, plain] = request.preview.items!;
+      expect(unreadable).toMatchObject({ transfer: null, unreadableTokenTransfer: true });
+      expect(transfer!.transfer).toMatchObject({ token: target, recipient, amount: "7" });
+      expect(transfer!.unreadableTokenTransfer).toBeUndefined();
+      expect(plain!.transfer).toBeNull();
+      expect(plain!.unreadableTokenTransfer).toBeUndefined();
+
+      await handler.resolveApproval({ requestId, approved: false });
+      await expect(pending).rejects.toThrow();
+    });
   });
 });
 
