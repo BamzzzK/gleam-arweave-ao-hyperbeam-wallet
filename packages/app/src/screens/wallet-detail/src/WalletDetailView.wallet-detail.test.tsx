@@ -223,7 +223,7 @@ describe("WalletDetailView", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it("warns explicitly that access is lost permanently when there's no confirmed backup", () => {
+  it("warns explicitly that access is lost for good when there's no confirmed backup", () => {
     const send = vi.fn();
     render(
       <WalletDetailView runtime={fakeRuntime({ send })} wallet={WALLET} onBack={vi.fn()} onRenamed={vi.fn()} onRemoved={vi.fn()} />,
@@ -231,7 +231,7 @@ describe("WalletDetailView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove wallet" }));
 
-    expect(screen.getByRole("alert").textContent).toMatch(/lost permanently/i);
+    expect(screen.getByRole("alert").textContent).toMatch(/lose access for good/i);
     expect(send).not.toHaveBeenCalled();
   });
 

@@ -3,7 +3,7 @@ import { defineMessages } from "../define";
 export const connectedApps = defineMessages({
   en: {
     title: "Connected apps",
-    empty: "No apps connected yet. Grants you approve will show up here.",
+    empty: "No apps connected yet. Sites you connect will show up here.",
     scopePayments: "Sees your address, can request payments",
     scopeMore: "Sees your address and more",
     scopeAddress: "Sees your address only",
@@ -18,7 +18,7 @@ export const connectedApps = defineMessages({
   },
   es: {
     title: "Apps conectadas",
-    empty: "Aún no hay apps conectadas. Los permisos que apruebes aparecerán aquí.",
+    empty: "Aún no hay apps conectadas. Los sitios que conectes aparecerán aquí.",
     scopePayments: "Ve tu dirección y puede pedir pagos",
     scopeMore: "Ve tu dirección y más",
     scopeAddress: "Solo ve tu dirección",
@@ -33,7 +33,7 @@ export const connectedApps = defineMessages({
   },
   id: {
     title: "Aplikasi terhubung",
-    empty: "Belum ada aplikasi terhubung. Izin yang Anda setujui akan muncul di sini.",
+    empty: "Belum ada aplikasi terhubung. Situs yang Anda hubungkan akan muncul di sini.",
     scopePayments: "Melihat alamat Anda, dapat meminta pembayaran",
     scopeMore: "Melihat alamat Anda dan lainnya",
     scopeAddress: "Hanya melihat alamat Anda",
@@ -48,7 +48,7 @@ export const connectedApps = defineMessages({
   },
   "pt-BR": {
     title: "Apps conectados",
-    empty: "Nenhum app conectado ainda. As permissões que você aprovar aparecem aqui.",
+    empty: "Nenhum app conectado ainda. Os sites que você conectar aparecem aqui.",
     scopePayments: "Vê seu endereço, pode solicitar pagamentos",
     scopeMore: "Vê seu endereço e mais",
     scopeAddress: "Vê só seu endereço",
@@ -63,7 +63,7 @@ export const connectedApps = defineMessages({
   },
   vi: {
     title: "Ứng dụng đã kết nối",
-    empty: "Chưa có ứng dụng nào kết nối. Quyền bạn cấp sẽ hiện ở đây.",
+    empty: "Chưa có ứng dụng nào kết nối. Trang web bạn kết nối sẽ hiện ở đây.",
     scopePayments: "Xem địa chỉ, có thể yêu cầu thanh toán",
     scopeMore: "Xem địa chỉ và hơn nữa",
     scopeAddress: "Chỉ xem địa chỉ",
@@ -78,7 +78,7 @@ export const connectedApps = defineMessages({
   },
   tr: {
     title: "Bağlı uygulamalar",
-    empty: "Henüz bağlı uygulama yok. Onayladığınız izinler burada görünür.",
+    empty: "Henüz bağlı uygulama yok. Bağladığınız siteler burada görünür.",
     scopePayments: "Adresinizi görür, ödeme isteyebilir",
     scopeMore: "Adresinizi ve daha fazlasını görür",
     scopeAddress: "Yalnızca adresinizi görür",
@@ -93,7 +93,7 @@ export const connectedApps = defineMessages({
   },
   ru: {
     title: "Подключённые приложения",
-    empty: "Подключённых приложений пока нет. Здесь появятся одобренные вами доступы.",
+    empty: "Подключённых приложений пока нет. Здесь появятся сайты, которые вы подключите.",
     scopePayments: "Видит ваш адрес, может запрашивать платежи",
     scopeMore: "Видит ваш адрес и не только",
     scopeAddress: "Видит только ваш адрес",
@@ -108,7 +108,7 @@ export const connectedApps = defineMessages({
   },
   ja: {
     title: "接続済みアプリ",
-    empty: "接続済みのアプリはまだありません。承認した許可がここに表示されます。",
+    empty: "接続済みのアプリはまだありません。接続したサイトがここに表示されます。",
     scopePayments: "アドレスの参照、支払いのリクエスト",
     scopeMore: "アドレスの参照など",
     scopeAddress: "アドレスの参照のみ",
@@ -123,7 +123,7 @@ export const connectedApps = defineMessages({
   },
   ko: {
     title: "연결된 앱",
-    empty: "아직 연결된 앱이 없어요. 승인한 권한이 여기에 표시돼요.",
+    empty: "아직 연결된 앱이 없어요. 연결한 사이트가 여기에 표시돼요.",
     scopePayments: "주소 확인, 결제 요청 가능",
     scopeMore: "주소 등 확인 가능",
     scopeAddress: "주소만 확인 가능",
@@ -138,7 +138,7 @@ export const connectedApps = defineMessages({
   },
   "zh-CN": {
     title: "已连接的应用",
-    empty: "尚未连接任何应用。你批准的授权会显示在这里。",
+    empty: "尚未连接任何应用。你连接的网站会显示在这里。",
     scopePayments: "可查看你的地址，可发起付款请求",
     scopeMore: "可查看你的地址及更多信息",
     scopeAddress: "仅可查看你的地址",
@@ -153,7 +153,7 @@ export const connectedApps = defineMessages({
   },
   "zh-TW": {
     title: "已連接的應用程式",
-    empty: "尚未連接任何應用程式。你批准的授權會顯示在這裡。",
+    empty: "尚未連接任何應用程式。你連接的網站會顯示在這裡。",
     scopePayments: "可檢視你的地址，可發起付款請求",
     scopeMore: "可檢視你的地址及更多資訊",
     scopeAddress: "僅可檢視你的地址",

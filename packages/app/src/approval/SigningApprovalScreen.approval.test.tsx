@@ -246,7 +246,7 @@ describe("SigningApprovalScreen primary action and warning", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     const text = screen.getByRole("alert").textContent ?? "";
     expect(text.match(/cannot be undone/gi)).toHaveLength(1);
-    expect(text).toMatch(/looks familiar, but is different/);
+    expect(text).toMatch(/looks like one you've used but it's different/);
     expect(screen.getByText(addressText(known))).toBeTruthy();
     expect(primary("Sign").hasAttribute("disabled")).toBe(false);
   });

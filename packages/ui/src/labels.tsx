@@ -78,7 +78,7 @@ export const DEFAULT_UI_LABELS: UiLabels = {
   },
   recipientWarning: {
     irreversible: "This cannot be undone.",
-    lookalikeTitle: "This address looks familiar, but is different.",
+    lookalikeTitle: "This address looks like one you've used but it's different.",
     lookalikeScammers: "Scammers create lookalike addresses to trick you.",
     lookalikeCompare: "Compare every character before sending.",
     firstTime: "You haven't sent to this address before.",

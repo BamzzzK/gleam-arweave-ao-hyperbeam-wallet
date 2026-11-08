@@ -198,7 +198,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(screen.getByText("That URL didn't answer as an Arweave gateway…")).toBeTruthy(),
+      expect(screen.getByText("That URL isn't responding like an Arweave gateway.")).toBeTruthy(),
     );
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
@@ -222,7 +222,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(screen.getByText("That URL didn't answer as an Arweave gateway…")).toBeTruthy(),
+      expect(screen.getByText("That URL isn't responding like an Arweave gateway.")).toBeTruthy(),
     );
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
     vi.unstubAllGlobals();
@@ -241,7 +241,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
-      expect(screen.getByText("Permission denied for that origin — the gateway was not changed.")).toBeTruthy(),
+      expect(screen.getByText("Gleam wasn't given access to that site so the gateway didn't change.")).toBeTruthy(),
     );
     expect(send).toHaveBeenCalledTimes(1);
   });
@@ -395,7 +395,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
       expect(permissionsRequest).toHaveBeenCalledWith(["https://denied-peer.example.com/*"]),
     );
     await waitFor(() =>
-      expect(screen.getByText("Permission denied for that origin — the peer was not added.")).toBeTruthy(),
+      expect(screen.getByText("Gleam wasn't given access to that site so the peer wasn't added.")).toBeTruthy(),
     );
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));
@@ -414,7 +414,7 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() =>
-      expect(screen.getByText("Permission denied for that origin — the peer was not added.")).toBeTruthy(),
+      expect(screen.getByText("Gleam wasn't given access to that site so the peer wasn't added.")).toBeTruthy(),
     );
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "setNetworkSettings" }));

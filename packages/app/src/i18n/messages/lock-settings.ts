@@ -5,7 +5,7 @@ export const lockSettings = defineMessages({
     title: "Security",
     lockNow: "Lock now",
     locking: "Locking…",
-    lockNowHint: "You'll need to unlock Gleam again before it can be used",
+    lockNowHint: "You'll need to unlock Gleam to use it again",
     autoLock: "Auto-lock",
     timeoutNever: "Stay unlocked",
     timeoutImmediate: "After 1 minute",

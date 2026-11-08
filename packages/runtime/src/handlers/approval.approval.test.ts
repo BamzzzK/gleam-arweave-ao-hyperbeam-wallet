@@ -1158,7 +1158,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await vi.waitFor(() => expect(presenter.presented.length).toBeGreaterThan(0));
     const requestId = presenter.presented.pop()!;
 
-    const message = "This wallet's stored public key doesn't match its address. Encryption was refused.";
+    const message = "This wallet's stored public key doesn't match its address, so Gleam won't encrypt with it.";
     const dappRejected = expect(pending).rejects.toThrow(message);
     await expect(handler.resolveApproval({ requestId, approved: true })).rejects.toThrow(message);
     await dappRejected;
