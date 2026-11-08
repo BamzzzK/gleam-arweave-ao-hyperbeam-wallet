@@ -21,19 +21,27 @@ professional audit.
    `.gleam-scan/challenge.json`, writes a starter
    `.gleam-scan/attestation.json` and prints the 3 functions to answer.
    Then the agent follows `security/scan/SKILL.md` from that checkout.
-3. **The agent reports what it finds.** Low or informational issues go
-   in a PR. Medium and above go in a private GitHub advisory.
+3. **The agent reports what it finds.** PRs are the default: low or
+   informational issues, hardening, and fixes to the skill. Medium and
+   above go in a private GitHub advisory. Each report has a short summary
+   on top and its detail folded under `<details>`
+   ([`REPORT.md`](security/scan/REPORT.md)).
 4. **The agent checks its own work.** `pnpm scan finish` reads
    `.gleam-scan/attestation.json`, fills `release` and `commit` from git,
    runs the core checks locally, then sends the attestation to
    `POST /attestations/check`, which runs every server check that doesn't
    need your signature. On success it prints the `attest.html#<payload>`
-   link. Each failure prints one line, `✗ <field>: <what to change>`, and
-   the agent fixes it before you see anything. `--json` prints the same
-   result as one JSON object.
+   link inside a short closing message, which the agent shows you as the
+   last thing it writes. Each failure prints one line,
+   `✗ <field>: <what to change>`, and the agent fixes it before you see
+   anything. A draft advisory that runs long or reads hard gets a `!`
+   warning, which never fails the run. `--json` prints the same result as
+   one JSON object.
 5. **You sign.** Open the link. Gleam shows a window with the release,
    the model, the result and the report. Approve, and the extension
-   submits the attestation. The agent never touches a key.
+   submits the attestation. The agent never touches a key. Reply
+   "signed", and the agent files its PRs and advisories and lists their
+   links.
 6. **You get points straight away.** The window shows "+N points".
    Finding points arrive when a maintainer accepts the finding.
 
@@ -58,7 +66,8 @@ gets the points.
 ```
 
 - `result` is `pass` if the agent reported nothing, and `scanned` if it
-  filed a fix PR or an advisory. A skill or surface PR doesn't count. It
+  filed a fix PR, hardening PR or advisory. A skill or surface PR
+  doesn't count. It
   never says what was found.
 - `report` describes coverage, not vulnerabilities. Details of a
   medium-or-above issue go only in the advisory.
@@ -213,13 +222,14 @@ it.
 ## The skill: `security/scan/SKILL.md`
 
 [`security/scan/SKILL.md`](security/scan/SKILL.md) is written for any
-coding agent to follow literally, with the exact commands. Two companion
+coding agent to follow literally, with the exact commands. Three companion
 files sit beside it:
 [`CHECKS.md`](security/scan/CHECKS.md), the questions to ask in each area
 and the classes of bug that cut across them, and
 [`VERIFY.md`](security/scan/VERIFY.md), which a fresh subagent (or the
 scanning agent itself) follows to try to disprove one finding and rate
-what survives. In summary:
+what survives, and [`REPORT.md`](security/scan/REPORT.md), the shape and
+style of an advisory or PR body. In summary:
 
 1. Check out the latest release tag and run `pnpm scan start`. It saves
    `.gleam-scan/challenge.json` and a starter `.gleam-scan/attestation.json`.
@@ -234,16 +244,22 @@ what survives. In summary:
 6. Try to disprove each finding with `VERIFY.md`, in a fresh subagent
    where the agent can start one. Only findings that survive get
    drafted, at the severity the verdict gives.
-7. Draft the reports: low or informational issues as a PR, medium and
-   above as a private advisory. Never as a public issue. Anything that
-   would have made the scan better (a missing surface file, a check the
-   skill should name, a command that misled) becomes a
-   `docs(scan): …` PR to the skill or `security/surface.txt`. File
-   nothing yet, since each one has to quote the attestation id.
+7. Draft the reports, as `REPORT.md` says. PRs are the default: low or
+   informational issues, hardening, and anything that would have made
+   the scan better (a missing surface file, a check the skill should
+   name, a command that misled). Every scan considers at least one PR
+   candidate, such as a fix, a test that pins a security property, a
+   `security/surface.txt` entry or a skill change, and drafts it if it is
+   real. A weak PR is closed and earns nothing. Medium and above go in a
+   private advisory, never a PR or a public issue. File nothing yet,
+   since each one has to quote the attestation id.
 8. Answer the challenge from the code you read by filling in
    `.gleam-scan/attestation.json`. Run `pnpm scan finish` until it
-   passes, and give the user the link and the sentence that goes with
-   it. Once they have signed, file each draft with the attestation id.
+   passes, and end the turn with the closing message it prints: the
+   link, and a request to reply "signed" so it can open the PRs and
+   advisories. Nothing comes after it. Once
+   the user has signed, file each draft with the attestation id, then
+   list one link per line.
 
 **Report like a working security engineer:**
 
@@ -257,6 +273,8 @@ what survives. In summary:
   attack.
 - Say once whether a finding was demonstrated, traced or needs a
   browser check, then write plainly.
+- Keep the part above `<details>` to about 200 words, written for a
+  maintainer skimming.
 - A clean `pass` earns the same as `scanned`. Padding a report with
   weak findings earns nothing.
 

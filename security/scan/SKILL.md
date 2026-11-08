@@ -12,8 +12,10 @@ The prompt a user pastes into their agent to start this skill:
 Gleam is a Chrome browser-extension wallet for Arweave and AO. In this
 skill you check out its latest release, review the code where a bug could
 leak a key or sign something the user didn't approve, report what you find,
-and answer a short challenge that shows you read the code. At the end you
-give the user a link. They open it, Gleam shows them the attestation, and
+and answer a short challenge that shows you read the code. PRs are the main
+thing a scan leaves behind: a fix, a test that pins a security property, a
+surface entry, or a better check in this skill. At the end you give the user
+a link. They open it, Gleam shows them the attestation, and
 when they approve, their Gleam wallet signs it and earns Gleam Points. You
 never sign anything, hold a key or touch a wallet. The user does that in
 Gleam. The user needs a Gleam wallet that is registered for points, and the
@@ -39,15 +41,15 @@ part of the skill.
 - **Acts as the user, only after asking:** `gh repo fork`, `git push`,
   `gh pr create`, and filing a private advisory (Step 8c). Each one is
   public or reaches the maintainers, so ask the user first. The closing
-  message in Step 8c is that one question, and it covers every draft it
-  lists.
+  message in Step 8c is that one question. The user's "signed" reply
+  covers every draft you made.
 - **Never:** reads a seed phrase, key, keyfile or wallet; signs anything;
   moves funds.
 
 Follow the steps in order. Every command runs from the root of the checkout
 unless a step says otherwise. Background on the program is in `SCANS.md`.
 
-This skill has two companion files in the same directory. Each step says
+This skill has three companion files in the same directory. Each step says
 when to read them:
 
 - `security/scan/CHECKS.md`: what to look for, area by area (Steps 4
@@ -55,6 +57,8 @@ when to read them:
 - `security/scan/VERIFY.md`: how to try to disprove a finding and rate
   what survives (Step 6). It stands on its own, so a fresh subagent can
   follow it.
+- `security/scan/REPORT.md`: how to write an advisory or a PR body
+  (Step 7).
 
 ## Rules that always apply
 
@@ -332,6 +336,21 @@ Done when every candidate has a verdict.
 
 ## Step 7: Draft your reports (don't file them yet)
 
+PRs are the default output of a scan. Draft one for anything low,
+informational or hardening. Before you finish, consider at least one PR
+candidate:
+
+- a fix for a low finding;
+- a test that pins a security property the tests don't cover yet
+  (`CHECKS.md` Section 5);
+- a file that belongs in `security/surface.txt` and `.github/CODEOWNERS`;
+- a change to `CHECKS.md`, `VERIFY.md`, `REPORT.md` or this skill.
+
+Draft it if it is real. A weak PR is closed and earns nothing, so don't
+pad. A merged fix for a low finding, or a merged hardening PR, takes 2% of
+the bounty pool (`SCANS.md` § Points). The maintainer decides what counts
+as hardening.
+
 Draft each candidate that survived Step 6, at the severity its verdict
 gives:
 
@@ -343,6 +362,11 @@ Draft everything first, and file nothing yet. Every PR and advisory,
 skill and surface PRs included, quotes the attestation id, which only
 exists after Step 8. Write `{{ATTESTATION_ID}}` in its place. The id goes
 in PR and advisory bodies, never in a commit message.
+
+Read `security/scan/REPORT.md` before you write the first draft. It gives
+the shape and style of every advisory and PR body: a short summary a
+maintainer can skim, with the trace, test code and reasoning in a
+`<details>` block.
 
 **PR draft.** Write the fix in a separate worktree, so the scan checkout
 stays on the tag. Base it on `origin/master` if the file to fix exists
@@ -365,23 +389,26 @@ it fails, fix what it names and commit again.
 
 - Title: a Conventional Commit, `fix(security): <what it fixes>`
   (`docs(security): …` for a docs-only fix).
-- Body: follow `.github/PULL_REQUEST_TEMPLATE.md`. Fill **Why** and
-  **What**. The **Attestation id** section gets
-  `Attestation id: {{ATTESTATION_ID}}`. Tick only the Checklist boxes you
-  ran; leave the rest unticked and say why in the body.
+- Body: follow `.github/PULL_REQUEST_TEMPLATE.md` in the style of
+  `REPORT.md` § PR body. Fill **Why** and **What**. The **Attestation id**
+  section gets `Attestation id: {{ATTESTATION_ID}}`. Tick only the
+  Checklist boxes you ran; leave the rest unticked and say why in the
+  body. Save it in the scan checkout as `.gleam-scan/pr-<n>.md`.
 - Low details may be public. Medium-and-above details never go in a PR,
   even one that fixes them.
 
-**Advisory draft.** Write a title, the severity, and a description with:
-the attacker (from the threat model), the affected files or flow, the steps
-from the attacker's access to the harm, the impact, and the evidence from
-the verdict: demonstrated, traced, or the exact fact a browser check has
-to settle. Keep the draft local, for example in
-`.gleam-scan/advisory-1.md`.
+**Advisory draft.** Write a title, the severity, and a description in the
+shape `REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
+**Fix**, the `Attestation id:` line, then the detail for the triager in
+`<details>`. Give the evidence from the verdict once: demonstrated, traced,
+or the exact fact a browser check has to settle. Save it as
+`.gleam-scan/advisory-<n>.md`. `pnpm scan finish` warns when the part
+above `<details>` is too long or too hard to read.
 
 **Skill or surface PR.** This skill improves through the scans that use
 it. If something would have made your scan better, draft a PR for it, in
-its own worktree like a fix PR. For example:
+its own worktree like a fix PR, and save its body as
+`.gleam-scan/pr-<n>.md`. For example:
 
 - a file that belongs in `security/surface.txt`. Add it at its tier, and
   add the same path to `.github/CODEOWNERS` (a test keeps the two
@@ -403,8 +430,9 @@ until the advisory is fixed. It doesn't change
 `result`. A maintainer reviews it like any other PR, and nothing merges
 automatically.
 
-Done when every surviving finding and skill suggestion has a draft. If
-nothing survived Step 6, that's a clean scan.
+Done when you have considered at least one PR candidate, and every
+surviving finding and real PR candidate has a draft. If nothing survived
+Step 6, that's a clean scan.
 
 ## Step 8: Answer the challenge, finish, then file
 
@@ -452,9 +480,9 @@ Fill it in field by field:
     using the `lines <start>-<end>` that `pnpm scan start` printed.
   - `check`: one sentence, 10 to 300 characters, on one line, on what that
     check prevents. Write it from what you read, about this code.
-- `result`: `"pass"` if you drafted no fix PR or advisory in Step 7,
-  `"scanned"` if you drafted at least one. A skill or surface PR doesn't
-  count either way. It never says what you found, and
+- `result`: `"pass"` if you drafted no fix PR, hardening PR or advisory
+  in Step 7, `"scanned"` if you drafted at least one. A skill or surface
+  PR doesn't count either way. It never says what you found, and
   both earn the same.
 - `report`: markdown, at most 20,000 characters, `\n` line endings. It
   describes **coverage only**: what you checked, what you didn't, the tools
@@ -470,6 +498,9 @@ Fill it in field by field:
 pnpm scan finish          # or: pnpm scan finish --json
 ```
 
+With `--json`, `closingHeader` holds the header line and `userMessage`
+the closing message to show under it.
+
 It checks the attestation locally, then asks the points server to run the
 same checks. Each problem prints as one line, `✗ <field>: <what to
 change>`. Fix each one in `.gleam-scan/attestation.json` and run it again.
@@ -480,13 +511,20 @@ note. Read the id from the `Attestation id:` line:
 ✓ Attestation valid for Gleam v<release>.
 Attestation id: <64 hex characters>
 Paid places left: <n>
-Put the attestation id <id> in every PR and advisory you filed for this scan.
-Link: https://gleamwallet.app/attest.html#<payload>
-Tell the user: Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.
+Once the user has signed, put the attestation id <id> in every PR and advisory you draft for this scan.
+
+Show the user exactly this, as the last thing you write:
+
+Scan done. I have <n> reports ready to file.
+
+1. Open this link and click Sign: https://gleamwallet.app/attest.html#<payload>
+2. Reply "signed" and I'll open the PRs and advisories.
 ```
 
-On a `scanned` result, `Tell the user:` also says to reply "signed" so
-you can file your drafts.
+`<n>` counts the `.gleam-scan/advisory-*.md` and `.gleam-scan/pr-*.md`
+drafts. A line starting with `!` names a draft advisory to shorten
+(`REPORT.md`). It never fails the run. Fix the draft; you don't need to
+run `finish` again.
 
 `finish` rewrites `.gleam-scan/attestation.json` with `release` and
 `commit` filled in; that doesn't change the id. You can run `finish` again
@@ -498,28 +536,30 @@ challenge, and only the id from the last run counts.
 The attestation id is the SHA-256 of the attestation's content, so it
 changes if any field changes. In this order:
 
-1. End your turn with this closing message, so the two things the user
-   has to do can't be missed. Put it first. Any results go under it, in
-   three lines at most. The challenge expires 24 hours after
-   `pnpm scan start`.
+1. End your turn with the closing message `pnpm scan finish` printed. It
+   is the last thing you write, with nothing after it. Put any results
+   above it, in three lines at most, such as a warning that no paid places
+   are left. The challenge expires 24 hours after `pnpm scan start`.
 
    ```text
-   Scan done. <n> PR(s) and <n> advisory(ies) are ready to file.
-   1. Sign: <the Link: from pnpm scan finish>
-   2. Reply "signed" and I'll file them, which could earn you more Gleam Points.
+   Scan done. I have <n> report(s) ready to file.
+
+   1. Open this link and click Sign: <link>
+   2. Reply "signed" and I'll open the PRs and advisories.
    ```
 
-   With no drafts, leave out the count and line 2, and ask the user to
-   tell you when Gleam accepts the signature.
-2. Wait until the user confirms that Gleam accepted the signature. Their
-   "signed" is the approval to fork, push, open each PR and file each
-   advisory that message listed, so don't ask again. Don't edit
+   For a clean pass the first line is just `Scan done.`, and line 2 is
+   `2. Reply "signed" when you're done.` The reply tells you Gleam
+   accepted the signature.
+2. Wait for "signed". It is the approval to fork, push, open each PR and
+   file each advisory the message listed, so don't ask again. Don't edit
    `.gleam-scan/attestation.json` after that.
 3. In every draft from Step 7, replace `{{ATTESTATION_ID}}` with the id
-   from the last `pnpm scan finish`. Then file it.
+   from the last `pnpm scan finish`. Then file it. Only a skill PR that
+   Step 7 says to hold for an unfixed advisory waits.
 
-If the challenge expires first, follow its Troubleshooting row and give
-the user the new link. If signing can't succeed (see the end of
+If the challenge expires first, follow its Troubleshooting row and end
+your turn with the new closing message. If signing can't succeed (see the end of
 Troubleshooting), still file every draft, without the `Attestation id:`
 line.
 
@@ -532,7 +572,7 @@ cd ../gleam-fix-<short-name>
 gh repo fork --remote --remote-name fork      # forks origin, adds the fork as remote "fork"
 git push fork HEAD
 gh pr create --repo skyf0xx/gleam-arweave-ao-hyperbeam-wallet --base master \
-  --head <your-github-login>:fix/security-<short-name> --title "fix(security): <what it fixes>" --body-file <your filled-in template>
+  --head <your-github-login>:fix/security-<short-name> --title "fix(security): <what it fixes>" --body-file ../gleam-scan/.gleam-scan/pr-<n>.md
 ```
 
 In the body, the template's `## Attestation id` section holds the line
@@ -570,6 +610,8 @@ user, with the id in it.
   attack.
 - Say once whether a finding was demonstrated, traced or needs a browser
   check, then write plainly.
+- Write every advisory and PR body as `REPORT.md` says: short on top,
+  detail in `<details>`.
 - A clean `pass` earns the same as `scanned`. Padding a report with weak
   findings earns nothing.
 
@@ -618,9 +660,10 @@ nothing about what they contain.
 
 ## When you're done
 
-Tell the user, in a few lines, the attestation id, a link to each PR and
-advisory you filed (or the drafts for them to file), and, if `finish` printed a warning that no
-paid places are left, that the scan is recorded but earns no points.
+Once the user replies "signed", file every PR and advisory without asking
+again. Then your final message is one line per filed link, and nothing
+else. If you filed nothing, it is one line: `Done.` If you couldn't file a
+draft, give it to the user ready to paste instead of its link.
 
 ## Troubleshooting
 
@@ -648,7 +691,7 @@ Each `✗` line already says what to do. The common ones:
 | `✗ answers[i].line: … is 0 …`, `… is a comment`, `… is blank`, `… holds only punctuation`, `… is in the signature …`, `… is outside …`, `… closes …` | Pick another line inside the body range the message gives, one that makes a check. Count lines with `git show HEAD:<file> \| cat -n`. |
 | `✗ answers[i].check: …` | One sentence, 10 to 300 characters, one line, no leading or trailing space. |
 | `✗ answers[i].symbol: …` or `✗ answers[i]: … isn't in the challenge …` or `✗ answers: No answer names …` | Restore `file` and `symbol` exactly as `pnpm scan start` wrote them; one answer per challenge function. |
-| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start`, answer the 3 new functions, copy `model`, `result` and `report` from the backup `.gleam-scan/attestation.<old challenge id>.json`, and run `pnpm scan finish`. The id changes: give the user the new link. |
+| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start`, answer the 3 new functions, copy `model`, `result` and `report` from the backup `.gleam-scan/attestation.<old challenge id>.json`, and run `pnpm scan finish`. The id changes: end your turn with the new closing message. |
 | `✗ release: v<x> isn't the latest release (v<y> is) …` | A new release came out. Check out `v<y>`, run `pnpm scan start` and scan that release. |
 | `✗ attestationId: The server computed a different attestation id …` | Your checkout's scan tools are out of date. Run `git fetch --tags`, check out the latest release again, and rerun `pnpm scan finish`. |
 | `✗ scan: Unexpected error …` | Run it again; if it repeats, tell the user. |
