@@ -19,6 +19,7 @@ LAUNCH.md
 docs/MOBILE.md
 
 .env
+local.env
 .playwright-mcp
 .gleam-scan/
 CLAUDE.local.md
