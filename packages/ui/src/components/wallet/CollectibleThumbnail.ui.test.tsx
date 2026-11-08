@@ -14,6 +14,11 @@ describe("CollectibleThumbnail", () => {
     expect(img.getAttribute("referrerpolicy")).toBe("no-referrer");
   });
 
+  it("leaves the alt text empty when decorative", () => {
+    const { container } = render(<CollectibleThumbnail name={"\u202EgorF"} imageUrl="https://arweave.net/abc" decorative />);
+    expect(container.querySelector("img")!.getAttribute("alt")).toBe("");
+  });
+
   it("shows the plain tile when there is no image", () => {
     render(<CollectibleThumbnail name="Doc" />);
     expect(screen.getByTestId("collectible-placeholder")).toBeTruthy();

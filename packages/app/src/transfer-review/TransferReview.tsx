@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { cn } from "@gleam/ui/src/primitives/cn.ts";
@@ -15,7 +15,7 @@ import { UntrustedText } from "../approval/UntrustedText";
 import { DataItemCard } from "./DataItemCard";
 import {
   amountText,
-  balanceAfterText,
+  balanceAfterParts,
   feeText,
   fiatText,
   glyphLabel,
@@ -27,6 +27,7 @@ import {
   totalFiatText,
   unitText,
   warningReasons,
+  type BalanceAfterPart,
   type RecipientRisk,
   type SignedPart,
   type TransferContext,
@@ -81,7 +82,7 @@ export function TransferReview({
   const warned = showsWarning(request, risk);
   const batch = request.transfers.length > 1 || request.others.length > 0;
   const first = request.transfers[0]!;
-  const balanceAfter = balanceAfterText(context, request);
+  const balanceAfter = balanceAfterParts(context, request);
   const lookalikeOf = risk?.lookalikeOf ?? null;
 
   const warning = warned ? (
@@ -123,7 +124,7 @@ export function TransferReview({
           <div className={`flex flex-col gap-3.5 pt-6 ${GUTTER}`}>
             {from ? <SummaryRow label={t("transferReview.from")} value={<FromValue from={from} />} /> : null}
             <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
-            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={balanceAfter} /> : null}
+            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
       ) : (
@@ -134,7 +135,7 @@ export function TransferReview({
           <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
             <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
             <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
-            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={balanceAfter} /> : null}
+            {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
       )}
@@ -204,7 +205,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
     const name = transfer.collectible.name ?? truncateAddress(transfer.collectible.id, 6);
     return (
       <div className={`flex flex-col items-center gap-3 pb-8 pt-8 text-center ${GUTTER}`}>
-        <CollectibleThumbnail name={name} imageUrl={transfer.collectible.imageUrl} className="w-40 rounded-[14px]" />
+        <CollectibleThumbnail name={name} imageUrl={transfer.collectible.imageUrl} decorative className="w-40 rounded-[14px]" />
         <div className="flex flex-col items-center gap-0.5">
           <span className="break-words text-h3 font-semibold text-foreground"><UntrustedText text={name} /></span>
           <span className="text-label text-muted">{t("transferReview.oneItem")}</span>
@@ -345,6 +346,20 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
       <span className="flex-shrink-0 text-muted">{label}</span>
       <span className="min-w-0 text-right tabular-nums text-foreground">{value}</span>
     </div>
+  );
+}
+
+function BalanceAfter({ parts }: { parts: BalanceAfterPart[] }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? " · " : null}
+          {part.amount}
+          {part.ticker !== null ? <> <UntrustedText text={part.ticker} /></> : null}
+        </Fragment>
+      ))}
+    </>
   );
 }
 

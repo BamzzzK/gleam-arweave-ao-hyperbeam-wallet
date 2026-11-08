@@ -291,7 +291,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeTruthy());
-    expect(screen.getByText("2.5")).toBeTruthy();
+    expect(screen.getAllByText("2.5").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ARDRIVE").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 

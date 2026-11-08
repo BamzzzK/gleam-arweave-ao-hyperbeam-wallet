@@ -12,6 +12,11 @@ afterEach(() => {
   cleanup();
 });
 
+/** The ticker is its own isolated run, so the row is read as a whole. */
+function balanceAfterText(): string | null | undefined {
+  return screen.getByText("Balance after").nextElementSibling?.textContent;
+}
+
 const RECIPIENT = "xU9zFq2wR7mN4tK8vB1jH6yE0sD3aC5fG9pLxU9k3kL";
 const SECOND_RECIPIENT = "Lm8sQe3Rt5Yu7Io9Pa1Sd3Fg5Hj7Kl9Zx1Cv3Bn5Mq";
 const FROM = { name: "Main", address: "Gx7cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAk2Qa" };
@@ -132,7 +137,7 @@ describe("SigningApprovalScreen transfer layout: AO token", () => {
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
-    expect(screen.getByText("10.75 AO")).toBeTruthy();
+    expect(balanceAfterText()).toBe("10.75 AO");
   });
 
   it("shows the site's icon when its grant has one, and the letter tile otherwise", () => {
@@ -191,7 +196,7 @@ describe("SigningApprovalScreen transfer layout: AR", () => {
     expect(screen.getByText("50")).toBeTruthy();
     expect(screen.getAllByText("AR").length).toBeGreaterThan(1);
     expect(screen.getByText("0.0008 AR")).toBeTruthy();
-    expect(screen.getByText("49.9992 AR")).toBeTruthy();
+    expect(balanceAfterText()).toBe("49.9992 AR");
     expect(screen.getByText(`≈ ${formatCurrencyValue(50 * 8.7, "USD")}`)).toBeTruthy();
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText(exactGroup("50000000000000"))).toBeTruthy();
   });
@@ -327,7 +332,8 @@ describe("SigningApprovalScreen transfer layout: collectible and Gleam's own sen
     expect(screen.getByText("Gleam")).toBeTruthy();
     expect(screen.getByText("Send collectible")).toBeTruthy();
     expect(screen.getByText("Beam #1")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Beam #1" })).toBeTruthy();
+    // The name already shows escaped beside it, so the image carries no alt text of its own.
+    expect(document.querySelector('img[src="https://arweave.net/asset"]')!.getAttribute("alt")).toBe("");
     expect(screen.getByText("1 item")).toBeTruthy();
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText("NNNNNN…NNNN")).toBeTruthy();
@@ -392,7 +398,7 @@ describe("SigningApprovalScreen transfer layout: data items", () => {
     expect(screen.getByText(/"Action":"Notify"/)).toBeTruthy();
     expect(screen.getByText("Main")).toBeTruthy();
     expect(screen.getByText("None")).toBeTruthy();
-    expect(screen.getByText("10.75 AO · 1.2 wAR")).toBeTruthy();
+    expect(balanceAfterText()).toBe("10.75 AO · 1.2 wAR");
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText("batchSignDataItem · 3 items")).toBeTruthy();
     expect(primary("Sign 3")).toBeTruthy();
   });

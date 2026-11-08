@@ -7,6 +7,7 @@ import { formatAtomicAsDisplay, formatWinstonAsAr } from "../screens/main-screen
 import { DEVICE_NAMES, type DeviceSignPanel } from "./device-panels";
 import { errorText } from "../i18n/errors";
 import { RequestHeader } from "../transfer-review/RequestHeader";
+import { UntrustedText } from "./UntrustedText";
 import { DeviceBanner, ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromDevice, type TransferContext } from "../transfer-review/model";
 
@@ -195,9 +196,14 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
     // shown as unknown rather than trusted to be a token at all.
     const scale = token?.processId === summary.process ? token : undefined;
     const quantity =
-      scale?.denomination != null
-        ? `${formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)} ${scale.ticker ?? ""}`.trim()
-        : t("approval.amountSmallestUnits", { quantity: summary.quantity });
+      scale?.denomination != null ? (
+        <>
+          {formatAtomicAsDisplay(summary.quantity, scale.denomination, scale.denomination)}
+          {scale.ticker?.trim() ? <> <UntrustedText text={scale.ticker} /></> : null}
+        </>
+      ) : (
+        t("approval.amountSmallestUnits", { quantity: summary.quantity })
+      );
     return (
       <>
         {/* A resolved ticker already names the token in the amount. */}
@@ -220,7 +226,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   }
   if (summary.kind === "message") {
     return summary.text !== null ? (
-      <Row label={t("approval.message")} value={summary.text} />
+      <Row label={t("approval.message")} value={<UntrustedText text={summary.text} />} />
     ) : (
       <Row label={t("approval.message")} value={t("approval.bytes", { size: summary.size })} />
     );
@@ -233,7 +239,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line py-2 text-caption last:border-b-0">
       <span className="flex-shrink-0 text-muted">{label}</span>

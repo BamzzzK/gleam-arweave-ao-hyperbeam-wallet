@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SigningApprovalPreview } from "@gleam/core";
+import { HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { t } from "../i18n";
 import {
-  balanceAfterText,
+  balanceAfterParts,
+  glyphLabel,
   groupDigits,
   recipientsOf,
   showsWarning,
@@ -95,15 +97,49 @@ describe("transferRequestFromDevice", () => {
   });
 });
 
-describe("balanceAfterText", () => {
+describe("balanceAfterParts", () => {
   it("takes the amount and the fee off an AR balance", () => {
-    expect(balanceAfterText({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"))).toBe(
-      "0.5 AR",
-    );
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] } }, request({ amount: "400000000000" }, "100000000000"))).toEqual([
+      { amount: "0.5", ticker: "AR" },
+    ]);
+  });
+
+  it("keeps a token's ticker apart from its amount, and leaves a ticker that echoes the id out", () => {
+    const context = {
+      balances: {
+        arBalance: "0",
+        tokenBalances: [
+          { address: R, processId: P, ticker: "\u202EXYZ", denomination: 6, name: "X", quantity: "5000000", source: "watched" as const },
+        ],
+      },
+    };
+    expect(balanceAfterParts(context, request({ token: P, ticker: "\u202EXYZ", denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: "\u202EXYZ" },
+    ]);
+    expect(balanceAfterParts(context, request({ token: P, ticker: P, denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: null },
+    ]);
+    expect(balanceAfterParts(context, request({ token: P, ticker: "  ", denomination: 6, amount: "2500000" }, null))).toEqual([
+      { amount: "2.5", ticker: null },
+    ]);
+  });
+
+  it("masks every amount while balances are hidden", () => {
+    expect(balanceAfterParts({ balances: { arBalance: "1000000000000", tokenBalances: [] }, balancesHidden: true }, request())).toEqual([
+      { amount: HIDDEN_AMOUNT, ticker: null },
+    ]);
   });
 
   it("leaves out a balance the request would overdraw", () => {
-    expect(balanceAfterText({ balances: { arBalance: "5", tokenBalances: [] } }, request())).toBeUndefined();
+    expect(balanceAfterParts({ balances: { arBalance: "5", tokenBalances: [] } }, request())).toBeUndefined();
+  });
+});
+
+describe("glyphLabel", () => {
+  it("drops hidden characters from a ticker's initials", () => {
+    expect(glyphLabel({ token: P, ticker: "\u202Exyz", denomination: 6, amount: "1", recipient: R })).toBe("XY");
+    expect(glyphLabel({ token: P, ticker: "\u202E\u200B", denomination: 6, amount: "1", recipient: R })).toBe("?");
+    expect(glyphLabel({ token: P, ticker: " \u202E ", denomination: 6, amount: "1", recipient: R })).toBe("?");
   });
 });
 
