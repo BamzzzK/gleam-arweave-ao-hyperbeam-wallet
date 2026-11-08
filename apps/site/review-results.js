@@ -31,7 +31,7 @@ function failure(message) {
   const retry = el("button", "link-button", "Try again");
   retry.type = "button";
   retry.addEventListener("click", () => {
-    status.textContent = "Loading reviews…";
+    status.textContent = "Loading scans…";
     loadRelease();
   });
   status.appendChild(retry);
@@ -192,8 +192,8 @@ async function loadRelease() {
   state.listing = first.listing;
   state.attestations = first.listing.attestations;
   state.nextCursor = first.listing.nextCursor;
-  document.title = `Gleam review results · v${first.listing.release}`;
-  $("[data-release-title]").textContent = `Reviews of v${first.listing.release}`;
+  document.title = `Gleam scan results · v${first.listing.release}`;
+  $("[data-release-title]").textContent = `Scans of v${first.listing.release}`;
   $("[data-paid-left]").textContent = String(Math.max(0, first.listing.paidPlacesLeft));
 
   // A link to one entry needs it loaded.

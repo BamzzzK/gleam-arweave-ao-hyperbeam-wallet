@@ -311,7 +311,7 @@ describe("site scan lib: the points API", () => {
   it("summarises coverage", () => {
     expect(coverageSummary(listing.coverage)).toEqual({
       share: 41 / 64,
-      text: "41 of 64 security functions examined by at least one review",
+      text: "41 of 64 security functions examined by at least one scan",
       unexamined: [{ file: "a.ts", symbol: "f" }],
     });
     expect(coverageSummary({ examined: 3, total: 4, unexamined: null })!.unexamined).toBeNull();

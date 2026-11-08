@@ -32,14 +32,14 @@ describe("AboutBuild", () => {
   it("links the security reviews of this version with their count", async () => {
     render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />, runtimeReturning(7));
 
-    const link = await screen.findByRole("link", { name: "7 security reviews" });
+    const link = await screen.findByRole("link", { name: "7 security scans" });
     expect(link.getAttribute("href")).toBe("https://gleamwallet.app/review-results.html?v=1.26.0");
   });
 
   it("says 1 review in the singular", async () => {
     render((runtime) => <AboutBuild runtime={runtime} version="1.26.0" />, runtimeReturning(1));
 
-    expect(await screen.findByRole("link", { name: "1 security review" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "1 security scan" })).toBeTruthy();
   });
 
   it.each([null, new Error("boom")])("shows the row without a count when it can't be read (%s)", async (result) => {
@@ -47,7 +47,7 @@ describe("AboutBuild", () => {
     render((r) => <AboutBuild runtime={r} version="1.26.0" />, runtime);
 
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
-    expect(screen.getByRole("link", { name: "Security reviews" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Security scans" }).getAttribute("href")).toBe(
       "https://gleamwallet.app/review-results.html?v=1.26.0",
     );
   });

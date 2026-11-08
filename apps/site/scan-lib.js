@@ -416,13 +416,13 @@ function isListing(body) {
   );
 }
 
-/** "41 of 64 security functions examined by at least one review", or null before the server has a figure. */
+/** "41 of 64 security functions examined by at least one scan", or null before the server has a figure. */
 export function coverageSummary(coverage) {
   if (!coverage || !Number.isInteger(coverage.examined) || !Number.isInteger(coverage.total) || coverage.total <= 0) return null;
   const share = Math.min(1, Math.max(0, coverage.examined / coverage.total));
   return {
     share,
-    text: `${coverage.examined} of ${coverage.total} security functions examined by at least one review`,
+    text: `${coverage.examined} of ${coverage.total} security functions examined by at least one scan`,
     unexamined: Array.isArray(coverage.unexamined) ? coverage.unexamined : null,
   };
 }

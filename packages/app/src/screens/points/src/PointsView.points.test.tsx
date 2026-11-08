@@ -170,12 +170,12 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    const review = within(await screen.findByRole("region", { name: "Review" }));
+    const review = within(await screen.findByRole("region", { name: "Scan" }));
     expect(review.getByRole("heading", { name: "Scan Gleam with your agent" })).toBeTruthy();
-    const link = review.getByRole("link", { name: /Start a review/ });
+    const link = review.getByRole("link", { name: /Start a scan/ });
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
-    expect(await review.findByText(sentence("Earn 12.50 GLEAM to review Gleam with your coding agent."))).toBeTruthy();
+    expect(await review.findByText(sentence("Earn 12.50 GLEAM to scan Gleam with your coding agent."))).toBeTruthy();
     expect(review.getByText("Plus a 5,000 GLEAM bounty pool for confirmed vulnerabilities.")).toBeTruthy();
   });
 
@@ -194,10 +194,10 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    const review = within(await screen.findByRole("region", { name: "Review" }));
+    const review = within(await screen.findByRole("region", { name: "Scan" }));
     expect(await review.findByText(/taken\. Confirmed vulnerabilities still share the 5,000 GLEAM bounty pool/)).toBeTruthy();
-    expect(review.getByRole("link", { name: /Start a review/ })).toBeTruthy();
-    expect(review.getByText("Review Gleam with your coding agent.")).toBeTruthy();
+    expect(review.getByRole("link", { name: /Start a scan/ })).toBeTruthy();
+    expect(review.getByText("Scan Gleam with your coding agent.")).toBeTruthy();
   });
 
   it("drops the places line when the stats can't be read", async () => {
@@ -209,7 +209,7 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    const review = within(await screen.findByRole("region", { name: "Review" }));
+    const review = within(await screen.findByRole("region", { name: "Scan" }));
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
     expect(review.queryByText(/paid places|bounty pool/i)).toBeNull();
     expect(review.queryByText(/GLEAM/)).toBeNull();
@@ -221,7 +221,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     expect(await screen.findByRole("button", { name: "Join Gleam Points" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Review" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Scan" })).toBeNull();
     expect(runtime.send).not.toHaveBeenCalledWith({ type: "getScanStats", payload: undefined });
   });
 
@@ -350,7 +350,7 @@ describe("PointsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy invite link" }));
     expect(writeText).toHaveBeenCalledWith(LINK);
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Start a review↗"]);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Start a scan↗"]);
     expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
     const about = screen.getByRole("button", { name: "About Gleam Points" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
