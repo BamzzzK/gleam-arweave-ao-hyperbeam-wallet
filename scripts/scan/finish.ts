@@ -9,6 +9,7 @@ import {
   type ScanIssue,
 } from "../../packages/core/src/scan/index.ts";
 import { callApi } from "./api.ts";
+import { advisoryDrafts, draftWarnings, prDrafts } from "./readability.ts";
 import {
   ATTESTATION_FILE,
   CHALLENGE_FILE,
@@ -29,11 +30,26 @@ import {
 
 const START_FIRST = "run `pnpm scan start` first";
 
-export const USER_MESSAGE =
-  "Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.";
+/** Heads the closing message, which the agent shows the user as the last thing in its turn. */
+export const CLOSING_HEADER = "Show the user exactly this, as the last thing you write:";
 
-/** Follows `USER_MESSAGE` on a `scanned` result, so the drafts waiting on the signature don't get missed. */
-export const FILE_MESSAGE = 'Then reply "signed" and I\'ll file the reports I drafted, which could earn you more Gleam Points.';
+/**
+ * The message that ends the agent's turn: the signing link and the one reply
+ * the agent waits for. `drafts` counts the advisory and PR drafts saved in
+ * `.gleam-scan/`; a `scanned` result with none saved there still has drafts
+ * somewhere, so it gets the uncounted line.
+ */
+export function closingMessage(link: string, result: "pass" | "scanned", drafts: number): string[] {
+  const reports = drafts > 0 || result === "scanned";
+  const first =
+    drafts > 0
+      ? `Scan done. I have ${drafts} ${drafts === 1 ? "report" : "reports"} ready to file.`
+      : reports
+        ? "Scan done. I have reports ready to file."
+        : "Scan done.";
+  const reply = reports ? '2. Reply "signed" and I\'ll open the PRs and advisories.' : '2. Reply "signed" when you\'re done.';
+  return [first, "", `1. Open this link and click Sign: ${link}`, reply];
+}
 
 export async function runFinish(deps: Deps): Promise<Outcome> {
   const challengeText = await readText(deps, CHALLENGE_FILE);
@@ -175,8 +191,10 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
   await writeJson(deps, ATTESTATION_FILE, attestation);
   const startedAt = Number((await readText(deps, STARTED_FILE))?.trim());
   const elapsedMs = Number.isFinite(startedAt) && startedAt > 0 ? deps.now() - startedAt : undefined;
+  const warnings = await draftWarnings(deps);
   const link = `${deps.siteUrl.replace(/\/*$/, "/")}attest.html#${encodeAttestationPayload(attestation)}`;
-  const userMessage = attestation.result === "scanned" ? `${USER_MESSAGE} ${FILE_MESSAGE}` : USER_MESSAGE;
+  const drafts = (await advisoryDrafts(deps)).length + (await prDrafts(deps)).length;
+  const closing = closingMessage(link, attestation.result, drafts);
   const lines = [
     ...notes,
     `Attestation valid for Gleam v${attestation.release}.`,
@@ -185,15 +203,18 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     ...(paidPlacesLeft === undefined ? [] : [`Paid places left: ${paidPlacesLeft}`]),
     ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this scan will be recorded but earns no points."] : []),
     `Once the user has signed, put the attestation id ${id} in every PR and advisory you draft for this scan.`,
-    `Link: ${link}`,
-    `Tell the user: ${userMessage}`,
+    ...warnings,
+    "",
+    CLOSING_HEADER,
+    "",
+    ...closing,
   ];
   return {
     ok: true,
     command: "finish",
     lines,
     issues: [],
-    json: { challenge: challenge.challenge, attestationId: id, link, userMessage, ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
+    json: { challenge: challenge.challenge, attestationId: id, link, closingHeader: CLOSING_HEADER, userMessage: closing.join("\n"), ...(warnings.length === 0 ? {} : { warnings }), ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
   };
 }
 

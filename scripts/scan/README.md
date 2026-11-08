@@ -15,6 +15,8 @@ instructions are in `security/scan/SKILL.md`.
 - **`finish.ts`**: checks the agent's report and answers with the points
   server, then prints the link where the user signs the attestation in
   their wallet.
+- **`readability.ts`**: warns when a draft advisory in `.gleam-scan/` is
+  too long or too hard to read (`security/scan/REPORT.md`).
 - **`api.ts`**: the calls to the points server.
 - **`harness.ts`**, **`shared.ts`**: shared setup and types.
 

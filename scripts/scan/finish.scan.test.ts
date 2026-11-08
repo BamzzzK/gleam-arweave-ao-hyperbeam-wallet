@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { attestationId, decodeAttestationPayload } from "../../packages/core/src/scan/index.ts";
 import { main, render, renderJson } from "./cli.ts";
-import { FILE_MESSAGE, runFinish, USER_MESSAGE } from "./finish.ts";
+import { CLOSING_HEADER, closingMessage, runFinish } from "./finish.ts";
 import { CHALLENGE, COMMIT, FUNCTIONS, fakeGit, goodAttestation, json, makeDeps, readJsonFile } from "./harness.ts";
 import type { Deps } from "./shared.ts";
 
@@ -140,10 +140,10 @@ describe("pnpm scan finish: server and output", () => {
     expect(text).toContain(`Attestation id: ${id}`);
     expect(text).toContain("Paid places left: 7");
     expect(text).toContain(`put the attestation id ${id} in every PR and advisory`);
-    expect(text).toContain("Tell the user: Open this link in Chrome with Gleam installed and click Sign with Gleam; it signs no transaction and moves no funds.");
-    expect(text).not.toContain(FILE_MESSAGE);
+    const link = /^1\. Open this link and click Sign: (.+)$/m.exec(text)![1]!;
+    expect(text.endsWith(`${CLOSING_HEADER}\n\nScan done.\n\n1. Open this link and click Sign: ${link}\n2. Reply "signed" when you're done.`)).toBe(true);
+    expect(text).not.toContain("Tell the user");
 
-    const link = /^Link: (.+)$/m.exec(text)![1]!;
     expect(link.startsWith("https://site.test/attest.html#")).toBe(true);
     const decoded = decodeAttestationPayload(link.split("#")[1]!);
     if (!decoded.ok) throw new Error("link did not decode");
@@ -187,15 +187,52 @@ describe("pnpm scan finish: server and output", () => {
     expect((await lines(deps))[0]).toContain("The server computed a different attestation id");
   });
 
-  it("on a scanned result asks the user to reply once signed, so the drafts get filed", async () => {
+  it("ends with the closing message, counting saved drafts on a scanned result", async () => {
+    const accept = (deps: Deps) => {
+      deps.fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+        const { attestation } = JSON.parse(String(init?.body)) as { attestation: Parameters<typeof attestationId>[0] };
+        return accepted(await attestationId(attestation))(_url as string, init);
+      }) as typeof fetch;
+      return deps;
+    };
+    const tail = (text: string) => text.split("\n").slice(-4);
+
+    const uncounted = await runFinish(accept(setup(goodAttestation({ result: "scanned" }))));
+    const link = String(uncounted.json.link);
+    expect(tail(render(uncounted, false))).toEqual(closingMessage(link, "scanned", 0));
+    expect(closingMessage(link, "scanned", 0)[0]).toBe("Scan done. I have reports ready to file.");
+    expect(uncounted.json).toMatchObject({ userMessage: closingMessage(link, "scanned", 0).join("\n") });
+
+    const deps = accept(setup(goodAttestation({ result: "scanned" })));
+    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), "The page signs it. The user loses funds.");
+    writeFileSync(join(deps.root, ".gleam-scan/pr-1.md"), "## Why\n\nA test was missing.");
+    const counted = await runFinish(deps);
+    expect(tail(render(counted, false))).toEqual([
+      "Scan done. I have 2 reports ready to file.",
+      "",
+      `1. Open this link and click Sign: ${String(counted.json.link)}`,
+      '2. Reply "signed" and I\'ll open the PRs and advisories.',
+    ]);
+    expect(closingMessage(link, "pass", 1)).toEqual(["Scan done. I have 1 report ready to file.", "", `1. Open this link and click Sign: ${link}`, '2. Reply "signed" and I\'ll open the PRs and advisories.']);
+    expect(closingMessage(link, "scanned", 0)[3]).toBe('2. Reply "signed" and I\'ll open the PRs and advisories.');
+    expect(counted.json).not.toHaveProperty("warnings");
+  });
+
+  it("warns about a long advisory draft above the closing message, without failing", async () => {
     const deps = setup(goodAttestation({ result: "scanned" }));
     deps.fetchImpl = (async (_url: unknown, init?: RequestInit) => {
       const { attestation } = JSON.parse(String(init?.body)) as { attestation: Parameters<typeof attestationId>[0] };
       return accepted(await attestationId(attestation))(_url as string, init);
     }) as typeof fetch;
+    const wordy = Array.from({ length: 30 }, () => "The page signs a tag the user never saw.").join(" ");
+    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), wordy);
     const outcome = await runFinish(deps);
-    expect(render(outcome, false)).toContain(`Tell the user: ${USER_MESSAGE} ${FILE_MESSAGE}`);
-    expect(outcome.json).toMatchObject({ userMessage: `${USER_MESSAGE} ${FILE_MESSAGE}` });
+    expect(outcome.ok).toBe(true);
+    const out = render(outcome, false).split("\n");
+    const warning = out.findIndex((line) => line.startsWith("! .gleam-scan/advisory-1.md: 270 words above <details>"));
+    expect(warning).toBeGreaterThan(0);
+    expect(warning).toBeLessThan(out.indexOf(CLOSING_HEADER));
+    expect(outcome.json).toMatchObject({ warnings: [out[warning]] });
   });
 
   it("--json prints exactly one object on stdout", async () => {
@@ -208,8 +245,9 @@ describe("pnpm scan finish: server and output", () => {
     expect(await main(["finish", "--json"], good, { out: (t) => out.push(t), tty: true })).toBe(0);
     expect(out).toHaveLength(1);
     const parsed = JSON.parse(out[0]!);
-    expect(Object.keys(parsed).sort()).toEqual(["attestationId", "challenge", "command", "link", "ok", "paidPlacesLeft", "userMessage"]);
-    expect(parsed).toMatchObject({ ok: true, command: "finish", paidPlacesLeft: 7 });
+    expect(Object.keys(parsed).sort()).toEqual(["attestationId", "challenge", "closingHeader", "command", "link", "ok", "paidPlacesLeft", "userMessage"]);
+    expect(parsed).toMatchObject({ ok: true, command: "finish", paidPlacesLeft: 7, closingHeader: CLOSING_HEADER });
+    expect(parsed.userMessage).toBe(closingMessage(parsed.link, "pass", 0).join("\n"));
     expect(out[0]).not.toContain("\u001b");
 
     const bad = setup(goodAttestation({ report: "" }));
