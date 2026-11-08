@@ -16,6 +16,7 @@ import { DataItemCard } from "./DataItemCard";
 import {
   amountText,
   balanceAfterParts,
+  feeFiatText,
   feeText,
   fiatText,
   glyphLabel,
@@ -123,7 +124,7 @@ export function TransferReview({
           {warning}
           <div className={`flex flex-col gap-3.5 pt-6 ${GUTTER}`}>
             {from ? <SummaryRow label={t("transferReview.from")} value={<FromValue from={from} />} /> : null}
-            <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
+            <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={request.fee} context={context} />} />
             {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
@@ -134,7 +135,7 @@ export function TransferReview({
           {warning}
           <div className={`flex flex-col gap-3.5 pt-8 ${GUTTER}`}>
             <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={first} />} />
-            <SummaryRow label={t("transferReview.networkFee")} value={feeText(request.fee, t)} />
+            <SummaryRow label={t("transferReview.networkFee")} value={<FeeValue fee={request.fee} context={context} />} />
             {balanceAfter !== undefined ? <SummaryRow label={t("transferReview.balanceAfter")} value={<BalanceAfter parts={balanceAfter} />} /> : null}
           </div>
         </>
@@ -287,25 +288,47 @@ function Parties({ from, to, toName }: { from: TransferReviewProps["from"]; to: 
   const t = useT();
   const identity = useAddressIdentity();
   return (
-    <div className={`grid grid-cols-[32px_minmax(0,1fr)] gap-x-3.5 ${GUTTER}`}>
+    <div className={`grid grid-cols-[36px_minmax(0,1fr)] gap-x-3.5 ${GUTTER}`}>
       {from ? (
         <>
-          <AccountAvatar svgMarkup={identity.avatarSvg(from.address)} label="" size={32} />
-          <div className="flex min-w-0 flex-col justify-center gap-0.5">
+          <AccountAvatar svgMarkup={identity.avatarSvg(from.address)} label="" size={36} />
+          <div className="flex min-w-0 flex-col justify-center">
             <span className="text-label text-muted">{t("transferReview.from")}</span>
             <FromValue from={from} />
           </div>
-          <div aria-hidden="true" className="my-1.5 h-5 w-0.5 justify-self-center rounded-full bg-line" />
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 28"
+            className="my-2.5 h-7 w-3 justify-self-center text-muted/60"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.25"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 1v25M1.5 21.5 6 26l4.5-4.5" />
+          </svg>
           <div />
         </>
       ) : null}
-      <AccountAvatar svgMarkup={identity.avatarSvg(to)} label="" size={32} />
-      <div className="flex min-w-0 flex-col gap-1">
+      <AccountAvatar svgMarkup={identity.avatarSvg(to)} label="" size={36} />
+      <div className="flex min-w-0 flex-col">
         <span className="text-label text-muted">{t("transferReview.to")}</span>
         {toName ? <span className="break-words text-body font-medium text-foreground">{toName}</span> : null}
         <MemorableAddress address={to} emphasisPick={identity.emphasisPick} tone="confirm" />
       </div>
     </div>
+  );
+}
+
+function FeeValue({ fee, context }: { fee: string | null; context: TransferContext }) {
+  const t = useT();
+  const fiat = feeFiatText(fee, context);
+  return (
+    <>
+      {feeText(fee, t)}
+      {fiat ? <span className="ml-1.5 text-muted">{fiat}</span> : null}
+    </>
   );
 }
 

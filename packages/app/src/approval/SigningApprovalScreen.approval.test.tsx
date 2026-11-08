@@ -201,10 +201,10 @@ describe("SigningApprovalScreen transfer layout: AR", () => {
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText(exactGroup("50000000000000"))).toBeTruthy();
   });
 
-  it("shows a tiny amount and fee exactly, not rounded to 0", () => {
+  it("shows a tiny amount exactly and a tiny fee rounded up, never to 0", () => {
     renderScreen({ preview: { ...AR_PREVIEW, amount: "10000000", fee: "46409930" } });
     expect(screen.getByText("0.00001")).toBeTruthy();
-    expect(screen.getByText("0.00004640993 AR")).toBeTruthy();
+    expect(screen.getByText("0.0000465 AR")).toBeTruthy();
   });
 
   it("leaves out a fiat line priced in the token being sent", () => {
@@ -337,7 +337,7 @@ describe("SigningApprovalScreen transfer layout: collectible and Gleam's own sen
     expect(screen.getByText("1 item")).toBeTruthy();
     expect(screen.getByText(addressText(RECIPIENT))).toBeTruthy();
     expect(screen.getByText("NNNNNN…NNNN")).toBeTruthy();
-    expect(screen.getByText("0.000000654321 AR")).toBeTruthy();
+    expect(screen.getByText("0.000000655 AR")).toBeTruthy();
     expect(within(screen.getByRole("button", { name: /^Details/ })).getByText("1")).toBeTruthy();
   });
 

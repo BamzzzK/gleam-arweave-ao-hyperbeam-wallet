@@ -4,6 +4,9 @@ import { HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { t } from "../i18n";
 import {
   balanceAfterParts,
+  feeFiatText,
+  feeText,
+  fiatText,
   glyphLabel,
   groupDigits,
   recipientsOf,
@@ -178,5 +181,34 @@ describe("showsWarning", () => {
     expect(warned.unreadableTokenTransfer).toBe(true);
     expect(showsWarning(warned, null)).toBe(true);
     expect(showsWarning(transferRequestFromPreview(batch(false))!, null)).toBe(false);
+  });
+});
+
+describe("feeText", () => {
+  it("rounds up to three significant digits", () => {
+    expect(feeText("42855127", t)).toBe("0.0000429 AR");
+    expect(feeText("42800000", t)).toBe("0.0000428 AR");
+    expect(feeText("1", t)).toBe("0.000000000001 AR");
+  });
+
+  it("says None for a request with no fee", () => {
+    expect(feeText(null, t)).toBe(t("transferReview.none"));
+  });
+});
+
+describe("fiat values", () => {
+  const context = { currency: "USD" as const, prices: [{ processId: null, price: 5, change24h: null }] };
+
+  it("shows a tiny nonzero value as under one cent", () => {
+    expect(fiatText(context, request({ amount: "1000000000" }).transfers[0]!)).toBe("< $0.01");
+    expect(feeFiatText("42855127", context)).toBe("< $0.01");
+  });
+
+  it("keeps the estimate for larger values", () => {
+    expect(fiatText(context, request({ amount: "2000000000000" }).transfers[0]!)).toBe("≈ $10.00");
+  });
+
+  it("leaves the fee unpriced when the display currency is AR", () => {
+    expect(feeFiatText("42855127", { ...context, currency: "AR" })).toBeUndefined();
   });
 });
