@@ -85,6 +85,11 @@
 3 packages/core/src/models/method-privileges.ts
 3 packages/runtime/src/handlers/announcements.ts
 3 packages/runtime/src/handlers/site-wallet.ts
+3 packages/core/src/ao/peer-discovery.ts
+3 packages/core/src/ao/peer-failover.ts
+3 packages/runtime/src/peers.ts
+3 packages/core/src/models/network.ts
+3 packages/messaging/src/protocol.ts
 
 4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
@@ -99,6 +104,8 @@
 4 apps/mobile/src/adapters/approval-presenter.ts
 4 apps/mobile/src/adapters/approval-sheet.ts
 4 apps/extension/src/adapters/windows.ts
+4 packages/core/src/recipients/assess.ts
+4 packages/runtime/src/handlers/reads.ts
 
 5 packages/runtime/src/points-invite.ts
 5 packages/runtime/src/points-attest.ts
