@@ -171,6 +171,9 @@ The extension talks to:
   (reading results), `state.forward.computer`, HyperBEAM peers,
   `alpha.neo.zephyrdev.xyz` and `charlie.neo2.zephyrdev.xyz` (token
   balances, and posting a signed transaction the gateway can't take).
+  Balance and collectible reads fail over to the other enabled peers:
+  a shipped community list and nodes discovered daily from on-chain
+  location records (`core/ao/peer-discovery.ts`).
 - **Gleam:** `api.gleamwallet.app` (prices: the token id only, relayed to
   CoinGecko and CoinPaprika; Gleam Points: the wallet address, a signed
   proof of ownership, and a device id) and `gleamwallet.app`
@@ -347,6 +350,17 @@ These are true of the current release.
   None of these changes what is signed, and a send above the real
   balance is refused by the network or the token. The worst case is a
   send that reads pending, then failed after 2 hours, with nothing moved.
+- **Failover peers are not vetted.** When the active HyperBEAM peer is
+  down, token balance and collectible reads try up to two more enabled
+  peers, including community nodes and ones announced in on-chain
+  location records, which anyone can publish. Such a node sees the
+  wallet address and could answer a wrong balance or list collectibles
+  the wallet doesn't hold. Discovered URLs must be bare public https
+  origins that answer as a node. What is signed never depends on their
+  answers: a wrong balance can misstate the balance and balance-after
+  lines or block a send as over the balance, and a send above the real
+  balance is refused by the token. A user can remove any peer in
+  Network & peers.
 - **Prices are display only.** A lying node can post a collectible
   listing at any price above 0.1 AR, and a wrong FX rate from the Points
   API misstates a fiat figure. Neither feeds a signature or a send, which
