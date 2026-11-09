@@ -60,7 +60,9 @@ export type L1TokenTransferReading =
  * Tags are matched by name, case-insensitively and in any order, with
  * other tags allowed, because the scheduler and HyperBEAM's `dev_token`
  * read them that way. A name given twice is unreadable: the token could
- * act on either copy.
+ * act on either copy. So is any `Assign-To` tag, since the scheduler also
+ * hands the transaction to each process it names, and each one would run
+ * the same transfer of its own token.
  */
 export function readL1TokenTransfer(transaction: {
   target: string;
@@ -80,6 +82,7 @@ export function readL1TokenTransfer(transaction: {
   const quantity = only("quantity");
   if (
     actions.length !== 1 ||
+    named("assign-to").length > 0 ||
     (transaction.quantity || "0") !== "0" ||
     transaction.data_size !== "0" ||
     recipient === null ||
