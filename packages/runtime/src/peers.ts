@@ -55,12 +55,30 @@ export async function readDismissedPeers(storage: StoragePort): Promise<string[]
  */
 export async function saveNetworkSettings(storage: StoragePort, next: NetworkSettings): Promise<void> {
   const kept = new Set(next.peers.map((peer) => stripTrailingSlashes(peer.url)));
-  const removed = (await readExtraPeerUrls(storage)).filter((url) => !kept.has(url));
+  // Saving writes the merged peers into the stored list, so a peer can
+  // outlive the discovery result that brought it. Counting the stored list
+  // too keeps its removal from being undone when discovery finds it again.
+  const shown = [...(await readStoredPeerUrls(storage)), ...(await readExtraPeerUrls(storage))];
+  const removed = [...new Set(shown)].filter((url) => !kept.has(url));
   if (removed.length > 0) {
     const dismissed = await readDismissedPeers(storage);
     await storage.set(DISMISSED_PEERS_KEY, [...new Set([...dismissed, ...removed])]);
   }
   await storage.set(NETWORK_SETTINGS_KEY, next);
+}
+
+async function readStoredPeerUrls(storage: StoragePort): Promise<string[]> {
+  try {
+    const raw = await storage.get<{ peers?: unknown }>(NETWORK_SETTINGS_KEY);
+    if (!Array.isArray(raw?.peers)) return [];
+    return raw.peers.flatMap((peer: unknown) =>
+      typeof peer === "object" && peer !== null && typeof (peer as { url?: unknown }).url === "string"
+        ? [stripTrailingSlashes((peer as { url: string }).url)]
+        : [],
+    );
+  } catch {
+    return [];
+  }
 }
 
 /** Reads the last discovery result, if any. */

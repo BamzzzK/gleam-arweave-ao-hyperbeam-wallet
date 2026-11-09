@@ -17,7 +17,7 @@ overrides:
   '@keystonehq/bc-ur-registry-arweave>uuid': ^11.1.1
   xcode>uuid: ^11.1.1
   vite: ^8.3.3
-  node-forge: 1.4.2
+  node-forge: 1.4.3
 
 importers:
 
@@ -328,8 +328,8 @@ importers:
         specifier: 4.12.0
         version: 4.12.0
       node-forge:
-        specifier: 1.4.2
-        version: 1.4.2
+        specifier: 1.4.3
+        version: 1.4.3
     devDependencies:
       '@dha-team/arbundles':
         specifier: ^1.2.0
@@ -3869,8 +3869,8 @@ packages:
     resolution: {integrity: sha512-kXs9Go0cah0qHVV2v389IXQLdLCeE1xfFtjOAF+iobu0OIoG1pje8At2vMHyaPMiPMnG/LWP50twML21eMcAag==}
     engines: {node: '>= 0.4'}
 
-  node-forge@1.4.2:
-    resolution: {integrity: sha512-rRtAR5XLJ8gCKd9du4qrKAsgCG1ObGP4gLeNJMa4vYSeq4bmBMOJk5IHkrviBV0q7uoAJlVd8HEQYQSVUb4FGQ==}
+  node-forge@1.4.3:
+    resolution: {integrity: sha512-P6wzfh6t70avmV8FrVEAd/36sOPJQ+hkaJVX1Laap9J/77m7M0eyozDvc8SwnDf4P7MP94gwbAAo0rg3YVXT+g==}
     engines: {node: '>= 6.13.0'}
 
   node-gyp-build@4.8.4:
@@ -5459,7 +5459,7 @@ snapshots:
       bluebird: 3.7.2
       commander: 9.5.0
       debug: 4.3.7(supports-color@7.2.0)
-      node-forge: 1.4.2
+      node-forge: 1.4.3
       split: 1.0.1
     transitivePeerDependencies:
       - supports-color
@@ -8827,7 +8827,7 @@ snapshots:
       object.entries: 1.1.9
       semver: 6.3.1
 
-  node-forge@1.4.2: {}
+  node-forge@1.4.3: {}
 
   node-gyp-build@4.8.4: {}
 

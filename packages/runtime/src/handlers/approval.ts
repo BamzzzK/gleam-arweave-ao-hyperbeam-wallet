@@ -894,7 +894,9 @@ function buildConnectPreview(
   requestedPermissions: PermissionType[],
   appInfo: ConnectAppInfo | null,
 ): ConnectApprovalPreview {
-  return { kind: "connect", requestedPermissions, appInfo };
+  // The approval window would fetch the page's logo as given, so it gets the
+  // same filter as the icon kept on the grant: no plaintext http fetch.
+  return { kind: "connect", requestedPermissions, appInfo: appInfo && { ...appInfo, logo: safeSiteIconUrl(appInfo.logo) } };
 }
 
 /**

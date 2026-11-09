@@ -360,6 +360,22 @@ describe("ApprovalHandler: connect() -> Grant", () => {
     expect((await approveConnect({ favIconUrl: "http://bazar.arweave.net/favicon.ico" }))?.icon).toBeNull();
   });
 
+  it("shows the connect screen only a logo the wallet may fetch", async () => {
+    const pending = handler.requestApproval({
+      kind: "connect",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      requestedPermissions: ["ACCESS_ADDRESS"],
+      appInfo: { name: "Bazar", logo: "http://bazar.arweave.net/logo.png" },
+    });
+    await vi.waitFor(() => expect(presenter.presented.length).toBeGreaterThan(0));
+    const requestId = presenter.presented.at(-1)!;
+    const request = await handler.getApproval({ requestId });
+    expect(request.preview.kind === "connect" ? request.preview.appInfo : undefined).toEqual({ name: "Bazar", logo: null });
+    await handler.resolveApproval({ requestId, approved: false });
+    await expect(pending).rejects.toThrow();
+  });
+
   it("keeps the dApp's name on the grant, dropping one with bidi overrides", async () => {
     expect((await approveConnect({ appInfo: { name: "Bazar", logo: null } }))?.name).toBe("Bazar");
     await storage.set("local:grants", []);

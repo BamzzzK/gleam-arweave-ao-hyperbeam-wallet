@@ -1,7 +1,7 @@
 import type { ActivityEntry } from "../models/activity";
 
 export interface RecipientAssessment {
-  /** No prior activity with this address, and it is not a saved contact or one of your wallets. */
+  /** The wallet has never sent to this address, and it is not a saved contact or one of your wallets. */
   firstTime: boolean;
   /** A trusted address this one closely resembles but isn't: a spoof or a one-character slip. */
   lookalikeOf: string | null;
