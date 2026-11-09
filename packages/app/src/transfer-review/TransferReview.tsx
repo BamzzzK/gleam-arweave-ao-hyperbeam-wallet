@@ -280,6 +280,23 @@ function TransferCard({ transfer, context }: { transfer: TransferLine; context: 
           <MemorableAddress address={transfer.recipient} emphasisPick={identity.emphasisPick} tone="confirm" />
         </div>
       </div>
+      {/* The ticker and scale come from untrusted metadata, so the process
+          and raw units sit on the card, not only behind Details. */}
+      {transfer.token !== null ? (
+        <div className="flex flex-col gap-1.5">
+          <SummaryRow label={t("transferReview.token")} value={<TokenValue transfer={transfer} />} />
+          {transfer.collectible || isUnknownScale(transfer) ? null : (
+            <SummaryRow
+              label={t("transferReview.rawUnitsLabel")}
+              value={
+                <span dir="ltr" className="font-mono text-caption">
+                  {groupDigits(transfer.amount)}
+                </span>
+              }
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
