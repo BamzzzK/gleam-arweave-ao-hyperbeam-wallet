@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ActivityPage, Contact, FeeEstimate, RuntimePort, TokenBalance, TokenPrice, WalletState, WalletSummary } from "@gleam/core";
+import type { ActivityPage, Contact, RecipientAssessment, RuntimePort, TokenBalance, TokenPrice, TransferFeeQuote, WalletState, WalletSummary } from "@gleam/core";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { PlatformProvider } from "../../../app-platform/context";
 import { fakeAppPlatform } from "../../../app-platform/testing";
@@ -84,7 +84,8 @@ function routedSend(handlers: {
   getTokenBalances?: (payload: { address: string }) => TokenBalance[];
   getActivity?: (payload: { address: string }) => ActivityPage;
   getArFee?: () => string;
-  estimateTransfer?: () => FeeEstimate;
+  estimateTransfer?: () => TransferFeeQuote;
+  assessRecipient?: () => RecipientAssessment | Promise<RecipientAssessment>;
   submitTransfer?: () => { txId: string };
   listContacts?: () => Contact[];
   saveContact?: (payload: { address: string; name: string }) => Contact;
@@ -105,9 +106,10 @@ function routedSend(handlers: {
         return (
           handlers.estimateTransfer?.() ?? {
             fee: "100000000",
-            firstSeenRecipient: false,
           }
         );
+      case "assessRecipient":
+        return handlers.assessRecipient?.() ?? { firstTime: false, lookalikeOf: null };
       case "submitTransfer":
         return handlers.submitTransfer?.() ?? { txId: "tx-123" };
       case "listContacts":
@@ -259,7 +261,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
   it("selecting a non-AR token sets the compose ticker and carries it through estimate/submit", async () => {
     const send = routedSend({
       getTokenBalances: () => [AO_TOKEN],
-      estimateTransfer: () => ({ fee: null, firstSeenRecipient: false }),
+      estimateTransfer: () => ({ fee: null }),
       submitTransfer: () => ({ txId: "ao-tx-456" }),
     });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
@@ -284,7 +286,7 @@ describe("SendView token picker (AO-SEND-UI-WALLET-CORE)", () => {
           walletId: WALLET.id,
           recipient: RECENT_RECIPIENT_A,
           token: AO_TOKEN.processId,
-          amount: "2500000",
+          amount: "0",
           fee: null,
         },
       }),
@@ -431,7 +433,7 @@ describe("SendView AR Max and balance check account for the network fee", () => 
     const send = routedSend({
       getBalance: () => "1000000000000", // 1 AR
       getArFee: () => "50000000000", // 0.05 AR (rough, recipient-less quote)
-      estimateTransfer: () => ({ fee: "50000000000", firstSeenRecipient: false }),
+      estimateTransfer: () => ({ fee: "50000000000" }),
     });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
@@ -454,7 +456,7 @@ describe("SendView AR Max and balance check account for the network fee", () => 
     const send = routedSend({
       getBalance: () => "1000000000000", // 1 AR
       getArFee: () => "50000000000", // 0.05 AR
-      estimateTransfer: () => ({ fee: "200000000000", firstSeenRecipient: true }), // 0.2 AR
+      estimateTransfer: () => ({ fee: "200000000000" }), // 0.2 AR
     });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
@@ -702,7 +704,7 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
         activityPage([
           { txId: "tx-1", type: "send", status: "confirmed", address: RECENT_RECIPIENT_A, amount: "1", tags: [], timestamp: 100 },
         ]),
-      estimateTransfer: () => ({ fee: "100000000", firstSeenRecipient: false }),
+      estimateTransfer: () => ({ fee: "100000000" }),
     });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
@@ -775,7 +777,7 @@ describe("SendView address book: your own wallets are known recipients (AO-SEND-
   it("shows the wallet's name above the address on Review and skips first-seen framing when sending to your own wallet", async () => {
     const send = routedSend({
       getState: () => ({ wallets: [WALLET, OTHER_WALLET], activeWalletId: WALLET.id, session: null }),
-      estimateTransfer: () => ({ fee: "100000000", firstSeenRecipient: true }),
+      assessRecipient: () => ({ firstTime: true, lookalikeOf: null }),
     });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
@@ -788,7 +790,7 @@ describe("SendView address book: your own wallets are known recipients (AO-SEND-
     await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
     expect(screen.getByText(OTHER_WALLET.name)).toBeTruthy();
     // A known recipient (one of your own wallets) skips the first-seen risk framing,
-    // even though the backend's own `firstSeenRecipient` came back true.
+    // even though the background's history check came back first-time.
     expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
   });
 
@@ -864,7 +866,7 @@ describe("SendView address book: save this address (AO-SEND-UI-WALLET-CORE)", ()
 describe("SendView with a hardware wallet", () => {
   it("re-quotes after a failed send and shows the new fee instead of retrying the stale one", async () => {
     const fees = ["100000000", "300000000"];
-    const routed = routedSend({ estimateTransfer: () => ({ fee: fees.shift() ?? "300000000", firstSeenRecipient: false }) });
+    const routed = routedSend({ estimateTransfer: () => ({ fee: fees.shift() ?? "300000000" }) });
     const submitted: unknown[] = [];
     const send = vi.fn(async (message: { type: string; payload: unknown }) => {
       if (message.type !== "submitTransfer") return routed(message as never);
@@ -934,10 +936,8 @@ describe("SendView with a hardware wallet", () => {
 describe("SendView recipient lookalike warning", () => {
   const LOOKALIKE_OF = "AAAAAA2222222222222222222222222222222222222";
 
-  async function reviewWith(estimate: { lookalikeOf?: string | null; firstSeenRecipient: boolean }) {
-    const send = routedSend({
-      estimateTransfer: () => ({ fee: "100000000", ...estimate }),
-    });
+  async function reviewWith(assessment: RecipientAssessment) {
+    const send = routedSend({ assessRecipient: () => assessment });
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
     fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
@@ -946,20 +946,20 @@ describe("SendView recipient lookalike warning", () => {
   }
 
   it("names the address a lookalike recipient imitates, and still lets the user send", async () => {
-    await reviewWith({ firstSeenRecipient: false, lookalikeOf: LOOKALIKE_OF });
+    await reviewWith({ firstTime: false, lookalikeOf: LOOKALIKE_OF });
     expect(screen.getByText(/looks like one you've used but it's different/)).toBeTruthy();
     expect(screen.getByText(addressText(LOOKALIKE_OF))).toBeTruthy();
     expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(false);
   });
 
   it("shows the first-time notice when there is no lookalike", async () => {
-    await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
+    await reviewWith({ firstTime: true, lookalikeOf: null });
     expect(screen.getByText(/haven't sent to this address before/)).toBeTruthy();
     expect(screen.queryByText(/looks like one you've used but it's different/)).toBeNull();
   });
 
   it("shows the shared transfer review: From, amount, AR token, fee, a red Send under the warning", async () => {
-    await reviewWith({ firstSeenRecipient: true, lookalikeOf: null });
+    await reviewWith({ firstTime: true, lookalikeOf: null });
     expect(screen.getByText(WALLET.name)).toBeTruthy();
     expect(screen.getByText("0.5")).toBeTruthy();
     expect(screen.getByText(addressText(RECENT_RECIPIENT_A))).toBeTruthy();
@@ -970,7 +970,7 @@ describe("SendView recipient lookalike warning", () => {
   });
 
   it("keeps Send black for a recipient sent to before, and Cancel goes back to compose", async () => {
-    await reviewWith({ firstSeenRecipient: false, lookalikeOf: null });
+    await reviewWith({ firstTime: false, lookalikeOf: null });
     expect(screen.queryByText(/haven't sent to this address before/)).toBeNull();
     expect(screen.getByRole("button", { name: "Send" }).className).toContain("bg-foreground");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -1007,5 +1007,59 @@ describe("SendView lookalike warning while composing", () => {
     fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: `BBBB${"2".repeat(39)}` } });
     await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getActivity" })));
     expect(screen.queryByText(/looks like one you've used but it's different/)).toBeNull();
+  });
+});
+
+describe("SendView fee quote", () => {
+  it("shows the network fee on compose as soon as the recipient and amount are in, before Continue", async () => {
+    let resolveFee: (quote: TransferFeeQuote) => void = () => {};
+    const send = routedSend({});
+    const routed = vi.fn((message: { type: string; payload: unknown }) =>
+      message.type === "estimateTransfer"
+        ? new Promise<TransferFeeQuote>((resolve) => (resolveFee = resolve))
+        : send(message as never),
+    ) as unknown as RuntimePort["send"];
+    renderSendView({ runtime: fakeRuntime({ send: routed }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    expect(await screen.findByText("Estimating fee…")).toBeTruthy();
+
+    resolveFee({ fee: "100000000" });
+    expect(await screen.findByText("0.0001 AR")).toBeTruthy();
+  });
+
+  it("reaches review on the fee alone, and holds Send until the recipient check answers", async () => {
+    let resolveAssessment: (assessment: RecipientAssessment) => void = () => {};
+    const send = routedSend({
+      assessRecipient: () => new Promise<RecipientAssessment>((resolve) => (resolveAssessment = resolve)),
+    });
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+    const checking = screen.getByRole("button", { name: "Checking recipient…" }) as HTMLButtonElement;
+    expect(checking.disabled).toBe(true);
+
+    resolveAssessment({ firstTime: true, lookalikeOf: null });
+    expect(await screen.findByText(/haven't sent to this address before/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("asks for the fee once when Continue follows the compose quote", async () => {
+    const send = routedSend({});
+    renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+
+    fireEvent.change(screen.getByPlaceholderText("Paste an address"), { target: { value: RECENT_RECIPIENT_A } });
+    fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "0.5" } });
+    await screen.findByText("0.0001 AR");
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+    await waitFor(() => expect(screen.getByText("Review send")).toBeTruthy());
+
+    const estimates = vi.mocked(send).mock.calls.filter(([message]) => (message as { type: string }).type === "estimateTransfer");
+    expect(estimates).toHaveLength(1);
   });
 });

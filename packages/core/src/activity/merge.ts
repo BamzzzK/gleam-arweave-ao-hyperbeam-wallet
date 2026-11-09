@@ -82,18 +82,3 @@ function withFailedAoTransferDetection(entry: ActivityEntry): ActivityEntry {
 
   return { ...entry, status: "failed", error: errorTag.value };
 }
-
-/**
- * Whether `recipient` has no prior confirmed-or-pending activity in
- * either source — the "first-seen-address" signal `estimateTransfer`
- * (handlers/transfer.ts) uses to escalate its review-screen framing.
- * Checked against the union so a pending local send-in-flight to the
- * same address still counts as "seen".
- */
-export function isFirstSeenRecipient(
-  recipient: string,
-  localLog: ActivityEntry[],
-  gatewayEntries: ActivityEntry[],
-): boolean {
-  return ![...localLog, ...gatewayEntries].some((entry) => entry.address === recipient);
-}

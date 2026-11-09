@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Collectible, FeeEstimate, RuntimePort, WalletSummary } from "@gleam/core";
+import type { Collectible, RecipientAssessment, RuntimePort, TransferFeeQuote, WalletSummary } from "@gleam/core";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { PlatformProvider } from "../../../app-platform/context";
@@ -32,13 +32,19 @@ const COLLECTIBLE: Collectible = {
 };
 
 function setup(
-  handlers: { estimate?: () => FeeEstimate; send?: () => { txId: string } } = {},
+  handlers: {
+    estimate?: () => TransferFeeQuote;
+    assess?: () => RecipientAssessment | Promise<RecipientAssessment>;
+    send?: () => { txId: string };
+  } = {},
   wallet: WalletSummary = WALLET,
 ) {
   const send = vi.fn(async (message: { type: string; payload: unknown }) => {
     switch (message.type) {
       case "estimateCollectibleSend":
-        return handlers.estimate?.() ?? { fee: "654321", firstSeenRecipient: false };
+        return handlers.estimate?.() ?? { fee: "654321" };
+      case "assessRecipient":
+        return handlers.assess?.() ?? { firstTime: false, lookalikeOf: null };
       case "sendCollectible":
         return handlers.send?.() ?? { txId: "tx-nft" };
       case "listContacts":
@@ -163,5 +169,36 @@ describe("SendCollectibleView", () => {
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Gateway down"));
     expect(screen.getByText("Review send")).toBeTruthy();
+  });
+
+  it("shows the fee on compose once the recipient is in", async () => {
+    setup();
+
+    enterRecipient(RECIPIENT);
+
+    expect(await screen.findByText("0.000000655 AR")).toBeTruthy();
+  });
+
+  it("does not quote a recipient the send would refuse", async () => {
+    const { send } = setup();
+
+    enterRecipient(WALLET.address);
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "getState" })));
+    expect(screen.queryByText("Network fee")).toBeNull();
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "estimateCollectibleSend" }));
+  });
+
+  it("holds Send until the recipient check answers, then warns about a new address", async () => {
+    let resolveAssessment: (assessment: RecipientAssessment) => void = () => {};
+    setup({ assess: () => new Promise<RecipientAssessment>((resolve) => (resolveAssessment = resolve)) });
+
+    enterRecipient(RECIPIENT);
+    fireEvent.click(screen.getByRole("button", { name: "Review and Send" }));
+
+    expect(((await screen.findByRole("button", { name: "Checking recipient…" })) as HTMLButtonElement).disabled).toBe(true);
+    resolveAssessment({ firstTime: true, lookalikeOf: null });
+    expect(await screen.findByText(/haven't sent to this address before/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

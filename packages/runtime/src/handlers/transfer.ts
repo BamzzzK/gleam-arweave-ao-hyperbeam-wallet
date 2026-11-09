@@ -14,7 +14,6 @@ import {
   prepareTransfer as prepareAoTransfer,
   submitTransfer as submitAoTransfer,
 } from "@gleam/core/src/ao/transfer.ts";
-import { isFirstSeenRecipient } from "@gleam/core/src/activity/index.ts";
 import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
   capabilityRefusal,
@@ -24,7 +23,6 @@ import {
   type ActivityEntry,
   type CollectibleSendDraft,
   type CollectibleSendRequest,
-  type FeeEstimate,
   type RecipientAssessment,
   type NetworkSettings,
   type Signer,
@@ -32,6 +30,7 @@ import {
   type TokenTransport,
   type TransferDraft,
   type UnsignedPayload,
+  type TransferFeeQuote,
   type Wallet,
   type Winston,
 } from "@gleam/core";
@@ -191,33 +190,30 @@ export class TransferHandler {
 
   /**
    * `token: null` is the AR path. `token: <processId>` is an AO token
-   * transfer: `firstSeenRecipient` is still computed against the same
-   * merged local+gateway AR activity history the AR path uses (there is
-   * no separate AO-only recipient-history source), but `fee` has no AO
-   * equivalent — see `core/ao/transfer.ts`'s
-   * `AO_TRANSFER_HAS_NO_FEE` doc comment for why an AO `Transfer` message
-   * has no sender-side fee quote the way an AR value-transfer does.
-   * Returned as `fee: null` rather than a fabricated `0`, matching
-   * `TransferDraft.fee`'s `Winston | null` shape.
+   * transfer, which has no sender-side fee (see `core/ao/transfer.ts`'s
+   * `AO_TRANSFER_HAS_NO_FEE`) and returns `fee: null` rather than a
+   * fabricated `0`, unless the token moves on L1. Only the fee: the
+   * recipient checks read up to two pages of gateway GraphQL, which can
+   * take many seconds, so the send screen asks `assessRecipient` for them
+   * separately.
    */
-  async estimateTransfer(req: EstimateTransferRequest): Promise<FeeEstimate> {
+  async estimateTransfer(req: EstimateTransferRequest): Promise<TransferFeeQuote> {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
-    const { firstSeenRecipient, lookalikeOf } = await this.checkRecipient(settings, wallet.address, req.recipient);
 
     if (req.token !== null) {
-      if ((await this.transportOf(req)) === "mu") return { fee: null, firstSeenRecipient, lookalikeOf };
+      if ((await this.transportOf(req)) === "mu") return { fee: null };
       // An L1 token transfer costs an AR network reward, like a collectible send.
       const [{ fee }, balance] = await Promise.all([
         estimateFee(settings.gatewayUrl, req.token),
         getArBalance(wallet.address, settings.gatewayUrl),
       ]);
       assertCoversNetworkFee(balance, fee);
-      return { fee, firstSeenRecipient, lookalikeOf };
+      return { fee };
     }
 
     const { fee } = await estimateFee(settings.gatewayUrl, req.recipient);
-    return { fee, firstSeenRecipient, lookalikeOf };
+    return { fee };
   }
 
   private async loadRecipientHistory(settings: NetworkSettings, address: string): Promise<[ActivityEntry[], ActivityEntry[]]> {
@@ -243,22 +239,6 @@ export class TransferHandler {
     return addresses;
   }
 
-  /** One history read for both the legacy first-seen flag and the lookalike check. */
-  private async checkRecipient(
-    settings: NetworkSettings,
-    address: string,
-    recipient: string,
-  ): Promise<{ firstSeenRecipient: boolean; lookalikeOf: string | null }> {
-    const [[localLog, gatewayEntries], known] = await Promise.all([
-      this.loadRecipientHistory(settings, address),
-      this.loadKnownAddresses(),
-    ]);
-    return {
-      firstSeenRecipient: isFirstSeenRecipient(recipient, localLog, gatewayEntries),
-      lookalikeOf: assessRecipient(recipient, [...localLog, ...gatewayEntries], known).lookalikeOf,
-    };
-  }
-
   /** What the approval window shows for a recipient; reads the same history as the send screen. */
   async assessRecipient(req: { walletId: string; recipient: string }): Promise<RecipientAssessment> {
     const settings = await this.loadNetworkSettings();
@@ -275,17 +255,16 @@ export class TransferHandler {
    * reward for a data-less transaction to the asset process. Fails early
    * when the wallet's AR can't pay it.
    */
-  async estimateCollectibleSend(req: CollectibleSendDraft): Promise<FeeEstimate> {
+  async estimateCollectibleSend(req: CollectibleSendDraft): Promise<TransferFeeQuote> {
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     refuseCollectibleSend(wallet.address, req.recipient, req.collectible.id);
-    const [{ fee }, balance, recipientCheck] = await Promise.all([
+    const [{ fee }, balance] = await Promise.all([
       estimateFee(settings.gatewayUrl, req.collectible.id),
       getArBalance(wallet.address, settings.gatewayUrl),
-      this.checkRecipient(settings, wallet.address, req.recipient),
     ]);
     assertCoversNetworkFee(balance, fee);
-    return { fee, ...recipientCheck };
+    return { fee };
   }
 
   /** Sends one collectible through `submitTransfer`, so a hardware wallet signs it in the approval window too. */

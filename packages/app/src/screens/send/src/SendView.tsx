@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { UseQueryResult } from "@tanstack/react-query";
-import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type FeeEstimate, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type ActivityPage, type Contact, type DisplayCurrency, type RecipientAssessment, type RuntimePort, type TokenBalance, type TokenPrice, type TransferFeeQuote, type WalletSummary } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -26,11 +26,12 @@ import { validateSendAmount } from "../../activity/src/validateSendAmount";
 import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
+import { fetchSendFeeQuote, useRecipientAssessment, useSendFeeQuote } from "./useSendQuotes";
 import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
-import type { RecipientRisk, TransferContext, TransferRequest } from "../../../transfer-review/model";
+import { feeText, type RecipientRisk, type TransferContext, type TransferRequest } from "../../../transfer-review/model";
 
 const WINSTON_PER_AR = 1_000_000_000_000n;
 
@@ -101,7 +102,7 @@ type Step =
       kind: "review";
       recipient: string;
       amountAtomic: string;
-      estimate: FeeEstimate;
+      estimate: TransferFeeQuote;
       submitting: boolean;
       error?: string;
     }
@@ -244,6 +245,12 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
   // Shared cache with the main screen; orders the recipient dropdown.
   const activityQuery = useActivity(runtime, wallet.address);
   const { emphasisPick } = useAddressIdentity();
+  const queryClient = useQueryClient();
+  const tokenId = selectedToken === null ? null : selectedToken.processId;
+  const quotedRecipient =
+    step.kind === "compose" ? recipientSchema.safeParse(step.recipient).data : step.kind === "review" ? step.recipient : undefined;
+  const feeQuoteQuery = useSendFeeQuote(runtime, wallet.id, step.kind === "compose" ? quotedRecipient : undefined, tokenId);
+  const assessmentQuery = useRecipientAssessment(runtime, wallet.id, quotedRecipient);
   const lookalikeOf = useLookalikeOf(
     runtime,
     wallet,
@@ -292,19 +299,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
 
       setStep({ ...step, submitting: true, recipientError: undefined, amountError: undefined });
       try {
-        const estimate = await runtime.send<
-          { walletId: string; recipient: string; token: string | null; amount: string; fee: null },
-          FeeEstimate
-        >({
-          type: "estimateTransfer",
-          payload: {
-            walletId: wallet.id,
-            recipient,
-            token: selectedToken === null ? null : selectedToken.processId,
-            amount: amountAtomic,
-            fee: null,
-          },
-        });
+        const estimate = await fetchSendFeeQuote(queryClient, runtime, wallet.id, recipient, tokenId);
 
         // getArFee's recipient-less quote underestimates for a first-seen
         // recipient (see its doc comment) — recheck the balance now that
@@ -345,6 +340,8 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
         token={selectedToken}
         balancesQuery={balancesQuery}
         arFeeAtomic={arFeeQuery.data}
+        feeQuote={feeQuoteQuery}
+        arPrice={priceFor(tokenPricesQuery.data, null)}
         price={priceFor(tokenPricesQuery.data, selectedToken)}
         currency={currency}
         tokenLogos={tokenLogos}
@@ -458,21 +455,10 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
     return <ContactsView runtime={runtime} onBack={() => setStep({ kind: "saved-addresses" })} />;
   }
 
-  const requote = async (recipient: string, amountAtomic: string): Promise<FeeEstimate | null> => {
+  const requote = async (recipient: string): Promise<TransferFeeQuote | null> => {
     try {
-      return await runtime.send<
-        { walletId: string; recipient: string; token: string | null; amount: string; fee: null },
-        FeeEstimate
-      >({
-        type: "estimateTransfer",
-        payload: {
-          walletId: wallet.id,
-          recipient,
-          token: selectedToken === null ? null : selectedToken.processId,
-          amount: amountAtomic,
-          fee: null,
-        },
-      });
+      await queryClient.invalidateQueries({ queryKey: ["sendFeeQuote", wallet.id, recipient, tokenId] });
+      return await fetchSendFeeQuote(queryClient, runtime, wallet.id, recipient, tokenId);
     } catch {
       return null;
     }
@@ -496,7 +482,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
         // The fee is pinned at review, so a quote the network has since
         // outgrown fails every retry. Re-quote, and if the fee moved, show
         // the new one and wait for another tap: it is never signed unseen.
-        const estimate = step.estimate.fee === null ? null : await requote(step.recipient, step.amountAtomic);
+        const estimate = step.estimate.fee === null ? null : await requote(step.recipient);
         if (estimate === null || estimate.fee === null || estimate.fee === step.estimate.fee) {
           setStep({ ...step, submitting: false, error: failed });
           return;
@@ -525,6 +511,8 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
           visibility: readRowVisibility(wallet.address),
         }}
         step={step}
+        assessment={assessmentQuery.data}
+        checkingRecipient={assessmentQuery.isPending}
         contact={contactFor(step.recipient)}
         ownWallet={ownWalletFor(step.recipient)}
         signsOnDevice={isHardwareWalletMethod(wallet.method)}
@@ -554,6 +542,8 @@ function ComposeStep({
   token,
   balancesQuery,
   arFeeAtomic,
+  feeQuote,
+  arPrice,
   price,
   currency,
   tokenLogos,
@@ -581,6 +571,10 @@ function ComposeStep({
   token: TokenBalance | null;
   balancesQuery: UseQueryResult<WalletBalances>;
   arFeeAtomic: string | undefined;
+  /** The recipient's fee, fetched while the user types; Continue reuses it. */
+  feeQuote: UseQueryResult<TransferFeeQuote>;
+  /** AR's spot price in `currency`, to value the fee. */
+  arPrice: number | undefined;
   /** The selected token's spot price in `currency`; `undefined` when unpriced or still loading. */
   price: number | undefined;
   currency: DisplayCurrency | undefined;
@@ -658,6 +652,11 @@ function ComposeStep({
   const balanceValue =
     price !== undefined && currency !== undefined && currency !== ticker && balanceDisplay !== undefined && Number.isFinite(balanceNumber)
       ? formatCurrencyValue(balanceNumber * price, currency)
+      : undefined;
+  const feeAtomic = feeQuote.data?.fee ?? null;
+  const feeFiat =
+    feeAtomic !== null && arPrice !== undefined && currency !== undefined && currency !== "AR"
+      ? formatCurrencyValue(Number(formatAtomicAsDisplay(feeAtomic, 12, 12)) * arPrice, currency)
       : undefined;
   const identity = useAddressIdentity();
 
@@ -797,6 +796,7 @@ function ComposeStep({
               {step.amountError}
             </div>
           ) : null}
+          {amountValid && recipientValid ? <NetworkFeeLine quote={feeQuote} fiat={feeFiat} /> : null}
         </div>
 
         {unsupported ? (
@@ -811,6 +811,28 @@ function ComposeStep({
           </Button>
         </ScreenFooter>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The fee on compose, fetched while the user types. A failed quote shows
+ * nothing here: Continue fetches it again and shows the error.
+ */
+export function NetworkFeeLine({ quote, fiat }: { quote: UseQueryResult<TransferFeeQuote>; fiat?: string }) {
+  const t = useT();
+  if (quote.isError) return null;
+  return (
+    <div role="status" className="flex items-center justify-between gap-3 text-label">
+      <span className="text-muted">{t("transferReview.networkFee")}</span>
+      {quote.data === undefined ? (
+        <span className="text-muted">{t("send.estimatingFee")}</span>
+      ) : (
+        <span className="tabular-nums text-foreground">
+          {feeText(quote.data.fee, t)}
+          {fiat !== undefined ? <span className="ml-1.5 text-muted">{fiat}</span> : null}
+        </span>
+      )}
     </div>
   );
 }
@@ -1107,6 +1129,8 @@ function ReviewStep({
   wallet,
   context,
   step,
+  assessment,
+  checkingRecipient,
   contact,
   ownWallet,
   signsOnDevice,
@@ -1117,6 +1141,10 @@ function ReviewStep({
   wallet: WalletSummary;
   context: TransferContext;
   step: Extract<Step, { kind: "review" }>;
+  /** The background's history check; `undefined` while it runs or if it failed. */
+  assessment: RecipientAssessment | undefined;
+  /** Send waits for the history check, so a warning can't arrive after the tap. */
+  checkingRecipient: boolean;
   /** A saved contact for `step.recipient`, if any — a known recipient skips first-seen framing. */
   contact: Contact | undefined;
   /** One of the vault's own other wallets, if `step.recipient` is its address — same known-recipient treatment as a saved contact. */
@@ -1128,13 +1156,11 @@ function ReviewStep({
 }) {
   const t = useT();
   // A saved contact or one of your own wallets counts as a known recipient
-  // even if the backend's own activity-log-based `firstSeenRecipient`
-  // check has no record of it yet (e.g. a contact saved from elsewhere, or
-  // a wallet you've never actually sent to before).
+  // even before the history check answers. A failed check reads as first-time.
   const known = contact ?? ownWallet;
   const risk: RecipientRisk = {
-    firstTime: step.estimate.firstSeenRecipient && !known,
-    lookalikeOf: known ? null : (step.estimate.lookalikeOf ?? null),
+    firstTime: !known && !checkingRecipient && (assessment?.firstTime ?? true),
+    lookalikeOf: known ? null : (assessment?.lookalikeOf ?? null),
   };
   const request: TransferRequest = {
     transfers: [
@@ -1171,11 +1197,17 @@ function ReviewStep({
               secondaryLabel={t("transferReview.cancel")}
               onSecondary={onBack}
               primaryLabel={
-                step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("transferReview.send")
+                step.submitting
+                  ? signsOnDevice
+                    ? t("send.waitingForApproval")
+                    : t("send.sending")
+                  : checkingRecipient && !known
+                    ? t("send.checkingRecipient")
+                    : t("transferReview.send")
               }
               onPrimary={onSign}
               warned={warned}
-              busy={step.submitting}
+              busy={step.submitting || (checkingRecipient && !known)}
               className="mt-0 p-0 phone:px-0"
             />
           </ScreenFooter>
