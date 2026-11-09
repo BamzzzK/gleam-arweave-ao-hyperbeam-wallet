@@ -78,6 +78,7 @@ describe("POST /me", () => {
           foundingNumber: 2,
           originalFounder: false,
           seatsLeft: 3,
+          recent: [],
         },
         {
           address: carol.address,
@@ -93,6 +94,7 @@ describe("POST /me", () => {
           foundingNumber: 3,
           originalFounder: false,
           seatsLeft: 3,
+          recent: [],
         },
       ]),
     );
@@ -152,6 +154,43 @@ describe("POST /me", () => {
       lastDay: { holdingAtomic: "1000", refereeBonusAtomic: "0", founderBonusAtomic: "100", referrerBonusAtomic: "0" },
     });
     expect((await me(devices.bob)).json.wallets[0].originalFounder).toBe(false);
+  });
+
+  it("lists the last two days' credits by source and friends joining, newest first", async () => {
+    const { db, devices, me } = await setup();
+    const balances: Record<string, { arAtomic: string; aoAtomic: string }> = {
+      [alice.address]: { arAtomic: "1000", aoAtomic: "0" },
+      [bob.address]: { arAtomic: "100", aoAtomic: "0" },
+      [carol.address]: { arAtomic: "0", aoAtomic: "0" },
+    };
+    const readBalances = async (address: string) => balances[address]!;
+    // Three days before NOW: outside the window.
+    await runSnapshot(db, new Date(NOW.getTime() - 3 * 86_400_000), { readBalances });
+    await runSnapshot(db, new Date(NOW.getTime() - 11 * 3_600_000), { readBalances });
+    await db.query(
+      `INSERT INTO challenges (id, release, commit, functions, created_at, expires_at) VALUES ('c1', '1.42.0', 'abc', '[]', $1, $1)`,
+      [NOW],
+    );
+    await db.query(
+      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at)
+       VALUES ('a1', '1.42.0', 'abc', 'c1', $1, 'o', 's', 'message', 'm', '{}', true, $2)`,
+      [alice.address, NOW],
+    );
+    await db.query(
+      `INSERT INTO scan_points (address, attestation_id, kind, amount_atomic, ref, created_at) VALUES
+         ($1, 'a1', 'scan', 250, NULL, $2), ($1, 'a1', 'finding', 1000, 'https://github.com/o/r/pull/142', $3)`,
+      [alice.address, new Date(NOW.getTime() - 3_600_000), new Date(NOW.getTime() - 60_000)],
+    );
+
+    const recent = (await me(devices.alice)).json.wallets[0].recent;
+
+    expect(recent).toEqual([
+      { kind: "finding", amountAtomic: "1000", at: "2026-10-08T11:59:00.000Z", release: "1.42.0", ref: "https://github.com/o/r/pull/142" },
+      { kind: "scan", amountAtomic: "250", at: "2026-10-08T11:00:00.000Z", release: "1.42.0" },
+      { kind: "holding", amountAtomic: "1000", at: "2026-10-08T01:00:00.000Z" },
+      { kind: "invites", amountAtomic: "10", at: "2026-10-08T01:00:00.000Z" },
+      { kind: "friendJoined", at: "2026-10-08T12:00:00.000Z" },
+    ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)));
   });
 
   it("lists a wallet on every install it is registered on", async () => {

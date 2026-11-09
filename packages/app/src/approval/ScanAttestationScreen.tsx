@@ -126,13 +126,17 @@ function JoinFirst({
   const t = useT();
   const join = useJoinPoints(runtime);
   const pending = usePendingInvite(runtime);
+  // A callback passed to `mutate` is dropped when the click lands before the
+  // mutation observer subscribes; the `mutateAsync` promise always settles.
+  // A failure shows through `join.error`.
+  const joinThenReview = () => join.mutateAsync({ walletId }).then(onJoined, () => {});
 
   if (join.error instanceof Error && join.error.message === INVITE_REQUIRED_MESSAGE) {
     return (
       <FoundingGate
         runtime={runtime}
         initialUnlock={null}
-        onUnlocked={() => join.mutate({ walletId }, { onSuccess: onJoined })}
+        onUnlocked={() => void joinThenReview()}
       />
     );
   }
@@ -156,7 +160,7 @@ function JoinFirst({
             {errorText(join.error)}
           </p>
         ) : null}
-        <Button disabled={join.isPending} onClick={() => join.mutate({ walletId }, { onSuccess: onJoined })}>
+        <Button disabled={join.isPending} onClick={() => void joinThenReview()}>
           {join.isPending ? t("approval.joining") : t("approval.joinPoints")}
         </Button>
         <Button variant="secondary" disabled={join.isPending} onClick={onCancel}>

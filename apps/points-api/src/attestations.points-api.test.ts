@@ -1059,7 +1059,7 @@ describe("/me and /leave", () => {
     );
     expect(devices.rows).toHaveLength(1);
     const { scoresForDevice } = await import("./score");
-    const scores = await scoresForDevice(s.db, devices.rows[0]!.id, 1);
+    const scores = await scoresForDevice(s.db, devices.rows[0]!.id, 1, new Date());
 
     // Holding on 2026-10-07 (3,000,000 + 99,000,000 on the 6th) plus the 10,000 scan reward.
     expect(scores.wallets[0]).toMatchObject({ address: alice.address, scanPointsAtomic: "10000", totalAtomic: "102010000" });
@@ -1071,7 +1071,7 @@ describe("/me and /leave", () => {
     await s.register(alice);
     const devices = await s.db.query<{ id: string }>("SELECT device_id AS id FROM wallets");
     const { scoresForDevice } = await import("./score");
-    const scores = await scoresForDevice(s.db, devices.rows[0]!.id, 1);
+    const scores = await scoresForDevice(s.db, devices.rows[0]!.id, 1, new Date());
     expect(scores.wallets[0]).toMatchObject({ scanPointsAtomic: "0", totalAtomic: "0" });
   });
 
