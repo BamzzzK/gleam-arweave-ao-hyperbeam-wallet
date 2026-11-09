@@ -56,7 +56,7 @@ export type {
 } from "./token-metadata";
 export type {
   TransferDraft,
-  FeeEstimate,
+  TransferFeeQuote,
   AoTokenTransferRequest,
   AoTokenTransferResult,
 } from "./transfer";

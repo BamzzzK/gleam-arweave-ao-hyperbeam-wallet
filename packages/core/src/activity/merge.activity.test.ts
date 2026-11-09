@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActivityEntry } from "../models/activity";
-import { isFirstSeenRecipient, mergeActivity } from "./merge";
+import { mergeActivity } from "./merge";
 
 function entry(overrides: Partial<ActivityEntry> & Pick<ActivityEntry, "txId" | "timestamp">): ActivityEntry {
   return {
@@ -187,27 +187,5 @@ describe("mergeActivity", () => {
     const page = mergeActivity([], gateway, 10);
 
     expect(page.entries[0]?.status).toBe("confirmed");
-  });
-});
-
-describe("isFirstSeenRecipient", () => {
-  it("returns true when no entry in either source addresses the recipient", () => {
-    const result = isFirstSeenRecipient("newAddr", [], []);
-    expect(result).toBe(true);
-  });
-
-  it("returns false when the local log has a prior entry to that address", () => {
-    const local = [entry({ txId: "tx-1", timestamp: 1, address: "knownAddr" })];
-    expect(isFirstSeenRecipient("knownAddr", local, [])).toBe(false);
-  });
-
-  it("returns false when only the gateway history has a prior entry to that address", () => {
-    const gateway = [entry({ txId: "tx-1", timestamp: 1, address: "knownAddr" })];
-    expect(isFirstSeenRecipient("knownAddr", [], gateway)).toBe(false);
-  });
-
-  it("treats a pending local send-in-flight to the address as 'seen'", () => {
-    const local = [entry({ txId: "tx-1", timestamp: 1, address: "inFlight", status: "pending" })];
-    expect(isFirstSeenRecipient("inFlight", local, [])).toBe(false);
   });
 });

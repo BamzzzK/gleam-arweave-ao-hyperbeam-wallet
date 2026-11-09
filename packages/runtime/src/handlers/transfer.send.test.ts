@@ -151,42 +151,7 @@ describe("TransferHandler: estimateTransfer", () => {
     expect(estimate.fee).toBeNull();
   });
 
-  it("computes firstSeenRecipient for an AO transfer against the same merged AR activity history the AR path uses", async () => {
-    await storage.set(`local:activityLog:${wallet.address}`, [
-      {
-        txId: "prior-tx",
-        type: "send",
-        status: "confirmed",
-        address: "knownAoAddr",
-        amount: "1",
-        tags: [],
-        timestamp: 1,
-        token: AO_PROCESS_ID,
-      },
-    ]);
-    mockFetchSequence([]);
-    const handler = new TransferHandler(storage, keySession);
-
-    const seen = await handler.estimateTransfer({
-      walletId: WALLET_ID,
-      recipient: "knownAoAddr",
-      token: AO_PROCESS_ID,
-      amount: "1000",
-      fee: null,
-    });
-    expect(seen.firstSeenRecipient).toBe(false);
-
-    const unseen = await handler.estimateTransfer({
-      walletId: WALLET_ID,
-      recipient: "brandNewAoAddr",
-      token: AO_PROCESS_ID,
-      amount: "1000",
-      fee: null,
-    });
-    expect(unseen.firstSeenRecipient).toBe(true);
-  });
-
-  it("returns a fee and firstSeenRecipient=true for a never-seen address", async () => {
+  it("returns the recipient's fee without reading gateway history", async () => {
     mockFetchSequence([{ status: 200, body: "999" }]);
     const handler = new TransferHandler(storage, keySession);
 
@@ -198,34 +163,37 @@ describe("TransferHandler: estimateTransfer", () => {
       fee: null,
     });
 
-    expect(estimate.fee).toBe("999");
-    expect(estimate.firstSeenRecipient).toBe(true);
+    expect(estimate).toEqual({ fee: "999" });
+    const urls = vi.mocked(globalThis.fetch).mock.calls.map(([input]) => String(input));
+    expect(urls).toEqual([expect.stringContaining("/price/0/brandNewAddr")]);
+  });
+});
+
+describe("TransferHandler: assessRecipient", () => {
+  let storage: StoragePort;
+  let wallet: Wallet;
+
+  beforeEach(async () => {
+    storage = createFakeStorage();
+    const created = await createTestWallet();
+    wallet = created.wallet;
+    await storage.set("local:wallets", [wallet]);
+    await cacheKey(WALLET_ID, created.jwk, wallet.address);
   });
 
-  it("returns firstSeenRecipient=false when the local log already has that address", async () => {
+  it("is firstTime for a never-seen address", async () => {
+    mockFetchSequence([]);
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: "brandNewAddr" });
+    expect(assessment.firstTime).toBe(true);
+  });
+
+  it("is not firstTime when the local log already has that address, AO sends included", async () => {
     await storage.set(`local:activityLog:${wallet.address}`, [
-      {
-        txId: "prior-tx",
-        type: "send",
-        status: "confirmed",
-        address: "knownAddr",
-        amount: "1",
-        tags: [],
-        timestamp: 1,
-      },
+      { txId: "prior-tx", type: "send", status: "confirmed", address: "knownAoAddr", amount: "1", tags: [], timestamp: 1, token: AO_PROCESS_ID },
     ]);
-    mockFetchSequence([{ status: 200, body: "999" }]);
-    const handler = new TransferHandler(storage, keySession);
-
-    const estimate = await handler.estimateTransfer({
-      walletId: WALLET_ID,
-      recipient: "knownAddr",
-      token: null,
-      amount: "1000",
-      fee: null,
-    });
-
-    expect(estimate.firstSeenRecipient).toBe(false);
+    mockFetchSequence([]);
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: "knownAoAddr" });
+    expect(assessment.firstTime).toBe(false);
   });
 });
 
@@ -435,15 +403,9 @@ describe("TransferHandler: lookalike recipients", () => {
     await storage.set(`local:activityLog:${wallet.address}`, [
       { txId: "t", type: "send", status: "confirmed", address: SENT_TO, amount: "1", tags: [], timestamp: 1 },
     ]);
-    mockFetchSequence([{ status: 200, body: "999" }]);
-    const estimate = await new TransferHandler(storage, keySession).estimateTransfer({
-      walletId: WALLET_ID,
-      recipient: POISON,
-      token: null,
-      amount: "1000",
-      fee: null,
-    });
-    expect(estimate.lookalikeOf).toBe(SENT_TO);
+    mockFetchSequence([]);
+    const assessment = await new TransferHandler(storage, keySession).assessRecipient({ walletId: WALLET_ID, recipient: POISON });
+    expect(assessment.lookalikeOf).toBe(SENT_TO);
   });
 
   it("names a saved contact that the new address imitates, for the approval window", async () => {

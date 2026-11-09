@@ -48,22 +48,12 @@ export interface AoTokenTransferResult {
   id: string;
 }
 
-export interface FeeEstimate {
+/** A send's network fee alone, without the recipient-history checks that can take seconds. */
+export interface TransferFeeQuote {
   /**
    * `null` for an AO token transfer — AO `Transfer` messages have no
    * sender-side fee quote the way an AR value-transfer does (see
    * `core/ao/transfer.ts`'s doc comment). Non-null for the AR path.
    */
   fee: Winston | null;
-  /**
-   * `true` when no prior ActivityEntry exists for `recipient` —
-   * escalates the review screen to first-seen-address (Irreversible)
-   * tier framing.
-   */
-  firstSeenRecipient: boolean;
-  /**
-   * A known address (contact, own wallet, past recipient) this recipient
-   * imitates by its first and last characters — address poisoning.
-   */
-  lookalikeOf?: string | null;
 }

@@ -28,7 +28,7 @@ import type { WalletBalances } from "./useBalances";
  * on top, or the gateway rejects it. `undefined` (fee not loaded yet)
  * skips the fee-inclusive check the same way an unloaded balance does,
  * for the same "unknown isn't insufficient" reason. Ignored for AO token
- * sends, which have no sender-side fee (see `FeeEstimate.fee`'s doc
+ * sends, which have no sender-side fee (see `TransferFeeQuote.fee`'s doc
  * comment).
  *
  * When the amount fits the balance but amount + fee doesn't, the message
