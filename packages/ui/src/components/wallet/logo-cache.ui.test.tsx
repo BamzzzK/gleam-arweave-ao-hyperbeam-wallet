@@ -2,26 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { TokenGlyph } from "./TokenGlyph";
 import { resetLogoCacheForTests } from "./logo-cache";
+import { fakeCaches } from "./image-cache.testing";
 
 const TX_A = "4eTBOaxZSSyGbpKlHyilxNKhXbocuZdiMBYIORjS4f0";
 const TX_B = "Btm_9_fvwb7eXbQ2VkCvL0FY_x8JhNKe0cVUEEVfbxE";
-
-/** A Cache Storage stand-in that keeps entries in insertion order, as the real one does. */
-function fakeCaches() {
-  const entries = new Map<string, string>();
-  const cache = {
-    match: vi.fn(async (key: string) => {
-      const body = entries.get(key);
-      return body === undefined ? undefined : new Response(body);
-    }),
-    put: vi.fn(async (key: string, response: Response) => {
-      entries.set(key, await response.text());
-    }),
-    keys: vi.fn(async () => [...entries.keys()].map((key) => ({ url: key }))),
-    delete: vi.fn(async (key: { url: string }) => entries.delete(key.url)),
-  };
-  return { entries, storage: { open: vi.fn(async () => cache) } };
-}
 
 function imageResponse(): Response {
   return new Response("png", { headers: { "content-type": "image/png" } });

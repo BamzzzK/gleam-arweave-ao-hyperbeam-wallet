@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { explorerUrlFor, isWatchWalletMethod, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
+import { explorerUrlFor, isWatchWalletMethod, type ActivityEntry, type Collectible, type CollectibleRef, type DisplayCurrency, type PendingAmounts, type PortfolioHistoryRange, type PortfolioScope, type RuntimePort, type TokenBalance, type TokenPrice, type WalletSummary } from "@gleam/core";
 import {
   DEFAULT_AO_TOKEN,
   DEFAULT_AR_TOKEN,
@@ -33,6 +33,8 @@ import { useBalances, type WalletBalances } from "../../activity/src/useBalances
 import { walletQueryKeys } from "../../activity/src/queryKeys";
 import { usePortfolioHistory } from "./usePortfolioHistory";
 import { useOtherWallets } from "../../activity/src/useOtherWallets";
+import { useContacts } from "../../activity/src/useContacts";
+import { ActivityDetailSheet, type ActivityDetail } from "./ActivityDetailSheet";
 import { useOrderbookPrices, useTokenPrices } from "./useTokenPrices";
 import { MainScreenNotice } from "./MainScreenNotice";
 import { SiteWalletCard, type SiteWalletCardProps } from "../../site-wallet/index.tsx";
@@ -76,10 +78,10 @@ import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
  * `bg-foreground text-background` for the active tab) is copied from
  * `PortfolioChart`'s existing range tabs above, on this same screen. The
  * Tokens tab renders the full, untruncated `state.tokenBalances` list;
- * the Activity tab caps at the 10 most recent entries and its "View all"
- * action, along with each row's click, opens lunar.arweave.net's block
- * explorer in a new tab rather than an in-app full-list screen — there is
- * no in-app activity list/detail screen to navigate to.
+ * the Activity tab caps at the most recent entries, names each counterparty
+ * by its saved contact or own-wallet name, and opens `ActivityDetailSheet`
+ * on a row's click. "View all" opens lunar.arweave.net's block explorer in
+ * a new tab; there is no in-app full-list screen.
  *
  * Navigation entry points: the account pill's chevron opens the wallet
  * switcher via `onOpenWalletSwitcher`; the header's gear icon opens the
@@ -101,6 +103,10 @@ export interface MainScreenViewProps {
    * `SendView` pre-selected for `token`, same sub-view kind as `onSend`.
    */
   onSendToken: (token: TokenBalance) => void;
+  /** Opens send prefilled with `address`, for AR (`null`) or that token, from an activity entry's detail. */
+  onSendTo?: (address: string, token: TokenBalance | null) => void;
+  /** Where the activity detail sheet mounts (see `Sheet`'s `container`). */
+  sheetContainer?: HTMLElement | null;
   onReceive: () => void;
   onOpenWalletSwitcher: () => void;
   onOpenSettings: () => void;
@@ -419,6 +425,8 @@ export function MainScreenView({
   wallet,
   onSend,
   onSendToken,
+  onSendTo,
+  sheetContainer = null,
   onReceive,
   onOpenWalletSwitcher,
   onOpenSettings,
@@ -505,6 +513,18 @@ export function MainScreenView({
   };
   const otherWalletsQuery = useOtherWallets(runtime, wallet.id);
   const hasOtherWallets = (otherWalletsQuery.data?.length ?? 0) > 0;
+  const contactsQuery = useContacts(runtime);
+  const nameFor = (address: string): string | undefined =>
+    contactsQuery.data?.find((contact) => contact.address === address)?.name ??
+    otherWalletsQuery.data?.find((other) => other.address === address)?.name;
+  const [detail, setDetail] = useState<ActivityDetail | null>(null);
+  // A send is offered only for AR or a token whose balance (and so denomination) is loaded.
+  const sendableToken = (entry: ActivityEntry): TokenBalance | null | undefined => {
+    if (entry.collectible || entry.swap || entry.type === "upload") return undefined;
+    if (!entry.token) return null;
+    const match = balancesQuery.data?.tokenBalances.find((token) => token.processId === entry.token);
+    return match && match.available !== false ? match : undefined;
+  };
   const [preferredScope, setPreferredScope] = useState<PortfolioScope>(readPortfolioScope);
   // With a single wallet "all" equals "wallet"; resolving it here keeps one cache entry and no toggle.
   const portfolioScope: PortfolioScope = hasOtherWallets ? preferredScope : "wallet";
@@ -1163,19 +1183,17 @@ export function MainScreenView({
               ) : !activityQuery.data || activityQuery.data.entries.length === 0 ? (
                 <EmptyState message={t("mainScreen.noActivity")} />
               ) : (
-                activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => (
-                  <ActivityRow
-                    key={entry.txId}
-                    activityType={entry.type}
-                    title={
+                activityQuery.data.entries.slice(0, ACTIVITY_PREVIEW_LIMIT).map((entry) => {
+                  const title =
                       entry.swap
                         ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
-                        : t("mainScreen.activityTitle", {
-                            verb: activityVerb(t, entry.type),
-                            target: entry.collectible ? collectibleLabel(t, entry.collectible) : truncateAddress(entry.address, 6),
-                          })
-                    }
-                    subtitle={
+                        : activityTitle(
+                            t,
+                            entry.type,
+                            entry.collectible ? collectibleLabel(t, entry.collectible) : (nameFor(entry.address) ?? truncateAddress(entry.address, 6)),
+                            Boolean(entry.collectible),
+                          );
+                  const subtitle =
                       entry.swap && entry.status === "confirmed"
                         ? entry.timestamp > 0
                           ? t("mainScreen.orderPlacedAt", { time: relativeTime(t, entry.timestamp) })
@@ -1190,23 +1208,44 @@ export function MainScreenView({
                           ? entry.error
                             ? t("mainScreen.failedWithError", { error: entry.error })
                             : t("mainScreen.failed")
-                          : relativeTime(t, entry.timestamp)
+                          : relativeTime(t, entry.timestamp);
+                  const amountLabel = entry.amount
+                    ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
+                    : "—";
+                  const token = sendableToken(entry);
+                  return (
+                  <ActivityRow
+                    key={entry.txId}
+                    activityType={entry.type}
+                    title={title}
+                    subtitle={subtitle}
+                    amountLabel={amountLabel}
+                    amountTone={
+                      entry.type === "receive" && !entry.unverified
+                        ? "positive"
+                        : entry.type === "send" && entry.status !== "failed" && entry.amount
+                          ? "negative"
+                          : "neutral"
                     }
-                    amountLabel={
-                      entry.amount
-                        ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
-                        : "—"
-                    }
-                    amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
                         ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
                         : undefined
                     }
                     pending={entry.status === "pending"}
-                    onClick={() => openInExplorer(entry.txId)}
+                    onClick={() =>
+                      setDetail({
+                        entry,
+                        title,
+                        subtitle,
+                        amountLabel,
+                        name: nameFor(entry.address),
+                        onSendTo: token === undefined || !onSendTo ? undefined : () => onSendTo(entry.address, token),
+                      })
+                    }
                   />
-                ))
+                  );
+                })
               )}
             </div>
             {activityQuery.data && activityQuery.data.entries.length > 0 ? (
@@ -1220,6 +1259,13 @@ export function MainScreenView({
                 </button>
               </div>
             ) : null}
+            <ActivityDetailSheet
+              runtime={runtime}
+              detail={detail}
+              onClose={() => setDetail(null)}
+              onViewInExplorer={openInExplorer}
+              container={sheetContainer}
+            />
           </>
         )}
       </div>
@@ -1282,15 +1328,17 @@ function SettingsIcon() {
   );
 }
 
-/**
- * Opens lunar.arweave.net's block explorer in a new tab — the in-app
- * activity list/detail screen this replaced is gone entirely (see this
- * component's doc comment), so both the Activity tab's "View all" action
- * (wallet address) and each row's click (that entry's tx id) route
- * straight to the external explorer instead.
- */
+/** Opens lunar.arweave.net's block explorer in a new tab, for the wallet ("View all") or one entry's tx id (its detail sheet). */
 function openInExplorer(path: string): void {
   window.open(explorerUrlFor(path), "_blank", "noopener,noreferrer");
+}
+
+// A collectible is the thing moved, not the counterparty, so it keeps the "Sent · Beam #1" form.
+function activityTitle(t: TFunction, type: "send" | "receive" | "upload", target: string, isCollectible: boolean): string {
+  if (isCollectible) return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
+  if (type === "send") return t("mainScreen.activitySentTo", { target });
+  if (type === "receive") return t("mainScreen.activityReceivedFrom", { target });
+  return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
 }
 
 function activityVerb(t: TFunction, type: "send" | "receive" | "upload"): string {

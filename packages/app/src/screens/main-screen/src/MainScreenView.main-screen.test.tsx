@@ -1166,7 +1166,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     }
   });
 
-  it("clicking an ActivityRow opens lunar.arweave.net for that entry's tx id", async () => {
+  it("clicking an ActivityRow opens its detail, whose explorer button opens lunar.arweave.net for that tx id", async () => {
     const send = sendWith({ activity: manyEntries(1) });
     renderMainScreen({ runtime: fakeRuntime({ send }) });
 
@@ -1177,6 +1177,8 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
 
       await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
       fireEvent.click(screen.getAllByText(/Received|Sent/)[0]!.closest("button")!);
+      expect(openSpy).not.toHaveBeenCalled();
+      fireEvent.click(await screen.findByRole("button", { name: "View in explorer" }));
 
       expect(openSpy).toHaveBeenCalledWith(
         "https://lunar.arweave.net/#/explorer/tx-0",
@@ -1186,6 +1188,58 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     } finally {
       openSpy.mockRestore();
     }
+  });
+
+  const OTHER = "zQ9xW2vE7rT4yU1iO8pA5sD3fG6hJ0kL2zX4cV7bN1m";
+
+  function withContacts(base: RuntimePort["send"], contacts: Array<{ address: string; name: string }>): RuntimePort["send"] {
+    return vi.fn(async (message: { type: string; payload: unknown }) => {
+      if (message.type === "listContacts") return contacts;
+      if (message.type === "saveContact") return message.payload;
+      return base(message as never);
+    }) as unknown as RuntimePort["send"];
+  }
+
+  const sentTo = (address: string): ActivityPage => ({
+    entries: [{ txId: "tx-s", type: "send", address, amount: "1000000000000", status: "confirmed", tags: [], timestamp: Date.now() }],
+    cursor: null,
+  });
+
+  it("names an activity entry's counterparty by its saved contact name", async () => {
+    const send = withContacts(sendWith({ activity: sentTo(OTHER) }), [{ address: OTHER, name: "Alice" }]);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("Sent to Alice")).toBeTruthy());
+  });
+
+  it("opens send prefilled for AR from an entry's detail", async () => {
+    const onSendTo = vi.fn();
+    renderMainScreen({ runtime: fakeRuntime({ send: withContacts(sendWith({ activity: sentTo(OTHER) }), []) }), onSendTo });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    fireEvent.click((await screen.findByText(/Sent/)).closest("button")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Resend to this address" }));
+
+    expect(onSendTo).toHaveBeenCalledWith(OTHER, null);
+  });
+
+  it("saves an entry's address as a contact from its detail", async () => {
+    const send = withContacts(sendWith({ activity: sentTo(OTHER) }), []);
+    renderMainScreen({ runtime: fakeRuntime({ send }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+    fireEvent.click((await screen.findByText(/Sent/)).closest("button")!);
+    fireEvent.click(await screen.findByRole("button", { name: "Save address" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Bob" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(send).toHaveBeenCalledWith({ type: "saveContact", payload: { address: OTHER, name: "Bob" } }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save address" })).toBeNull());
   });
 
   it("labels an AO token activity entry with the token's own ticker and denomination, not AR", async () => {
