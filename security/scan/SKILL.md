@@ -397,8 +397,9 @@ it fails, fix what it names and commit again.
 - Low details may be public. Medium-and-above details never go in a PR,
   even one that fixes them.
 
-**Advisory draft.** Write a title, the severity, and a description in the
-shape `REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
+**Advisory draft.** Write a title as `REPORT.md` § Advisory title gives
+it: who can do it and what the user loses, in the user's words. Then
+write the severity, and a description in the shape `REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
 **Fix**, the `Attestation id:` line, then the detail for the triager in
 `<details>`. Give the evidence from the verdict once: demonstrated, traced,
 or the exact fact a browser check has to settle. Save it as
