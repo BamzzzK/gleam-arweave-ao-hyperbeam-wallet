@@ -1,4 +1,5 @@
 import { useEffect, type ReactElement } from "react";
+import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
@@ -92,7 +93,8 @@ describe("AwaitingDeviceView", () => {
     expect(screen.getByText(addressText("r".repeat(43)))).toBeTruthy();
     expect(screen.getByText(addressText("q".repeat(43)))).toBeTruthy();
     expect(screen.getByText("2.5")).toBeTruthy();
-    expect(screen.getByText("ARDRIVE")).toBeTruthy();
+    expect(screen.getAllByText("ARDRIVE").length).toBe(2);
+    expect(screen.getByText(truncateAddress("p".repeat(43), 6))).toBeTruthy();
     expect(screen.getByText("0.002 AR")).toBeTruthy();
     expect(screen.getByText("Ledger")).toBeTruthy();
     expect(screen.getByText("Test panel")).toBeTruthy();

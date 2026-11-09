@@ -403,6 +403,38 @@ describe("SigningApprovalScreen transfer layout: data items", () => {
     expect(primary("Sign 3")).toBeTruthy();
   });
 
+  it("names each batch transfer's process and raw units without opening Details", () => {
+    const OTHER = "O".repeat(43);
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [
+        ITEM_TRANSFER,
+        { ...ITEM_TRANSFER, target: OTHER, transfer: { ...ITEM_TRANSFER.transfer, token: OTHER, amount: "7000000" } },
+      ],
+    };
+    renderScreen({ preview });
+    expect(screen.getByRole("button", { name: /^Details/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
+    expect(screen.getByText(truncateAddress(OTHER, 6))).toBeTruthy();
+    expect(screen.getByText(exactGroup("1500000000000"))).toBeTruthy();
+    expect(screen.getByText(exactGroup("7000000"))).toBeTruthy();
+  });
+
+  it("names the process of a transfer mixed with a plain item without opening Details", () => {
+    const preview: SigningApprovalPreview = {
+      ...MESSAGE_PREVIEW,
+      kind: "batchSignDataItem",
+      items: [
+        ITEM_TRANSFER,
+        { decodedData: null, tags: [{ name: "Action", value: "Notify" }], target: null, payloadHash: "f".repeat(64), transfer: null },
+      ],
+    };
+    renderScreen({ preview });
+    expect(screen.getByText(truncateAddress(AO, 6))).toBeTruthy();
+    expect(screen.getByText(exactGroup("1500000000000"))).toBeTruthy();
+  });
+
   it("leaves out the total value unless every transfer is priced", () => {
     const preview: SigningApprovalPreview = {
       ...MESSAGE_PREVIEW,
