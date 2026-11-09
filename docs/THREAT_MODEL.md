@@ -269,6 +269,13 @@ count as a finding.
   *Still a finding if,* by any path, `privateHash` resolves, or any
   provider method returns a value derived from private key material
   other than a signature or decryption the user approved.
+- **A connected site can ask whether a token is in the wallet's list.**
+  `addToken` and `isTokenAdded` need a connection and no other
+  permission, as in Wander. `isTokenAdded` answers one process id at a
+  time from the local watched list, which also holds tokens the wallet
+  discovered itself, and token balances are public on-chain.
+  *Still a finding if* a site without a grant gets an answer, or any
+  call returns the list, a balance or anything beyond that one bit.
 - **The deprecated `signature` is refused.** Wander's `signature` signs
   RSA-PSS straight over the bytes a site passes, with a salt length the
   site picks. A site that passes a hash it computed gets a signature
@@ -412,6 +419,9 @@ These are true of the current release.
     context, constrained by the parser's patterns.
   - `gleam-points:attest-status` tells `gleamwallet.app` whether a wallet
     is set up and has joined Points on this install, without an address.
+  - A member invite code's 3 seats go to the first 3 devices that redeem
+    it, and a device key costs nothing to make, so anyone holding the
+    link can use up its seats. It moves no funds and signs nothing.
 - **No independent audit has been completed.**
 
 ## Out of scope
