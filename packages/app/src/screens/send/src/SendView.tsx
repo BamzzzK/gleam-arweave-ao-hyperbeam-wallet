@@ -76,6 +76,8 @@ export interface SendViewProps {
   runtime: RuntimePort;
   wallet: WalletSummary;
   token: TokenBalance | null;
+  /** Prefills the recipient, as when opened from an activity entry. */
+  recipient?: string;
   onBack: () => void;
   onDone: () => void;
 }
@@ -180,9 +182,9 @@ function priceFor(prices: TokenPrice[] | undefined, token: TokenBalance | null):
   return typeof price === "number" ? price : undefined;
 }
 
-export function SendView({ runtime, wallet, token, onBack, onDone }: SendViewProps) {
+export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: SendViewProps) {
   const t = useT();
-  const [step, setStep] = useState<Step>(INITIAL_STEP);
+  const [step, setStep] = useState<Step>(() => ({ ...INITIAL_STEP, recipient: recipient ?? "" }));
   // Store the compose step state when opening the token picker so we can restore it
   const [savedComposeStep, setSavedComposeStep] = useState<Extract<Step, { kind: "compose" }> | null>(null);
   // The in-flow-selectable token: the compose step's own token picker can
