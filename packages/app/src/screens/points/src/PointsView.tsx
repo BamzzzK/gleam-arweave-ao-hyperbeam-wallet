@@ -4,6 +4,7 @@ import {
   capabilityRefusal,
   INVITE_REQUIRED_MESSAGE,
   isHardwareWalletMethod,
+  type PointsWalletScore,
   type RuntimePort,
   type WalletSummary,
 } from "@gleam/core";
@@ -18,6 +19,7 @@ import { inviteLinkFor, invitesRemainingLine } from "../../../points-share";
 import { FoundingGate } from "../../onboarding/src/FoundingGate";
 import { usePlatform } from "../../../app-platform/context";
 import { gleamUrl, howItWorksUrl, JoinNote, scanUrl } from "./JoinNote";
+import { RecentEarnings } from "./RecentEarnings";
 import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
@@ -188,17 +190,6 @@ function PointsTotal({ value, highlighted }: { value: string; highlighted: boole
   );
 }
 
-function InkStat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-caption text-on-ink-muted">{label}</dt>
-      <dd className="min-h-5 text-body font-semibold tabular-nums">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
 /**
  * One square per seat on the member's code, lit in beam order while it's open.
  * Seats have no cap, so the row stops at one full beam and the text beside it
@@ -245,7 +236,6 @@ function JoinedView({
   const status = prompt?.text ?? (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
-  const topPercent = score?.topPercent ?? null;
 
   return (
     <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
@@ -258,91 +248,62 @@ function JoinedView({
             </span>
           ) : null}
         </div>
-        <dl className="grid grid-cols-3 gap-3 border-t border-ink-line pt-3">
-          <InkStat label={t("points.perDay")}>
-            +{formatPoints(standing.dailyRateAtomic)}
-          </InkStat>
-          <InkStat label={t("points.rank")}>
-            {/* The leader is "#1" because an only ranked wallet is also "Top 100%". */}
-            {!score ? (
-              "—"
-            ) : score.rank === 1 ? (
-              "#1"
-            ) : topPercent !== null ? (
-              t("points.top", { percent: topPercent })
-            ) : (
-              <span
-                title={t("points.unrankedHint")}
-                className="cursor-help underline decoration-dotted underline-offset-4"
-              >
-                {t("points.unranked")}
-              </span>
-            )}
-          </InkStat>
-          <InkStat label={t("points.friendsJoined")}>{score?.refereeCount ?? 0}</InkStat>
-        </dl>
-        {score && score.rank !== 1 && topPercent === null ? (
-          // The explanation behind "Unranked" is a hover tooltip, which a touch screen can't show.
-          <p className="hidden text-caption text-on-ink-muted phone:block">
-            {t("points.unrankedHint")}
-          </p>
-        ) : null}
-        {score?.rank != null && score.pointsToNextRankAtomic !== null ? (
-          <p className="text-label text-on-ink-muted">
-            {t("points.toNextRank", {
-              rank: score.rank,
-              amount: formatPoints(score.pointsToNextRankAtomic),
-              next: score.rank - 1,
-            })}
-          </p>
-        ) : null}
+        {score ? <RankLines score={score} /> : null}
       </InkCard>
 
       {standing.linkedElsewhere ? (
         <ReconnectNotice runtime={runtime} wallet={wallet} />
       ) : (
-        <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
-          <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
-            {t("points.waysToEarn")}
-          </h2>
-          <div className="flex flex-col gap-6">
-            <EarnItem label={t("points.invite")} title={t("points.inviteFriend")}>
-              <div className="flex flex-col gap-1">
-                <p className="text-label text-muted">
-                  {t("points.referralBefore")}
-                  <Reward>{REFERRAL_PERCENT}%</Reward>
-                  {t("points.referralAfter")}
-                </p>
-                {status ? (
-                  <p className="flex items-center gap-2 text-caption text-muted">
-                    {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
-                    {status}
+        <>
+          <RecentEarnings
+            entries={score?.recent ?? []}
+            dailyRateAtomic={standing.dailyRateAtomic}
+            referralPercent={REFERRAL_PERCENT}
+            friends={score?.refereeCount ?? 0}
+          />
+          <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
+            <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
+              {t("points.waysToEarn")}
+            </h2>
+            <div className="flex flex-col gap-6">
+              <EarnItem label={t("points.invite")} title={t("points.inviteFriend")}>
+                <div className="flex flex-col gap-1">
+                  <p className="text-label text-muted">
+                    {t("points.referralBefore")}
+                    <Reward>{REFERRAL_PERCENT}%</Reward>
+                    {t("points.referralAfter")}
                   </p>
-                ) : null}
-                {full ? (
-                  <p className="text-caption text-muted">{t("points.twoMore")}</p>
-                ) : null}
-              </div>
-              {full ? null : (
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className={cn(copied && "text-positive")}
-                    onClick={() => {
-                      copy();
-                      prompt?.finish();
-                    }}
-                  >
-                    {copied ? t("points.copied") : t("points.copyInvite")}
-                  </Button>
+                  {status ? (
+                    <p className="flex items-center gap-2 text-caption text-muted">
+                      {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
+                      {status}
+                    </p>
+                  ) : null}
+                  {full ? (
+                    <p className="text-caption text-muted">{t("points.twoMore")}</p>
+                  ) : null}
                 </div>
-              )}
-            </EarnItem>
-            <ReviewItem runtime={runtime} />
-          </div>
-        </section>
+                {full ? null : (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className={cn(copied && "text-positive")}
+                      onClick={() => {
+                        copy();
+                        prompt?.finish();
+                      }}
+                    >
+                      {copied ? t("points.copied") : t("points.copyInvite")}
+                    </Button>
+                  </div>
+                )}
+              </EarnItem>
+              <ReviewItem runtime={runtime} />
+            </div>
+          </section>
+        </>
       )}
 
       <AboutPoints className="mt-auto">
@@ -352,6 +313,31 @@ function JoinedView({
           points={formatPoints(standing.estimateAtomic)}
         />
       </AboutPoints>
+    </div>
+  );
+}
+
+/** "Top N%" with the private rank under it, so the place never shows without saying what it is. */
+function RankLines({ score }: { score: PointsWalletScore }) {
+  const t = useT();
+  // The leader is "#1" because an only ranked wallet is also "Top 100%".
+  const headline =
+    score.rank === 1 ? "#1" : score.topPercent !== null ? t("points.top", { percent: score.topPercent }) : t("points.unranked");
+  const detail =
+    score.rank !== null && score.pointsToNextRankAtomic !== null
+      ? t("points.toNextRank", {
+          rank: score.rank,
+          amount: formatPoints(score.pointsToNextRankAtomic),
+          next: score.rank - 1,
+        })
+      : score.rank !== 1 && score.topPercent === null
+        ? t("points.unrankedHint")
+        : null;
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-body font-semibold tabular-nums">{headline}</p>
+      {detail ? <p className="text-label text-on-ink-muted">{detail}</p> : null}
     </div>
   );
 }

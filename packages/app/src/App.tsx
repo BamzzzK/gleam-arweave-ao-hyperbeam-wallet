@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Toast } from "@gleam/ui/src/primitives/toast.tsx";
 import { BackStackContext, createBackStack } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -145,6 +145,13 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   const [identityKey, setIdentityKey] = useState<AddressIdentityKey>(NO_ADDRESS_IDENTITY_KEY);
   const [backStack] = useState(createBackStack);
   const [layoutRoot, setLayoutRoot] = useState<HTMLDivElement | null>(null);
+
+  // The home screen scrolls the window, so a screen opened from far down
+  // it (Points sits below the tokens) would start at that offset. Reset
+  // before paint; going back home keeps the old behavior.
+  useLayoutEffect(() => {
+    if (subView.kind !== "home") window.scrollTo?.(0, 0);
+  }, [subView.kind]);
 
   const [notice, setNotice] = useState<string | null>(null);
   const subscribeNotices = platform.notices?.subscribe;
