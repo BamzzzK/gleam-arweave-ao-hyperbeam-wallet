@@ -19,7 +19,8 @@
     "release:check": "node scripts/release-gate.mjs",
     "release:pack": "scripts/pack-release.sh",
     "release:all": "node scripts/release-all.mjs",
-    "scan": "tsx scripts/scan/cli.ts"
+    "scan": "tsx scripts/scan/cli.ts",
+    "peers:refresh": "tsx scripts/peers-refresh.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
