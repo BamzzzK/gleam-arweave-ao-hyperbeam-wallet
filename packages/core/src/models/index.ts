@@ -36,6 +36,7 @@ export type {
   PointsSharePrompt,
   PointsScores,
   PointsWalletScore,
+  PointsRecentEntry,
 } from "./points";
 export { INVITE_REQUIRED_MESSAGE } from "./points";
 export type { Announcement } from "./announcement";

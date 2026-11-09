@@ -32,7 +32,16 @@ export interface PointsWalletScore {
   originalFounder: boolean;
   /** Installs the wallet's code can still let in; null when seats aren't limited (Phase 2). */
   seatsLeft: number | null;
+  /** The last 48 hours, newest first. Absent from servers that predate it. */
+  recent?: PointsRecentEntry[];
 }
+
+/** One line of a wallet's recent points history; a daily credit is dated when its snapshot completed. */
+export type PointsRecentEntry =
+  | { kind: "holding" | "invited" | "founder" | "invites"; amountAtomic: string; at: string }
+  | { kind: "scan"; amountAtomic: string; at: string; release: string }
+  | { kind: "finding"; amountAtomic: string; at: string; release: string; ref: string | null }
+  | { kind: "friendJoined"; at: string };
 
 export interface PointsScores {
   /** When the latest daily snapshot completed (ISO 8601); null before the first. */
