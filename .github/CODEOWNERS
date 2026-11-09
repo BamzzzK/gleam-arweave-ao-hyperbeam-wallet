@@ -79,7 +79,12 @@
 /packages/core/src/models/method-permissions.ts                     @skyf0xx
 /packages/core/src/models/method-privileges.ts                      @skyf0xx
 /packages/runtime/src/handlers/announcements.ts                      @skyf0xx
-/packages/runtime/src/handlers/site-wallet.ts                       @skyf0xx
+/packages/runtime/src/handlers/site-wallet.ts                         @skyf0xx
+/packages/core/src/ao/peer-discovery.ts                                 @skyf0xx
+/packages/core/src/ao/peer-failover.ts                                  @skyf0xx
+/packages/runtime/src/peers.ts                                         @skyf0xx
+/packages/core/src/models/network.ts                                   @skyf0xx
+/packages/messaging/src/protocol.ts                                    @skyf0xx
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
@@ -94,7 +99,9 @@
 /packages/core/src/models/user-errors.ts                                   @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx
 /apps/mobile/src/adapters/approval-sheet.ts                                @skyf0xx
-/apps/extension/src/adapters/windows.ts                             @skyf0xx
+/apps/extension/src/adapters/windows.ts                                @skyf0xx
+/packages/core/src/recipients/assess.ts                                @skyf0xx
+/packages/runtime/src/handlers/reads.ts                                @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
