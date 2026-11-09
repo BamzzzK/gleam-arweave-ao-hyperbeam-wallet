@@ -74,7 +74,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
     <div className="flex flex-col gap-6 px-6 pb-6 pt-4 phone:px-5">
       <div className="flex flex-col items-center gap-1 text-center">
         <p className="text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p>
-        <p className="text-label font-medium text-foreground">{detail.title}</p>
+        <p className="text-label text-muted">{detail.title}</p>
         {knownName === undefined && !naming ? (
           <button type="button" onClick={() => setNaming(true)} className="text-caption text-muted underline-offset-2 hover:underline phone:min-h-11">
             {t("mainScreen.saveAddress")}
@@ -93,7 +93,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
             type="button"
             onClick={() => onViewInExplorer(entry.txId)}
             aria-label={t("mainScreen.viewInExplorer")}
-            className="flex items-center gap-1.5 font-mono text-label text-foreground hover:underline phone:min-h-11"
+            className="flex items-center gap-1.5 font-mono text-caption text-foreground hover:underline phone:min-h-11"
           >
             {truncateAddress(entry.txId, 6)}
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
