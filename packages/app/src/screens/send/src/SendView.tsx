@@ -27,7 +27,7 @@ import { amountSchema, firstIssueMessage, recipientSchema } from "./sendFormSche
 import { TokenInfoPanel } from "./TokenInfoPanel";
 import { useLookalikeOf } from "./useLookalikeOf";
 import { fetchSendFeeQuote, useRecipientAssessment, useSendFeeQuote } from "./useSendQuotes";
-import { readRowVisibility, shownTokenLogo } from "../../../token-visibility";
+import { readRowVisibility, sendTokenLogo, shownTokenLogo } from "../../../token-visibility";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
@@ -666,7 +666,8 @@ function ComposeStep({
         <ScreenHeader title={t("send.tokenDetails")} onBack={() => onShowInfo(false)} />
         <div className="px-5 py-5">
           <TokenInfoPanel
-            token={token && { ...token, logoUrl: shownTokenLogo(token, readRowVisibility(wallet.address), tokenLogos) }}
+            token={token}
+            logoUrl={sendTokenLogo(token, readRowVisibility(wallet.address), tokenLogos)}
             balanceDisplay={balanceDisplay}
             balanceValue={balanceValue}
             priceDisplay={price !== undefined && currency !== undefined && currency !== ticker ? formatCurrencyValue(price, currency) : undefined}
@@ -1312,7 +1313,7 @@ function TokenPickerStep({
         ) : null}
 
         <TokenRow
-          glyph={{ label: DEFAULT_AR_TOKEN.ticker, tone: 1 }}
+          glyph={{ label: DEFAULT_AR_TOKEN.ticker, tone: 1, logoUrl: sendTokenLogo(null, visibility, tokenLogos) }}
           name={DEFAULT_AR_TOKEN.name}
           amount={
             balancesQuery.data === undefined
@@ -1325,7 +1326,7 @@ function TokenPickerStep({
         />
 
         <TokenRow
-          glyph={{ label: DEFAULT_AO_TOKEN.ticker, tone: 2 }}
+          glyph={{ label: DEFAULT_AO_TOKEN.ticker, tone: 2, logoUrl: sendTokenLogo(aoToken, visibility, tokenLogos) }}
           name={DEFAULT_AO_TOKEN.name}
           amount={
             aoBalance

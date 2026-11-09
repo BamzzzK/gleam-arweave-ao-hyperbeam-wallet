@@ -1235,6 +1235,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     fireEvent.click((await screen.findByText(/Sent/)).closest("button")!);
     fireEvent.click(await screen.findByRole("button", { name: "Save address" }));
+    expect(screen.getByText("Transaction · just now")).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Bob" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
