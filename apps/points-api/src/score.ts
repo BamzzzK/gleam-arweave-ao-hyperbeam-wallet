@@ -24,7 +24,23 @@ export interface WalletScore {
   originalFounder: boolean;
   /** Installs the wallet's code can still let in; null when seats aren't limited (Phase 2). */
   seatsLeft: number | null;
+  /** Credits and friends joining in the last `RECENT_WINDOW_MS`, newest first. */
+  recent: RecentEntry[];
 }
+
+/**
+ * One line of a wallet's recent history. A daily credit is split by source
+ * and dated when its snapshot completed, since that's when it reached the
+ * total. `friendJoined` carries no amount.
+ */
+export type RecentEntry =
+  | { kind: "holding" | "invited" | "founder" | "invites"; amountAtomic: string; at: string }
+  | { kind: "scan"; amountAtomic: string; at: string; release: string }
+  | { kind: "finding"; amountAtomic: string; at: string; release: string; ref: string | null }
+  | { kind: "friendJoined"; at: string };
+
+/** Covers the start of "yesterday" in any time zone, so the client can group by its own day. */
+export const RECENT_WINDOW_MS = 2 * 86_400_000;
 
 export interface DeviceScores {
   /** When the latest daily snapshot completed; null before the first one. */
@@ -37,7 +53,7 @@ export interface DeviceScores {
  * every credited day; once it shows up in latency, keep running totals in
  * a table the snapshot updates.
  */
-export async function scoresForDevice(db: Queryable, deviceId: string, pointsPhase: 1 | 2): Promise<DeviceScores> {
+export async function scoresForDevice(db: Queryable, deviceId: string, pointsPhase: 1 | 2, now: Date): Promise<DeviceScores> {
   const latest = await db.query<{ day: string; completed_at: Date }>(
     "SELECT day::text AS day, completed_at FROM snapshot_runs ORDER BY day DESC LIMIT 1",
   );
@@ -91,6 +107,8 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
     [deviceId, latestDay],
   );
 
+  const recent = await recentForWallets(db, rows.map((row) => row.address), new Date(now.getTime() - RECENT_WINDOW_MS));
+
   return {
     settledAt: latest.rows[0]?.completed_at.toISOString() ?? null,
     wallets: rows.map((row) => ({
@@ -115,8 +133,61 @@ export async function scoresForDevice(db: Queryable, deviceId: string, pointsPha
       rank: row.rank === null ? null : Number(row.rank),
       pointsToNextRankAtomic: row.to_next,
       topPercent: row.rank === null ? null : topPercent(Number(row.rank), Number(row.ranked)),
+      recent: recent.get(row.address) ?? [],
     })),
   };
+}
+
+async function recentForWallets(db: Queryable, addresses: string[], since: Date): Promise<Map<string, RecentEntry[]>> {
+  const byAddress = new Map<string, RecentEntry[]>(addresses.map((address) => [address, []]));
+  if (addresses.length === 0) return byAddress;
+
+  const [daily, scans, friends] = await Promise.all([
+    db.query<{ address: string; at: Date; holding: string; referee_bonus: string; founder_bonus: string; referrer_bonus: string }>(
+      `SELECT p.address, r.completed_at AS at, p.holding_atomic::text AS holding, p.referee_bonus_atomic::text AS referee_bonus,
+              p.founder_bonus_atomic::text AS founder_bonus, p.referrer_bonus_atomic::text AS referrer_bonus
+         FROM points p JOIN snapshot_runs r ON r.day = p.day
+        WHERE p.address = ANY($1) AND r.completed_at >= $2`,
+      [addresses, since],
+    ),
+    db.query<{ address: string; at: Date; kind: "scan" | "finding"; amount: string; release: string; ref: string | null }>(
+      `SELECT s.address, s.created_at AS at, s.kind, s.amount_atomic::text AS amount, a.release, s.ref
+         FROM scan_points s JOIN attestations a ON a.id = s.attestation_id
+        WHERE s.address = ANY($1) AND s.created_at >= $2 AND s.amount_atomic > 0`,
+      [addresses, since],
+    ),
+    db.query<{ address: string; at: Date }>(
+      "SELECT referred_by AS address, registered_at AS at FROM wallets WHERE referred_by = ANY($1) AND registered_at >= $2",
+      [addresses, since],
+    ),
+  ]);
+
+  const push = (address: string, entry: RecentEntry) => byAddress.get(address)?.push(entry);
+  for (const row of daily.rows) {
+    const at = row.at.toISOString();
+    const parts = [
+      ["holding", row.holding],
+      ["invited", row.referee_bonus],
+      ["founder", row.founder_bonus],
+      ["invites", row.referrer_bonus],
+    ] as const;
+    for (const [kind, amountAtomic] of parts) {
+      if (BigInt(amountAtomic) > 0n) push(row.address, { kind, amountAtomic, at });
+    }
+  }
+  for (const row of scans.rows) {
+    const at = row.at.toISOString();
+    push(
+      row.address,
+      row.kind === "scan"
+        ? { kind: "scan", amountAtomic: row.amount, at, release: row.release }
+        : { kind: "finding", amountAtomic: row.amount, at, release: row.release, ref: row.ref },
+    );
+  }
+  for (const row of friends.rows) push(row.address, { kind: "friendJoined", at: row.at.toISOString() });
+
+  for (const entries of byAddress.values()) entries.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  return byAddress;
 }
 
 /** Rounded up and never 0, so the leader reads "Top 1%" rather than "Top 0%". */

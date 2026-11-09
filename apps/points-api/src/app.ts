@@ -202,7 +202,7 @@ export function createApp(deps: AppDeps): Hono {
 
     const auth = await authenticateDevice(deps.db, "me", request, now());
     if (!auth.ok) return c.json({ error: auth.error }, auth.status);
-    return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase));
+    return c.json(await scoresForDevice(deps.db, auth.deviceId, pointsPhase, now()));
   });
 
   app.get("/scan/challenge", async (c) => {
