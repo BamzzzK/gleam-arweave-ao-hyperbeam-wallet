@@ -75,14 +75,20 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
       <div className="flex flex-col items-center gap-1 text-center">
         <p className="text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p>
         <p className="text-label font-medium text-foreground">{detail.title}</p>
-        <p className="text-caption text-muted">{detail.subtitle}</p>
+        {knownName === undefined && !naming ? (
+          <button type="button" onClick={() => setNaming(true)} className="text-caption font-medium text-foreground underline-offset-2 hover:underline phone:min-h-11">
+            {t("mainScreen.saveAddress")}
+          </button>
+        ) : null}
       </div>
 
       <AddressDisplay address={entry.address} onCopy={() => void navigator.clipboard?.writeText(entry.address)} />
 
       <div className="flex flex-col gap-3">
         <div className="flex min-h-8 items-center justify-between gap-3">
-          <p className="text-caption text-muted">{t("mainScreen.detailTransaction")}</p>
+          <p className="min-w-0 text-caption text-muted">
+            {t("mainScreen.detailTransaction")} · {detail.subtitle}
+          </p>
           <button
             type="button"
             onClick={() => onViewInExplorer(entry.txId)}
@@ -95,19 +101,6 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
             </svg>
           </button>
         </div>
-
-        {knownName === undefined && !naming ? (
-          <div className="flex min-h-8 items-center justify-between gap-3">
-            <p className="text-caption text-muted">{t("mainScreen.detailContact")}</p>
-            <button
-              type="button"
-              onClick={() => setNaming(true)}
-              className="text-label font-medium text-foreground hover:underline phone:min-h-11"
-            >
-              {t("mainScreen.saveAddress")}
-            </button>
-          </div>
-        ) : null}
 
         {naming ? (
           <form
