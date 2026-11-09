@@ -22,7 +22,7 @@ overrides:
   vite: ^8.3.3
   # Exact: recovery-phrase import derives RSA keys with forge's prime search
   # (core/keys/mnemonic-jwk.ts). Bump only with its reference vectors passing.
-  node-forge: 1.4.2
+  node-forge: 1.4.3
 # Hijacked npm releases are usually caught and pulled within a day or two;
 # refusing anything younger than 3 days keeps them out of the lockfile.
 # Setting it explicitly also makes pnpm fail instead of auto-excluding.
