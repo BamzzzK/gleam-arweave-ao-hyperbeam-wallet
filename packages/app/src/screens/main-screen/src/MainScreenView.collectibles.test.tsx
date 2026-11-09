@@ -124,12 +124,13 @@ describe("Collectibles tab", () => {
     expect(onTabChange).toHaveBeenCalledWith("collectibles");
   });
 
-  it("falls back to the plain tile when a thumbnail fails to load", async () => {
+  it("keeps a thumbnail pulsing rather than showing the file icon after one failed load", async () => {
     renderMain(runtimeWith(async () => [FROG]), { initialTab: "collectibles" });
     const img = await screen.findByAltText("Frog #1");
     fireEvent.error(img);
     expect(screen.queryByAltText("Frog #1")).toBeNull();
-    expect(screen.getByTestId("collectible-placeholder")).toBeTruthy();
+    expect(screen.queryByTestId("collectible-placeholder")).toBeNull();
+    expect(screen.getByTestId("collectible-tile").className).toContain("gleam-cached-pulse");
   });
 });
 

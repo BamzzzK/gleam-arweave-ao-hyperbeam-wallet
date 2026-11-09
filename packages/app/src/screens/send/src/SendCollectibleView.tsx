@@ -1,14 +1,14 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   capabilityRefusal,
   collectibleSendRefusal,
   isHardwareWalletMethod,
   type Collectible,
   type CollectibleRef,
-  type CollectibleSendDraft,
   type Contact,
-  type FeeEstimate,
   type RuntimePort,
+  type TransferFeeQuote,
   type WalletSummary,
 } from "@gleam/core";
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
@@ -22,7 +22,8 @@ import { useOtherWallets } from "../../activity/src/useOtherWallets";
 import { useSendCollectible } from "../../activity/src/useSendCollectible";
 import { firstIssueMessage, recipientSchema } from "./sendFormSchema";
 import { useLookalikeOf } from "./useLookalikeOf";
-import { namedSuggestions, RecipientField, SavedAddressesStep, SuccessStep } from "./SendView";
+import { namedSuggestions, NetworkFeeLine, RecipientField, SavedAddressesStep, SuccessStep } from "./SendView";
+import { fetchCollectibleFeeQuote, useCollectibleFeeQuote, useRecipientAssessment } from "./useSendQuotes";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
@@ -30,7 +31,8 @@ import type { TransferRequest } from "../../../transfer-review/model";
 
 /**
  * Compose → review → success for one collectible: recipient only, since
- * a collectible is sent whole. The network fee is AR, quoted on Review send.
+ * a collectible is sent whole. The network fee is AR, quoted while the
+ * recipient is entered and fixed on Review send.
  */
 export interface SendCollectibleViewProps {
   runtime: RuntimePort;
@@ -51,7 +53,7 @@ type Step =
       saveAddressName: string;
     }
   | { kind: "saved-addresses"; recipient: string }
-  | { kind: "review"; recipient: string; estimate: FeeEstimate; submitting: boolean; error?: string }
+  | { kind: "review"; recipient: string; estimate: TransferFeeQuote; submitting: boolean; error?: string }
   | { kind: "success"; txId: string; recipient: string };
 
 const composeStep = (recipient = ""): Extract<Step, { kind: "compose" }> => ({
@@ -98,7 +100,17 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
     contactsQuery.data ?? [],
     otherWalletsQuery.data ?? [],
   );
-  const lookalikeOf = step.kind === "review" ? (step.estimate.lookalikeOf ?? null) : null;
+  const queryClient = useQueryClient();
+  const ref = refOf(collectible);
+  // Only a recipient the send would accept is quoted; the others fail Continue with their own message.
+  const quotedRecipient =
+    step.kind === "review"
+      ? step.recipient
+      : step.kind === "compose" && recipientError(step.recipient, wallet.address, collectible.id) === undefined
+        ? recipientSchema.safeParse(step.recipient).data
+        : undefined;
+  const feeQuoteQuery = useCollectibleFeeQuote(runtime, wallet.id, step.kind === "compose" ? quotedRecipient : undefined, ref);
+  const assessmentQuery = useRecipientAssessment(runtime, wallet.id, quotedRecipient);
 
   if (step.kind === "compose") {
     const unsupported = capabilityRefusal(wallet.method, "signTransaction", "send collectibles");
@@ -114,10 +126,7 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
       const recipient = parsed.data;
       setStep({ ...step, submitting: true, recipientError: undefined, error: undefined });
       try {
-        const estimate = await runtime.send<CollectibleSendDraft, FeeEstimate>({
-          type: "estimateCollectibleSend",
-          payload: { walletId: wallet.id, recipient, collectible: refOf(collectible) },
-        });
+        const estimate = await fetchCollectibleFeeQuote(queryClient, runtime, wallet.id, recipient, ref);
         setStep({ kind: "review", recipient, estimate, submitting: false });
       } catch (estimateError) {
         setStep({
@@ -174,6 +183,8 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
             savingAddress={saveContactMutation.isPending}
           />
 
+          {quotedRecipient !== undefined && unsupported === null ? <NetworkFeeLine quote={feeQuoteQuery} /> : null}
+
           {unsupported ? (
             <p role="status" className="rounded-md border border-l-[3px] border-line border-l-warning bg-mist px-3.5 py-3 text-label leading-snug text-foreground">
               {errorText(unsupported)}
@@ -213,7 +224,9 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
 
   if (step.kind === "review") {
     const known = contactFor(step.recipient) ?? ownWalletFor(step.recipient);
-    const shownLookalikeOf = known ? null : lookalikeOf;
+    // Send waits for the history check, so a warning can't arrive after the tap. A failed check reads as first-time.
+    const checkingRecipient = assessmentQuery.isPending && !known;
+    const assessment = assessmentQuery.data;
     const signsOnDevice = isHardwareWalletMethod(wallet.method);
 
     const handleSign = async () => {
@@ -257,7 +270,10 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
         from={{ name: wallet.name, address: wallet.address }}
         toName={known?.name ?? null}
         context={{}}
-        risk={{ firstTime: step.estimate.firstSeenRecipient && !known, lookalikeOf: shownLookalikeOf }}
+        risk={{
+          firstTime: !known && !checkingRecipient && (assessment?.firstTime ?? true),
+          lookalikeOf: known ? null : (assessment?.lookalikeOf ?? null),
+        }}
         footer={(warned) => (
           <div className="mt-auto flex flex-col px-6 phone:px-5">
             <ScreenFooter pinned={false} className="pb-6 pt-5">
@@ -265,11 +281,17 @@ export function SendCollectibleView({ runtime, wallet, collectible, onBack, onDo
                 secondaryLabel={t("transferReview.cancel")}
                 onSecondary={() => setStep(composeStep(step.recipient))}
                 primaryLabel={
-                  step.submitting ? (signsOnDevice ? t("send.waitingForApproval") : t("send.sending")) : t("transferReview.send")
+                  step.submitting
+                    ? signsOnDevice
+                      ? t("send.waitingForApproval")
+                      : t("send.sending")
+                    : checkingRecipient
+                      ? t("send.checkingRecipient")
+                      : t("transferReview.send")
                 }
                 onPrimary={() => void handleSign()}
                 warned={warned}
-                busy={step.submitting}
+                busy={step.submitting || checkingRecipient}
                 className="mt-0 p-0 phone:px-0"
               />
             </ScreenFooter>

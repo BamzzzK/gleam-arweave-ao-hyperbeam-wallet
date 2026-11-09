@@ -22,7 +22,7 @@ export interface ActivityRowProps {
   title: string;
   subtitle: string;
   amountLabel: string;
-  amountTone?: "positive" | "neutral";
+  amountTone?: "positive" | "negative" | "neutral";
   /** A collectible transfer shows the collectible's thumbnail where the amount would be. */
   collectible?: { name: string; imageUrl?: string };
   pending?: boolean;
@@ -79,8 +79,8 @@ export function ActivityRow({
         {collectible ? (
           <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-[30px] flex-shrink-0 rounded-md" />
         ) : (
-          <div className="flex-shrink-0 text-label font-semibold tabular-nums text-foreground">
-            <span className={amountTone === "positive" ? "text-positive" : undefined}>
+          <div className="flex-shrink-0 text-label font-medium tabular-nums text-foreground">
+            <span className={amountTone === "positive" ? "text-positive" : amountTone === "negative" ? "text-negative" : undefined}>
               {amountLabel}
             </span>
           </div>

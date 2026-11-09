@@ -1,1 +1,1 @@
-export { mergeActivity, isFirstSeenRecipient } from "./merge";
+export { mergeActivity } from "./merge";

@@ -90,7 +90,7 @@ type MainSubView =
   /** `editTokens` reopens the token list in edit mode, where add-token was opened from. */
   | { kind: "home"; editTokens?: boolean }
   /** `token: null` is the AR path (the top-level Send action); an AO token row's click carries its `TokenBalance`. */
-  | { kind: "send"; token: TokenBalance | null }
+  | { kind: "send"; token: TokenBalance | null; recipient?: string }
   | { kind: "receive" }
   | { kind: "wallet-switcher" }
   | { kind: "wallet-detail"; walletId: string }
@@ -309,6 +309,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
         runtime={runtime}
         wallet={wallet}
         token={subView.token}
+        recipient={subView.recipient}
         onBack={() => setSubView({ kind: "home" })}
         onDone={() => setSubView({ kind: "home" })}
       />
@@ -473,6 +474,8 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
             wallet={wallet}
             onSend={() => setSubView({ kind: "send", token: null })}
             onSendToken={(token) => setSubView({ kind: "send", token })}
+            onSendTo={(recipient, token) => setSubView({ kind: "send", token, recipient })}
+            sheetContainer={layoutRoot}
             onReceive={() => setSubView({ kind: "receive" })}
             onOpenWalletSwitcher={() => setSubView({ kind: "wallet-switcher" })}
             onOpenSettings={() => setSubView({ kind: "settings-home" })}

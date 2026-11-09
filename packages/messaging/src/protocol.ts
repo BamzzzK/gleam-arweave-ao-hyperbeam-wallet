@@ -9,7 +9,7 @@ import type {
   ApprovalRequest,
   Contact,
   RecipientAssessment,
-  FeeEstimate,
+  TransferFeeQuote,
   FileDownloadResult,
   Grant,
   HardwareDevice,
@@ -203,12 +203,13 @@ export interface ProtocolMap {
   // unlocked-session cache (`packages/runtime/src/handlers/key-session.ts`),
   // not a password on the request: once unlocked, no further call needs
   // one until the session is locked or its auto-lock timeout elapses.
-  estimateTransfer(req: TransferDraft): FeeEstimate;
-  /** First-time and lookalike checks for a recipient, for the approval window. */
+  /** The network fee only; the recipient checks are `assessRecipient`, so a slow history read never holds up the fee. */
+  estimateTransfer(req: TransferDraft): TransferFeeQuote;
+  /** First-time and lookalike checks for a recipient, for the send review and the approval window. */
   assessRecipient(req: { walletId: string; recipient: string }): RecipientAssessment;
   submitTransfer(req: TransferDraft): { txId: string };
   /** Quotes the AR network fee for sending one collectible; fails when the wallet's AR can't cover it. */
-  estimateCollectibleSend(req: CollectibleSendDraft): FeeEstimate;
+  estimateCollectibleSend(req: CollectibleSendDraft): TransferFeeQuote;
   /** Sends one collectible as an L1 transaction to its process (`core/ao/collectible-transfer.ts`). */
   sendCollectible(req: CollectibleSendRequest): { txId: string };
 
