@@ -84,6 +84,8 @@
 /packages/core/src/ao/peer-failover.ts                                  @skyf0xx
 /packages/runtime/src/peers.ts                                         @skyf0xx
 /packages/core/src/models/network.ts                                   @skyf0xx
+/packages/core/src/arweave/first-run-gateway.ts                         @skyf0xx
+/packages/core/src/arweave/graphql.ts                                   @skyf0xx
 /packages/messaging/src/protocol.ts                                    @skyf0xx
 
 # 4 What you see is what you sign
