@@ -1,5 +1,5 @@
 import { COMMUNITY_HYPERBEAM_PEER_URLS, type NetworkSettings, type StoragePort, type TimerPort } from "@gleam/core";
-import { discoverHyperBeamPeers } from "@gleam/core/src/ao/peer-discovery.ts";
+import { discoverHyperBeamPeers, stripTrailingSlashes } from "@gleam/core/src/ao/peer-discovery.ts";
 
 export const DISCOVERED_PEERS_KEY = "local:discoveredPeers";
 /** Community or discovered peers the user removed in Network & peers; merging skips them. */
@@ -25,7 +25,7 @@ export function mergeDiscoveredPeers(
   dismissed: readonly string[] = [],
 ): NetworkSettings {
   const urls = Array.isArray(discovered) ? discovered : (discovered?.urls ?? []);
-  const known = new Set([...settings.peers.map((peer) => peer.url.replace(/\/+$/, "")), ...dismissed]);
+  const known = new Set([...settings.peers.map((peer) => stripTrailingSlashes(peer.url)), ...dismissed]);
   const added = urls.filter((url) => !known.has(url) && (known.add(url), true));
   if (added.length === 0) return settings;
   return { ...settings, peers: [...settings.peers, ...added.map((url) => ({ url, enabled: true }))] };
@@ -54,7 +54,7 @@ export async function readDismissedPeers(storage: StoragePort): Promise<string[]
  * add it back.
  */
 export async function saveNetworkSettings(storage: StoragePort, next: NetworkSettings): Promise<void> {
-  const kept = new Set(next.peers.map((peer) => peer.url.replace(/\/+$/, "")));
+  const kept = new Set(next.peers.map((peer) => stripTrailingSlashes(peer.url)));
   const removed = (await readExtraPeerUrls(storage)).filter((url) => !kept.has(url));
   if (removed.length > 0) {
     const dismissed = await readDismissedPeers(storage);
