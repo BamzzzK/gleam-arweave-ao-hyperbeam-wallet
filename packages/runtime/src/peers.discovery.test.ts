@@ -68,6 +68,21 @@ describe("saveNetworkSettings", () => {
   });
 });
 
+describe("saveNetworkSettings after discovery drops a peer", () => {
+  it("still remembers its removal, so rediscovery doesn't bring it back", async () => {
+    const storage = createFakeStorage();
+    const gone = "https://gone.test";
+    await storage.set("local:networkSettings", { ...SETTINGS, peers: [...SETTINGS.peers, { url: gone, enabled: true }] });
+    await storage.set(DISCOVERED_PEERS_KEY, { at: 1, urls: [] });
+
+    await saveNetworkSettings(storage, SETTINGS);
+
+    expect(storage.store.get(DISMISSED_PEERS_KEY)).toContain(gone);
+    const merged = mergeDiscoveredPeers(SETTINGS, [gone], storage.store.get(DISMISSED_PEERS_KEY) as string[]);
+    expect(merged.peers.map((peer) => peer.url)).not.toContain(gone);
+  });
+});
+
 describe("refreshDiscoveredPeersIfDue", () => {
   const DAY = 24 * 60 * 60 * 1000;
 
