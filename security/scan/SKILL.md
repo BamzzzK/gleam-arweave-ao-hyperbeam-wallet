@@ -397,9 +397,10 @@ it fails, fix what it names and commit again.
 - Low details may be public. Medium-and-above details never go in a PR,
   even one that fixes them.
 
-**Advisory draft.** Write a title as `REPORT.md` § Advisory title gives
-it: who can do it and what the user loses, in the user's words. Then
-write the severity, and a description in the shape `REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
+**Advisory draft.** Start with a `Title:` line, written as `REPORT.md`
+§ Advisory title gives it: who can do it and what the user loses, in the
+user's words. Then write the severity, and a description in the shape
+`REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
 **Fix**, the `Attestation id:` line, then the detail for the triager in
 `<details>`. Give the evidence from the verdict once: demonstrated, traced,
 or the exact fact a browser check has to settle. Save it as
@@ -523,8 +524,8 @@ Scan done. I have <n> reports ready to file.
 ```
 
 `<n>` counts the `.gleam-scan/advisory-*.md` and `.gleam-scan/pr-*.md`
-drafts. A line starting with `!` names a draft advisory to shorten
-(`REPORT.md`). It never fails the run. Fix the draft; you don't need to
+drafts. A line starting with `!` names a draft advisory whose title or
+summary breaks `REPORT.md`. It never fails the run. Fix the draft; you don't need to
 run `finish` again.
 
 `finish` rewrites `.gleam-scan/attestation.json` with `release` and
@@ -592,11 +593,13 @@ or with `gh`:
 
 ```bash
 gh api repos/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/security-advisories/reports \
-  -f summary="<title>" -f severity="<low|medium|high|critical>" \
-  -f description="$(cat .gleam-scan/advisory-1.md)"
+  -f summary="$(sed -n '1s/^Title: *//p' .gleam-scan/advisory-1.md)" \
+  -f severity="<low|medium|high|critical>" \
+  -f description="$(sed 1d .gleam-scan/advisory-1.md)"
 ```
 
-The description includes the line `Attestation id: <id>`.
+The title comes from the draft's `Title:` line, and the description is
+everything under it, including the line `Attestation id: <id>`.
 
 If you can't file (no `gh`, or the user would rather do it), give the user
 each draft, ready to paste, with the id already in it. Never publish an

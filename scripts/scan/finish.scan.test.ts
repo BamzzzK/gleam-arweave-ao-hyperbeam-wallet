@@ -204,7 +204,7 @@ describe("pnpm scan finish: server and output", () => {
     expect(uncounted.json).toMatchObject({ userMessage: closingMessage(link, "scanned", 0).join("\n") });
 
     const deps = accept(setup(goodAttestation({ result: "scanned" })));
-    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), "The page signs it. The user loses funds.");
+    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), "Title: A site can steal funds\nThe page signs it. The user loses funds.");
     writeFileSync(join(deps.root, ".gleam-scan/pr-1.md"), "## Why\n\nA test was missing.");
     const counted = await runFinish(deps);
     expect(tail(render(counted, false))).toEqual([
@@ -225,7 +225,7 @@ describe("pnpm scan finish: server and output", () => {
       return accepted(await attestationId(attestation))(_url as string, init);
     }) as typeof fetch;
     const wordy = Array.from({ length: 30 }, () => "The page signs a tag the user never saw.").join(" ");
-    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), wordy);
+    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), `Title: A site can steal funds\n${wordy}`);
     const outcome = await runFinish(deps);
     expect(outcome.ok).toBe(true);
     const out = render(outcome, false).split("\n");

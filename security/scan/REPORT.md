@@ -45,6 +45,8 @@ correct: it shows the maintainer one class of bug, not two.
 
 Use these parts, in this order:
 
+- `Title: <title>` as the first line. Filing sends it as the advisory's
+  title and the rest as its description.
 - **Summary**: two or three sentences on what is wrong.
 - **Impact**: who is affected and what they lose. Give the severity and
   one line on why.
@@ -69,15 +71,18 @@ Use these parts, in this order:
 - Say once whether it is demonstrated, traced or needs a browser check.
 
 `pnpm scan finish` warns when a `.gleam-scan/advisory-*.md` draft has
-more than 200 words above `<details>` or a reading grade above 10. The
-warning never fails the scan. Shorten the draft and move on.
+no `Title:` line, a title over 100 characters or with a check id, code
+name or parenthetical, more than 200 words above `<details>`, or a
+reading grade above 10. The warning never fails the scan. Fix the draft
+and move on.
 
 ## Example advisory
 
-This example is invented. It shows the shape, not a real bug. Its title:
-"A connected site can get a signature on an action the user never sees".
+This example is invented. It shows the shape, not a real bug.
 
 ```markdown
+Title: A connected site can get a signature on an action the user never sees
+
 **Summary**: The signing approval shows only the first 16 tags of a data
 item. A page can add a 17th tag that the user never sees. Gleam then signs
 it.
