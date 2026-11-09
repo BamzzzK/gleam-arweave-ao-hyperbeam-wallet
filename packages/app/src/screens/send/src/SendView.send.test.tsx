@@ -5,6 +5,7 @@ import type { ActivityPage, Contact, RecipientAssessment, RuntimePort, TokenBala
 import { addressText } from "@gleam/ui/src/components/wallet/MemorableAddress.testing.ts";
 import { PlatformProvider } from "../../../app-platform/context";
 import { fakeAppPlatform } from "../../../app-platform/testing";
+import { DEFAULT_AO_TOKEN } from "@gleam/ui";
 import { SendView, type SendViewProps } from "./SendView";
 
 afterEach(() => {
@@ -370,6 +371,18 @@ describe("SendView compose summary", () => {
     expect(screen.getByText("Arweave")).toBeTruthy();
     expect(screen.queryByText("Process")).toBeNull();
     expect(screen.getByRole("link", { name: /View on explorer/ }).getAttribute("href")).toBe("https://lunar.arweave.net/#/transactions/");
+  });
+
+  it("draws AR's and AO's logos on the details screen, though their balance rows carry none", () => {
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+    expect(document.querySelector("img")).not.toBeNull();
+    cleanup();
+
+    const ao: TokenBalance = { ...AO_TOKEN, processId: DEFAULT_AO_TOKEN.processId as string, ticker: "AO", logoUrl: null };
+    renderSendView({ runtime: fakeRuntime({ send: routedSend({}) }), wallet: WALLET, token: ao, onBack: vi.fn(), onDone: vi.fn() });
+    fireEvent.click(screen.getByRole("button", { name: "Token details" }));
+    expect(document.querySelector("img")).not.toBeNull();
   });
 });
 

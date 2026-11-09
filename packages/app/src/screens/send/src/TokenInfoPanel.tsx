@@ -15,11 +15,14 @@ const AR_EXPLORER_URL = "https://lunar.arweave.net/#/transactions/";
  */
 export function TokenInfoPanel({
   token,
+  logoUrl,
   balanceDisplay,
   balanceValue,
   priceDisplay,
 }: {
   token: TokenBalance | null;
+  /** Already filtered by the Token logos setting and the token's Show/Hide choice. */
+  logoUrl: string | undefined;
   balanceDisplay: string | undefined;
   /** The balance in the display currency, already formatted. */
   balanceValue: string | undefined;
@@ -36,7 +39,7 @@ export function TokenInfoPanel({
         <TokenGlyph
           label={token === null ? "AR" : ticker.slice(0, 2).toUpperCase()}
           tone={token === null ? 1 : 2}
-          logoUrl={token?.logoUrl}
+          logoUrl={logoUrl}
           className="h-10 w-10 text-label"
         />
         <div className="flex min-w-0 flex-col">
