@@ -559,9 +559,15 @@ changes if any field changes. In this order:
    Step 7 says to hold for an unfixed advisory waits.
 
 If the challenge expires first, follow its Troubleshooting row and end
-your turn with the new closing message. If signing can't succeed (see the end of
-Troubleshooting), still file every draft, without the `Attestation id:`
-line.
+your turn with the new closing message.
+
+The id is how a finding is paid: without it, the report earns nothing.
+If the user replies with anything but "signed", or signing fails (see the
+end of Troubleshooting), don't file yet. Ask again, up to three times in
+all: resend the link, and say that reports filed without the id earn no
+award. File without the id only after the third ask, or when the user
+says to. Then the line reads `Attestation id: none (not signed)`, never
+left out.
 
 **File a PR** (needs `gh` signed in to the user's GitHub account). If the
 user can push to the repository, skip the fork: `git push origin HEAD` and
@@ -595,8 +601,8 @@ If you can't file (no `gh`, or the user would rather do it), give the user
 each draft, ready to paste, with the id already in it. Never publish an
 advisory's text anywhere else.
 
-Done when the user has signed and every draft is filed, or handed to the
-user, with the id in it.
+Done when every draft is filed, or handed to the user, with the id in
+it, or with `Attestation id: none (not signed)` after three asks.
 
 ## Report like a working security engineer
 

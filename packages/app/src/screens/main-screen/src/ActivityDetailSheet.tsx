@@ -76,7 +76,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
         <p className="text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p>
         <p className="text-label font-medium text-foreground">{detail.title}</p>
         {knownName === undefined && !naming ? (
-          <button type="button" onClick={() => setNaming(true)} className="text-caption font-medium text-foreground underline-offset-2 hover:underline phone:min-h-11">
+          <button type="button" onClick={() => setNaming(true)} className="text-caption text-muted underline-offset-2 hover:underline phone:min-h-11">
             {t("mainScreen.saveAddress")}
           </button>
         ) : null}
