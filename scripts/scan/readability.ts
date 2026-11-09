@@ -5,6 +5,8 @@ import { readText, SCAN_DIR, type Deps } from "./shared.ts";
 /** The limits `security/scan/REPORT.md` sets for the part of an advisory above `<details>`. */
 export const MAX_WORDS = 200;
 export const MAX_GRADE = 10;
+/** About one sentence: REPORT.md § Advisory title. */
+export const MAX_TITLE_CHARS = 100;
 
 export interface Readability {
   words: number;
@@ -79,14 +81,38 @@ export function aboveTheFold(markdown: string): string {
   return at === -1 ? markdown : markdown.slice(0, at);
 }
 
-/** One `! <file>: …` line for a draft whose summary is too long or too hard to read, else undefined. */
-export function draftWarning(file: string, markdown: string): string | undefined {
-  const { words, grade } = readability(aboveTheFold(markdown));
+/** An advisory draft's `Title: …` first line, and the body under it. */
+export function splitTitle(markdown: string): { title: string | undefined; body: string } {
+  const m = /^Title:[ \t]*(.*)(?:\r?\n|$)/.exec(markdown);
+  return m ? { title: m[1]!.trim(), body: markdown.slice(m[0].length) } : { title: undefined, body: markdown };
+}
+
+/**
+ * The mechanical half of REPORT.md § Advisory title. Whether a title names the risk
+ * is judgment; these catch the parser-facing habits: check ids, code names, riders.
+ */
+export function titleProblems(title: string | undefined): string[] {
+  if (title === undefined || title === "") return ["no title"];
   const problems: string[] = [];
+  if (title.length > MAX_TITLE_CHARS) problems.push(`title is ${title.length} characters (limit ${MAX_TITLE_CHARS})`);
+  if (/^[A-Z][A-Z0-9-]*\d[A-Z0-9-]*:/.test(title)) problems.push("title starts with a check id");
+  if (/`|\b[a-z]{2,}[A-Z][a-z]/.test(title)) problems.push("title has a code name");
+  if (/[()]/.test(title)) problems.push("title has a parenthetical");
+  return problems;
+}
+
+/** One `! <file>: …` line for a draft whose title or summary breaks REPORT.md, else undefined. */
+export function draftWarning(file: string, markdown: string): string | undefined {
+  const { title, body } = splitTitle(markdown);
+  const { words, grade } = readability(aboveTheFold(body));
+  const titled = titleProblems(title);
+  const problems = [...titled];
   if (words > MAX_WORDS) problems.push(`${words} words above <details> (limit ${MAX_WORDS})`);
   if (grade > MAX_GRADE) problems.push(`reading grade ${grade} (limit ${MAX_GRADE})`);
   if (problems.length === 0) return undefined;
   const fixes = [
+    ...(title === undefined || title === "" ? ["start the draft with a Title: line"] : []),
+    ...(titled.length > 0 ? ["name the risk in the user's words"] : []),
     ...(words > MAX_WORDS ? ["move traces, code and duplicate notes into <details>"] : []),
     ...(grade > MAX_GRADE ? ["use shorter sentences and plainer words"] : []),
   ];
@@ -113,7 +139,7 @@ async function listDrafts(deps: Deps, pattern: RegExp): Promise<string[]> {
   return names.filter((name) => pattern.test(name)).sort().map((name) => `${SCAN_DIR}/${name}`);
 }
 
-/** A warning line per advisory draft that breaks REPORT.md's limits. Never fails the scan. */
+/** A warning line per advisory draft that breaks REPORT.md's title rules or limits. Never fails the scan. */
 export async function draftWarnings(deps: Deps): Promise<string[]> {
   const out: string[] = [];
   for (const file of await advisoryDrafts(deps)) {
