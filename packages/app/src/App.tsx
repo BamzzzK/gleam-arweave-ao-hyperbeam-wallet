@@ -341,10 +341,9 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
     content = (
       <WalletSwitcherView
         runtime={runtime}
-        onSwitched={() => {
-          setSubView({ kind: "home" });
-          void refresh(runtime);
-        }}
+        initialWallets={wallets}
+        initialActiveWalletId={wallet?.id ?? null}
+        onSwitched={() => void refresh(runtime)}
         onBack={() => setSubView({ kind: "home" })}
         onAddWallet={() => setSubView({ kind: "add-wallet" })}
         onManage={(walletId) => setSubView({ kind: "wallet-detail", walletId })}
