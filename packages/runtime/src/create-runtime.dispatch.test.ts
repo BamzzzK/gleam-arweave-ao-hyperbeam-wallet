@@ -202,6 +202,51 @@ describe("createRuntime", () => {
       expect(preview).toMatchObject({ recipient: token, amount: "7", token: null, unreadableTokenTransfer: true });
     });
 
+    it("a dApp's sign of a collectible's transfer shows the collectible", async () => {
+      stubLyingGateway();
+      const { runtime, storage, present } = await setupGranted();
+      const asset = "c".repeat(43);
+      const recipient = "r".repeat(43);
+      await storage.set(`local:tokenMetadata:${asset}`, {
+        processId: asset,
+        transport: "l1",
+        assetClass: "unique",
+        denomination: 0,
+        ticker: null,
+        name: "Art",
+        description: null,
+        logo: null,
+        totalSupply: "1",
+      });
+
+      const pending = runtime.dispatch(
+        "providerCall",
+        {
+          method: "sign",
+          params: { transaction: { target: asset, quantity: "0", tags: [tag("Action", "Transfer"), tag("Recipient", recipient), tag("Quantity", "1")] } },
+        },
+        CONTENT_SCRIPT,
+      );
+      void (pending as Promise<unknown>).catch(() => {});
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      const requestId = present.mock.calls[0]![0];
+      await expect(runtime.dispatch("getApproval", { requestId }, EXTENSION)).resolves.toMatchObject({
+        preview: { recipient, amount: "1", collectible: { id: asset } },
+      });
+      await runtime.dispatch("resolveApproval", { requestId, approved: false }, EXTENSION);
+    });
+
+    it("a dApp's sign of 1 unit of a fungible token shows the token", async () => {
+      const token = "t".repeat(43);
+      const preview = await previewOfSign({
+        target: token,
+        quantity: "0",
+        tags: [tag("Action", "Transfer"), tag("Recipient", "r".repeat(43)), tag("Quantity", "1")],
+      });
+      expect(preview).toMatchObject({ amount: "1", token });
+      expect(preview.collectible).toBeUndefined();
+    });
+
     it("a dApp's ordinary transaction to an address carries no flag", async () => {
       const preview = await previewOfSign({ target: "t".repeat(43), quantity: "7", tags: [tag("action", "eval")] });
       expect(preview.unreadableTokenTransfer).toBeUndefined();

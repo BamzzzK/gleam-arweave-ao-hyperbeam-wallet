@@ -37,6 +37,7 @@ import { PasskeyHandler } from "./handlers/passkey";
 import { ReadsHandler, registerActivityPromotionAlarm } from "./handlers/reads";
 import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
 import { readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
+import { COLLECTIBLE_TRANSFER_QUANTITY } from "@gleam/core/src/ao/collectible-transfer.ts";
 import { BrowserSitesHandler } from "./handlers/browser-sites";
 import { ContactsHandler } from "./handlers/contacts";
 import { TransferHandler } from "./handlers/transfer";
@@ -416,11 +417,28 @@ export function createRuntime(platform: Platform): Runtime {
     address: string,
     processId: string,
   ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null }> {
-    const UNRESOLVED = { tokenDenomination: null, tokenTicker: null };
+    const { tokenDenomination, tokenTicker } = await resolveTokenPreview(address, processId);
+    return { tokenDenomination, tokenTicker };
+  }
+
+  /** As `resolveTokenDenominationAndTicker`, and whether the process is a collectible rather than a token. */
+  async function resolveTokenPreview(
+    address: string,
+    processId: string,
+  ): Promise<{ tokenDenomination: number | null; tokenTicker: string | null; collectible: boolean }> {
+    const UNRESOLVED = { tokenDenomination: null, tokenTicker: null, collectible: false };
     const lookup = reads
       .previewWatchedToken({ address, processId })
-      .then((balance) => (balance.available === false ? UNRESOLVED : { tokenDenomination: balance.denomination, tokenTicker: balance.ticker }))
-      .catch(() => UNRESOLVED);
+      .then((balance) =>
+        balance.available === false
+          ? UNRESOLVED
+          : { tokenDenomination: balance.denomination, tokenTicker: balance.ticker, collectible: false },
+      )
+      .catch((error: unknown) =>
+        error instanceof Error && error.message === userErrorMessage("tokenIsCollectible")
+          ? { ...UNRESOLVED, collectible: true }
+          : UNRESOLVED,
+      );
     const timeout = new Promise<typeof UNRESOLVED>((resolve) =>
       setTimeout(() => resolve(UNRESOLVED), TOKEN_METADATA_LOOKUP_TIMEOUT_MS),
     );
@@ -639,7 +657,13 @@ export function createRuntime(platform: Platform): Runtime {
       : null;
     const tokenTransfer = reading?.kind === "transfer" ? reading : null;
     const tokenMetadata =
-      tokenTransfer && wallet ? await resolveTokenDenominationAndTicker(wallet.address, tokenTransfer.processId) : null;
+      tokenTransfer && wallet ? await resolveTokenPreview(wallet.address, tokenTransfer.processId) : null;
+    // A collectible's transfer of 1 shows as that collectible, as the
+    // hardware-wallet step already does, not as 1 unit of an unknown token.
+    const collectible =
+      tokenTransfer && tokenMetadata?.collectible && tokenTransfer.quantity === COLLECTIBLE_TRANSFER_QUANTITY
+        ? { id: tokenTransfer.processId }
+        : null;
     // The dApp's reward is the fee actually charged. Without one, the quote
     // the preview shows becomes the reward, so a gateway can't charge more
     // than the user approved. A bundled dispatch carries no reward at all.
@@ -649,7 +673,9 @@ export function createRuntime(platform: Platform): Runtime {
       kind,
       origin,
       walletId: activeWalletId(),
-      ...(tokenTransfer
+      ...(collectible && tokenTransfer
+        ? { recipient: tokenTransfer.recipient, amount: tokenTransfer.quantity, token: collectible.id, collectible }
+        : tokenTransfer
         ? {
             recipient: tokenTransfer.recipient,
             amount: tokenTransfer.quantity,
