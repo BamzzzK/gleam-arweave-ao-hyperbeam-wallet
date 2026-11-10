@@ -13,7 +13,8 @@ import { GithubUnavailableError, type GithubClient } from "./github";
 import { answeredFunctions, areaSummaries, canChallenge, functionKey } from "./scan-areas";
 import { GITHUB_UNAVAILABLE, NO_RELEASE, failure, type ScanFailure } from "./scan-errors";
 
-export const CHALLENGE_TTL_MS = 24 * 3_600_000;
+/** Long enough for a session that scans several areas and signs them all at the end. */
+export const CHALLENGE_TTL_MS = 72 * 3_600_000;
 /** Unused challenges are kept a day past expiry, then dropped when the next one is issued. */
 const PURGE_AFTER_MS = 24 * 3_600_000;
 

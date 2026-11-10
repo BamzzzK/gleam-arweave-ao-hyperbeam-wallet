@@ -151,7 +151,7 @@ describe("GET /scan/challenge", () => {
 
     // src/a.ts alone is too few functions for the keys area, so lib/ (signing) is drawn from.
     expect(status).toBe(200);
-    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, area: "signing", expiresAt: "2026-10-09T12:00:00.000Z" });
+    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, area: "signing", expiresAt: "2026-10-11T12:00:00.000Z" });
     expect(json.challenge).toMatch(/^[A-Za-z0-9_-]{22,43}$/);
     expect(json.functions).toHaveLength(3);
     const known = functionsOf(s.files).filter((fn) => fn.area === "signing").map((fn) => `${fn.file}:${fn.symbol}`);
