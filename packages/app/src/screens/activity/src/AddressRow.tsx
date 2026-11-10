@@ -19,7 +19,7 @@ export function AddressRow({ address, name, onSelect }: { address: string; name:
     <button
       type="button"
       onClick={onSelect}
-      className="relative flex w-full items-center gap-2.5 px-3.5 py-3 text-left after:absolute after:inset-x-3.5 after:bottom-0 after:border-b after:border-line last:after:hidden hover:bg-mist"
+      className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-mist"
     >
       <AccountAvatar svgMarkup={avatarSvg} label={name ? t("activity.avatarOf", { name }) : t("activity.addressAvatar")} size={32} />
       {name ? (

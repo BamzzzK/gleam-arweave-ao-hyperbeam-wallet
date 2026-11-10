@@ -4,6 +4,7 @@ import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type Activit
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
+import { SearchField } from "@gleam/ui/src/primitives/search-field.tsx";
 import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenGlyph, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "../../../address-identity";
@@ -758,7 +759,7 @@ function ComposeStep({
               ) : null}
             </span>
           </div>
-          <div className="flex flex-col gap-0.5 rounded-md border border-line bg-background p-3.5 focus-within:border-foreground">
+          <div className="flex flex-col gap-0.5 border-0 border-b border-line bg-transparent px-0 py-3.5">
             <div className="flex items-center gap-2">
               <input
                 type="text"
@@ -985,7 +986,7 @@ export function RecipientField({
               if (!pickedRef.current) onBlurRecipient();
             }}
             placeholder={t("send.pasteAddress")}
-            className="w-full rounded-md border border-line bg-background px-3.5 py-3 font-mono text-label leading-relaxed text-foreground focus:border-foreground focus:outline-none"
+            className="w-full border-0 border-b border-line bg-transparent px-0 py-3 font-mono text-label leading-relaxed text-foreground focus:outline-none"
           />
           {showDropdown ? (
             <div
@@ -993,11 +994,10 @@ export function RecipientField({
               aria-label={t("send.savedContacts")}
               // Keeps focus in the input, so a click lands before the blur closes the list.
               onMouseDown={(event) => event.preventDefault()}
-              className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md border border-line bg-background shadow-lg"
+              className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-md bg-surface shadow-[0_8px_24px_rgba(0,0,0,0.10),0_1px_3px_rgba(0,0,0,0.06)]"
             >
               {shownSuggestions.length > 0 ? (
-                // Its own wrapper, so the last row drops its separator.
-                <div className="pb-1">
+                <div className="py-1">
                   {shownSuggestions.map((candidate) => (
                     <AddressRow
                       key={candidate.address}
@@ -1115,7 +1115,7 @@ function SaveAddressInline({
               if (event.key === "Enter") onConfirm();
             }}
             placeholder={t("send.enterAddressName")}
-            className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
+            className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
           />
           <button
             type="button"
@@ -1456,15 +1456,12 @@ export function SavedAddressesStep({
           ) : undefined
         }
       />
-      <div className="px-3.5 pb-2 pt-3 phone:px-5">
-        <input
-          type="text"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value)}
-          placeholder={t("send.searchPlaceholder")}
-          className="w-full rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
-        />
-      </div>
+      <SearchField
+        value={filter}
+        onChange={(event) => setFilter(event.target.value)}
+        placeholder={t("send.searchPlaceholder")}
+        className="px-[18px] pb-1 pt-3 phone:px-5"
+      />
       <div className="flex flex-1 flex-col px-1 py-2 phone:px-5">
         {activityQuery.isError ? (
           <div role="alert" className="px-4 py-3 text-label leading-snug text-warning phone:px-0">
@@ -1640,7 +1637,7 @@ export function SuccessStep({
                   setSaved(true);
                 }}
                 placeholder={t("send.enterAddressName")}
-                className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
+                className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
               />
               <button
                 type="button"

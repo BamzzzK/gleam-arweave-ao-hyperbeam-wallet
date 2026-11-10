@@ -140,14 +140,14 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
       />
 
       {adding ? (
-        <div className="flex flex-col gap-2 border-b border-line px-3.5 py-3 phone:border-b-0 phone:px-5">
+        <div className="flex flex-col gap-2 px-[18px] py-3 phone:px-5">
           <input
             type="text"
             autoFocus
             value={newName}
             onChange={(event) => setNewName(event.target.value.slice(0, MAX_NAME_LENGTH))}
             placeholder={t("contacts.name")}
-            className="w-full rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
+            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
           />
           <input
             type="text"
@@ -157,7 +157,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
               if (event.key === "Enter") handleAdd();
             }}
             placeholder={t("contacts.addressPlaceholder")}
-            className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+            className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
           />
           {addError ? (
             <span role="alert" className="text-caption text-warning">
@@ -204,7 +204,7 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
         ) : (
           contacts.map((contact) =>
             editingAddress === contact.address ? (
-              <div key={contact.address} className="flex items-center gap-2 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
+              <div key={contact.address} className="flex items-center gap-2 px-3.5 py-2 phone:px-0">
                 <input
                   type="text"
                   autoFocus
@@ -215,11 +215,11 @@ export function ContactsView({ runtime, onBack }: ContactsViewProps) {
                     if (event.key === "Escape") setEditingAddress(null);
                   }}
                   onBlur={() => commitEdit(contact.address)}
-                  className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2 text-label text-foreground focus:border-foreground focus:outline-none"
+                  className="min-w-0 flex-1 border-0 border-b border-line bg-transparent px-0 py-2.5 text-label text-foreground focus:outline-none"
                 />
               </div>
             ) : (
-              <div key={contact.address} className="flex items-center border-b border-line last:border-b-0 phone:border-b-0">
+              <div key={contact.address} className="flex items-center">
                 <div className="min-w-0 flex-1">
                   <AddressRow address={contact.address} name={contact.name} onSelect={() => startEdit(contact)} />
                 </div>

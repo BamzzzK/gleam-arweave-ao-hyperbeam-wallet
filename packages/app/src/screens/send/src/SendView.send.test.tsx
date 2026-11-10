@@ -590,12 +590,12 @@ describe("SendView saved addresses (AO-SEND-UI-WALLET-CORE)", () => {
     renderSendView({ runtime: fakeRuntime({ send }), wallet: WALLET, token: null, onBack: vi.fn(), onDone: vi.fn() });
 
     openSavedContacts();
-    const recent = await screen.findByRole("region", { name: "Recent" });
+    const recent = await screen.findByRole("region", { name: "Recent addresses" });
     expect(within(recent).getAllByRole("button")).toHaveLength(5);
     expect(within(recent).queryByText(/^R6/)).toBeNull();
 
     fireEvent.change(screen.getByPlaceholderText("Search by name or address"), { target: { value: "R6" } });
-    expect(within(screen.getByRole("region", { name: "Recent" })).getByText(/^R6/)).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Recent addresses" })).getByText(/^R6/)).toBeTruthy();
   });
 
   it("populates from real send activity, most-recent-first and deduplicated", async () => {
