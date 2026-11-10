@@ -1221,7 +1221,7 @@ export function MainScreenView({
                     title={title}
                     subtitle={subtitle}
                     amountLabel={amountLabel}
-                    amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
+                    amountTone={entry.type === "send" && entry.status !== "failed" ? "negative" : entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
                         ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
