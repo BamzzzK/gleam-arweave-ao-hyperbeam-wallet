@@ -40,7 +40,8 @@ export const PasswordField = React.forwardRef<HTMLInputElement, PasswordFieldPro
             ref={ref}
             id={inputId}
             type={revealed ? "text" : "password"}
-            className="pr-10 phone:pr-12"
+            // Edge and some Chromium builds draw their own reveal eye beside ours.
+            className="pr-10 phone:pr-12 [&::-ms-clear]:hidden [&::-ms-reveal]:hidden"
             {...props}
           />
           <button
