@@ -195,7 +195,20 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               </span>
             )}
           </span>
-          <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
+          {/* A pointer shortcut to the manage button beside the row, which keyboard and screen-reader users reach directly. */}
+          <span
+            onClick={(event) => {
+              event.stopPropagation();
+              onManage();
+            }}
+            className="cursor-pointer"
+          >
+            {/* The phone's copy and manage tap targets leave too little width for the chunked address, so it runs as plain wrapped text there. */}
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:hidden" />
+            <span translate="no" className="hidden break-all font-mono text-caption leading-relaxed text-muted phone:block">
+              {wallet.address}
+            </span>
+          </span>
         </span>
       </button>
       <button
