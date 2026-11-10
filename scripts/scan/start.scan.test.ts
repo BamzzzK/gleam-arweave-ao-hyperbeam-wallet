@@ -2,9 +2,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { render } from "./cli.ts";
-import { CHALLENGE, CHALLENGE_ID, COMMIT, exists, fakeGit, json, makeDeps, readJsonFile } from "./harness.ts";
-import { runStart } from "./start.ts";
+import { parseSurfaceText } from "../../packages/core/src/scan/index.ts";
+import { main, render } from "./cli.ts";
+import { CHALLENGE, CHALLENGE_ID, COMMIT, SOURCE, exists, fakeGit, json, makeDeps, readJsonFile } from "./harness.ts";
+import { areaFiles, runStart } from "./start.ts";
 
 describe("pnpm scan start", () => {
   it("writes the challenge and a starter attestation, and lists the functions with spans", async () => {
@@ -99,5 +100,52 @@ describe("pnpm scan start", () => {
     expect(render(await runStart(reply(418)), false)).toBe(
       "✗ http_418: The points API answered 418 with no explanation; tell the user, since this is a bug to report.",
     );
+  });
+
+  it("names the area, lists its files and saves them for the skill's commands", async () => {
+    const deps = makeDeps();
+    const outcome = await runStart(deps);
+    const text = render(outcome, false);
+    expect(text).toContain("Area: Key material (keys, tier 1). Review these 3 files first, then follow anything they reach:\n    pkg/a.ts\n    pkg/b.ts\n    pkg/c.ts\n");
+    expect(text).toContain("1. Read security/scan/SKILL.md and scan the Key material area of the release.");
+    expect(outcome.json).toMatchObject({ area: { id: "keys", label: "Key material", tier: 1, files: ["pkg/a.ts", "pkg/b.ts", "pkg/c.ts"] } });
+    expect(readFileSync(join(deps.root, ".gleam-scan/area-files.txt"), "utf8")).toBe("pkg/a.ts\npkg/b.ts\npkg/c.ts\n");
+  });
+
+  it("asks for the named area and rejects an unknown one before calling the server", async () => {
+    const urls: string[] = [];
+    const deps = makeDeps({ fetchImpl: (async (url: string) => (urls.push(url), json({ ...CHALLENGE, area: "boundary" }))) as typeof fetch });
+    const outcome = await runStart(deps, { area: "boundary" });
+    expect(urls).toEqual(["https://api.test/scan/challenge?area=boundary"]);
+    expect(render(outcome, false)).toContain("Area: Trust boundary (boundary, tier 3).\n");
+
+    const out: string[] = [];
+    expect(await main(["start", "--area", "wallet"], deps, { out: (t) => out.push(t), tty: false })).toBe(1);
+    expect(out[0]).toBe("✗ area: \"wallet\" isn't a scan area; use one of keys, signing, boundary, preview, build, or leave out --area to scan the least-covered one.");
+    expect(await main(["start", "--area"], deps, { out: (t) => out.push(t), tty: false })).toBe(1);
+    expect(out[1]).toMatch(/^✗ area: --area needs an area id;/);
+    expect(urls).toHaveLength(1);
+  });
+
+  it("passes --area=<id> through main", async () => {
+    const urls: string[] = [];
+    const deps = makeDeps({ fetchImpl: (async (url: string) => (urls.push(url), json(CHALLENGE))) as typeof fetch });
+    expect(await main(["start", "--area=keys"], deps, { out: () => {}, tty: false })).toBe(0);
+    expect(urls).toEqual(["https://api.test/scan/challenge?area=keys"]);
+  });
+
+  it("files of an area: lowest tier wins, config files count, tests don't", () => {
+    const entries = parseSurfaceText("3 pkg/\n1 pkg/vault.ts\n5 .github/workflows/\n5 pnpm-lock.yaml\n");
+    const paths = ["pkg/vault.ts", "pkg/router.ts", "pkg/router.test.ts", ".github/workflows/ci.yml", "pnpm-lock.yaml", "other/x.ts"];
+    expect(areaFiles(entries, paths, 1)).toEqual(["pkg/vault.ts"]);
+    expect(areaFiles(entries, paths, 3)).toEqual(["pkg/router.ts"]);
+    expect(areaFiles(entries, paths, 5)).toEqual([".github/workflows/ci.yml", "pnpm-lock.yaml"]);
+  });
+
+  it("still starts when the surface file can't be read", async () => {
+    const deps = makeDeps({ git: fakeGit({ files: { "pkg/a.ts": SOURCE, "pkg/b.ts": SOURCE, "pkg/c.ts": SOURCE } }) });
+    const outcome = await runStart(deps);
+    expect(outcome.ok).toBe(true);
+    expect(render(outcome, false)).toContain("Area: Key material (keys, tier 1).\n");
   });
 });

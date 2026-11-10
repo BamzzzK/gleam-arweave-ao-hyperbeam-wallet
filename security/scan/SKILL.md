@@ -21,6 +21,13 @@ never sign anything, hold a key or touch a wallet. The user does that in
 Gleam. The user needs a Gleam wallet that is registered for points, and the
 wallet that signs gets the points.
 
+A scan is one round on one **area**: the files of one tier of
+`security/surface.txt`. The areas are `keys` (Key material), `signing`,
+`boundary` (Trust boundary), `preview` (Approval preview) and `build`
+(Build and release). A wallet scans each area once per release. Round 2
+earns 110% of the base reward, round 3 120%, and so on, so after each
+round you offer the next one (Next round).
+
 ## What this skill does on your machine
 
 Every side effect of the scan, in one place. Nothing outside this list is
@@ -35,8 +42,8 @@ part of the skill.
   by git), and a sibling git worktree for each fix (Step 7).
 - **Network:** GitHub (clone, tags, the release lookup), the npm registry
   (install), the osv-scanner advisory database, and the Gleam Points API
-  at `https://api.gleamwallet.app` (`pnpm scan start` and
-  `pnpm scan finish`). `finish` sends the attestation: the challenge
+  at `https://api.gleamwallet.app` (`pnpm scan start`, `pnpm scan finish`
+  and `pnpm scan next`). `finish` sends the attestation: the challenge
   answers, the model id and the coverage report.
 - **Acts as the user, only after asking:** `gh repo fork`, `git push`,
   `gh pr create`, and filing a private advisory (Step 8c). Each one is
@@ -75,6 +82,12 @@ when to read them:
   fails if `HEAD` moves. Write any fix in a separate worktree (Step 7).
 - When a `pnpm scan` command prints a line starting with `✗`, do what that
   line says, then run the command again.
+- Once `pnpm scan finish` has passed, every turn ends with one of two
+  messages, word for word, with nothing after it: the **sign request**
+  (from `pnpm scan finish`, or the after-filing one in Step 8c) while the
+  user hasn't signed, or the **next-round offer** (from `pnpm scan next`,
+  or its fallback in When you're done) once they have. Links, drafts and results go above it. No summary, tip
+  or question comes after it.
 
 ## Prerequisites
 
@@ -148,21 +161,27 @@ to. The defaults are the live Gleam servers.
 
 ## Step 1: Start the challenge
 
+If the user named an area, pass its id. Otherwise leave `--area` out and
+the server picks the area with the fewest scans:
+
 ```bash
-pnpm scan start
+pnpm scan start                    # the least-covered area
+pnpm scan start --area signing     # keys, signing, boundary, preview or build
 ```
 
-Done when it prints `✓ Challenge ready for Gleam v<release> (commit <sha>).`
-and lists 3 functions, each as `<file>  <symbol>  lines <start>-<end>`. It
-writes two files:
+Done when it prints `✓ Challenge ready for Gleam v<release> (commit <sha>).`,
+then `Area: <label> (<id>, tier <n>).` with the area's files, and lists 3
+functions from those files, each as `<file>  <symbol>  lines <start>-<end>`.
+It writes three files:
 
 - `.gleam-scan/challenge.json`: the challenge. Don't edit it.
+- `.gleam-scan/area-files.txt`: the area's files, one per line.
 - `.gleam-scan/attestation.json`: a starter attestation you fill in at
   Step 8.
 
 The challenge expires after 24 hours. Only the user's signature in Gleam
-uses it up; `pnpm scan finish` doesn't. Run `start` only once. Running it
-again replaces the challenge with new functions (it backs up your old
+uses it up; `pnpm scan finish` doesn't. Run `start` once per round. Running
+it again replaces the challenge with new functions (it backs up your old
 attestation to `.gleam-scan/attestation.<old challenge id>.json`).
 
 ## Step 2: Read the threat model
@@ -216,11 +235,12 @@ for example a page-supplied value reaching a signing call without going
 through its zod schema. This is optional. Say in the report whether you
 ran any.
 
-## Step 4: Review the security surface, changed files first
+## Step 4: Review your area, changed files first
 
 `security/surface.txt` lists the security-surface files, one per line as
 `<tier> <path>`. Tier 1 is the most severe. A path ending in `/` covers the
-whole directory.
+whole directory. Your area is one tier, and `pnpm scan start` saved its
+files to `.gleam-scan/area-files.txt`.
 
 Find the previous release tag (empty if this is the first release):
 
@@ -229,38 +249,38 @@ PREV=$(git tag --list 'v*' --merged HEAD --sort=-v:refname | grep -E '^v[0-9]+\.
 echo "previous release: ${PREV:-none}"
 ```
 
-List the surface files changed since then (all of the surface if there is
-no previous release). This works in bash and zsh; `git` expands the
-directory entries:
+List your area's files changed since then (all of them if there is no
+previous release). This works in bash and zsh:
 
 ```bash
-if [ -n "$PREV" ]; then git diff --name-only "$PREV" HEAD -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt); else git ls-files -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt); fi
+if [ -n "$PREV" ]; then git diff --name-only "$PREV" HEAD -- $(cat .gleam-scan/area-files.txt); else cat .gleam-scan/area-files.txt; fi
 ```
 
 See what changed in each file with `git diff "$PREV" HEAD -- <file>`.
 
-Review the changed files first, in tier order (1 before 5), and within a
-tier read non-test source before tests. With no previous release, every
-surface file counts as changed: skip `*.test.ts` files and `pnpm-lock.yaml`
-(Step 3 covers the lockfile). Then review the rest of the surface, again in
-tier order. List it all with:
+Review the changed files first, then the rest of the area's files. Skip
+`pnpm-lock.yaml` (Step 3 covers it). Follow anything they reach out of the
+area: callers, handlers, other tiers. With time left, review the rest of
+the surface in tier order (1 before 5). List it all with:
 
 ```bash
 git ls-files -- $(awk '!/^#/ && NF == 2 { print $2 }' security/surface.txt)
 ```
+
 Read the 3 challenge functions closely on the way, since you answer for
 them in Step 8.
 
 For what to look for, read `security/scan/CHECKS.md`. Section 1 has the
-questions for each area of the surface. Section 2 has the classes of bug
-that cut across areas; keep them in mind in every file.
+questions for each part of the surface, marked by tier; start with your
+area's tier. Section 2 has the classes of bug that cut across areas; keep
+them in mind in every file.
 
 Each time you hit something you can't settle, note it as a lead in
 `.gleam-scan/leads.md` (`.gleam-scan/` is ignored by git) with its file
 and line, and keep going. Step 6 turns the leads into candidates.
 
-Done when you have read every changed surface file (as above) and as much
-of the rest as you can, and you know which files you didn't reach.
+Done when you have read every changed file of your area and as much of
+the rest of it as you can, and you know which files you didn't reach.
 
 ## Step 5: Look anywhere else that seems worth it
 
@@ -487,9 +507,10 @@ Fill it in field by field:
   PR doesn't count either way. It never says what you found, and
   both earn the same.
 - `report`: markdown, at most 20,000 characters, `\n` line endings. It
-  describes **coverage only**: what you checked, what you didn't, the tools
-  you ran and their outcome in general terms, how many candidates Step 6
-  verified and whether subagents verified them, and how long you spent
+  describes **coverage only**: the area this round covered, what you
+  checked, what you didn't, the tools you ran and their outcome in
+  general terms, how many candidates Step 6 verified and whether
+  subagents verified them, and how long you spent
   (`cat .gleam-scan/started; date -u`, then subtract). Never
   vulnerability details, not even for a low finding. "Filed 1 PR and 1
   advisory" is fine. What they are about is not.
@@ -559,6 +580,7 @@ changes if any field changes. In this order:
 3. In every draft from Step 7, replace `{{ATTESTATION_ID}}` with the id
    from the last `pnpm scan finish`. Then file it. Only a skill PR that
    Step 7 says to hold for an unfixed advisory waits.
+4. Run `pnpm scan next` and end your turn as When you're done says.
 
 If the challenge expires first, follow its Troubleshooting row and end
 your turn with the new closing message.
@@ -566,10 +588,26 @@ your turn with the new closing message.
 The id is how a finding is paid: without it, the report earns nothing.
 If the user replies with anything but "signed", or signing fails (see the
 end of Troubleshooting), don't file yet. Ask again, up to three times in
-all: resend the link, and say that reports filed without the id earn no
-award. File without the id only after the third ask, or when the user
-says to. Then the line reads `Attestation id: none (not signed)`, never
-left out.
+all: answer them in a line or two, say that reports filed without the id
+earn no award, and end the turn with the closing message `pnpm scan
+finish` printed. File without the id only after the third ask, or when the
+user says to. Then the line reads `Attestation id: none (not signed)`,
+never left out.
+
+After filing without the id, the link still works until the challenge
+expires, so end the turn with the filed links, a blank line, then this
+sign request, with the link from the last `pnpm scan finish`:
+
+```text
+1. Open this link and click Sign: <link>
+2. Reply "signed" and I'll add the attestation id to the reports so they can earn an award.
+```
+
+For a clean pass with nothing filed, line 2 is `2. Reply "signed" when
+you're done.` If the user then replies "signed", add the line
+`Attestation id: <id>` to each filed report (`gh pr edit <n> --body-file`
+with the updated draft for a PR, a comment on the advisory), then run
+`pnpm scan next` as When you're done says.
 
 **File a PR** (needs `gh` signed in to the user's GitHub account). If the
 user can push to the repository, skip the fork: `git push origin HEAD` and
@@ -658,7 +696,7 @@ illustrative; use the ones from your own challenge and checkout.
     }
   ],
   "result": "pass",
-  "report": "## Coverage\n\n- Read docs/THREAT_MODEL.md in full.\n- Ran `pnpm vitest run`: all tests passed.\n- Ran `osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml`: no advisories that Gleam's code reaches.\n- Reviewed the 6 surface files changed since v1.25.0 line by line, tiers 1-3 first.\n- Reviewed the rest of tiers 1-3 (vault, keys, key session, background, content, provider, sender).\n- Skimmed tier 4 (approval window) and tier 5 (wxt.config.ts, CI workflows).\n\n## Not covered\n\n- Tier 5 release scripts and pnpm-lock.yaml beyond osv-scanner.\n- The popup screens outside the surface.\n- Nothing run in a real browser.\n\nFiled nothing. About 2 hours.",
+  "report": "## Coverage\n\nArea: Trust boundary (tier 3).\n\n- Read docs/THREAT_MODEL.md in full.\n- Ran `pnpm vitest run`: all tests passed.\n- Ran `osv-scanner scan --config osv-scanner.toml --lockfile pnpm-lock.yaml`: no advisories that Gleam's code reaches.\n- Reviewed the 6 area files changed since v1.25.0 line by line.\n- Reviewed the rest of the area (background, content, provider, sender, dispatch).\n- Followed the provider's signing calls into tier 2 (signing pipelines).\n\n## Not covered\n\n- Tiers 1, 4 and 5 beyond those calls.\n- Nothing run in a real browser.\n\nFiled nothing. About 2 hours.",
   "release": "1.26.0",
   "commit": "84f6449691277f9af52fd0be17957541e02cd8d9"
 }
@@ -671,9 +709,54 @@ nothing about what they contain.
 ## When you're done
 
 Once the user replies "signed", file every PR and advisory without asking
-again. Then your final message is one line per filed link, and nothing
-else. If you filed nothing, it is one line: `Done.` If you couldn't file a
-draft, give it to the user ready to paste instead of its link.
+again. Then run:
+
+```bash
+pnpm scan next            # or: pnpm scan next --json
+```
+
+It prints what this round earned and the next area, then the closing
+message under `Show the user exactly this, as the last thing you write:`
+(with `--json`, `userMessage`). It moves this round's drafts, `leads.md`
+and `candidates/` to `.gleam-scan/round-<n>-<id>/`, so the next round
+starts empty.
+
+Your final message is one line per filed link, a blank line, then that
+closing message verbatim, with nothing after it. If you filed nothing,
+it is the closing message alone. If you couldn't file a draft, give it to
+the user ready to paste instead of its link, still above the closing
+message. If the user never signed, Step 8c says how the turn ends.
+
+If `pnpm scan next` keeps failing with anything but `unknown_attestation`
+after two tries, end with this instead, with `<release>` from
+`.gleam-scan/attestation.json`:
+
+```text
+Each further round of v<release> earns 10% more than the last, even with no findings. Reply "next" to scan another area.
+```
+
+On "next" after that message, run `pnpm scan next` again and use the
+area it suggests. If it still fails, run `pnpm scan start --area <id>`
+with an area you haven't scanned in this checkout. Never start without
+`--area` after a round: the server picks the least-covered area without
+knowing the wallet, and may pick one it already scanned.
+
+## Next round
+
+When the user replies "next", scan the area `pnpm scan next` suggested,
+in the same checkout:
+
+```bash
+mkdir -p .gleam-scan && date -u | tee .gleam-scan/started
+pnpm scan start --area <suggested area>
+```
+
+Skip what this checkout already did: Prerequisites, Step 2 (the threat
+model) and Step 3 (tests and osv-scanner). Their results still hold, so
+reuse them in the report. Then follow Steps 4 to 8 for the new area.
+`start` backed up the last round's attestation; copy `model` from it.
+The user signs each round, and each round files its own drafts with its
+own attestation id.
 
 ## Troubleshooting
 
@@ -688,6 +771,7 @@ Each `✗` line already says what to do. The common ones:
 | `✗ http_<code>: … with no explanation …` | Stop and tell the user; it's a bug to report. |
 | `✗ $: Gleam couldn't read the release from GitHub …` | Wait a minute, then run it again. |
 | `✗ release: Gleam hasn't published a release yet …` | Nothing to scan yet. Tell the user. |
+| `✗ area: … isn't a scan area …` | Use one of the ids it lists, or leave out `--area`. |
 | `✗ $: v<x> has fewer than 3 security functions …` | The challenge pool is broken. Tell the user. |
 | `✗ git: HEAD is … but the latest release is v<x> …` (start) | Run the `git fetch --tags && git checkout v<x> && pnpm install --frozen-lockfile` it prints, then `pnpm scan start`. |
 | `✗ git: … has no v<x.y.z> release tag` or `✗ commit: HEAD is … but the challenge is for …` (finish) | Your `HEAD` moved off the tag. Run `git checkout v<release>` in the scan checkout, then `pnpm scan finish`. |
@@ -701,13 +785,19 @@ Each `✗` line already says what to do. The common ones:
 | `✗ answers[i].line: … is 0 …`, `… is a comment`, `… is blank`, `… holds only punctuation`, `… is in the signature …`, `… is outside …`, `… closes …` | Pick another line inside the body range the message gives, one that makes a check. Count lines with `git show HEAD:<file> \| cat -n`. |
 | `✗ answers[i].check: …` | One sentence, 10 to 300 characters, one line, no leading or trailing space. |
 | `✗ answers[i].symbol: …` or `✗ answers[i]: … isn't in the challenge …` or `✗ answers: No answer names …` | Restore `file` and `symbol` exactly as `pnpm scan start` wrote them; one answer per challenge function. |
-| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start`, answer the 3 new functions, copy `model`, `result` and `report` from the backup `.gleam-scan/attestation.<old challenge id>.json`, and run `pnpm scan finish`. The id changes: end your turn with the new closing message. |
+| `✗ challenge: The challenge expired …` or `This challenge expired` / `was already used` / `id is unknown` / `was issued for …` | Run `pnpm scan start --area <area>` with the `area` from `.gleam-scan/challenge.json`, answer the 3 new functions, copy `model`, `result` and `report` from the backup `.gleam-scan/attestation.<old challenge id>.json`, and run `pnpm scan finish`. The id changes: end your turn with the new closing message. |
 | `✗ release: v<x> isn't the latest release (v<y> is) …` | A new release came out. Check out `v<y>`, run `pnpm scan start` and scan that release. |
 | `✗ attestationId: The server computed a different attestation id …` | Your checkout's scan tools are out of date. Run `git fetch --tags`, check out the latest release again, and rerun `pnpm scan finish`. |
+| `This wallet already scanned the <label> area of v<x> …` | Run the `pnpm scan start --area <id>` it names, review that area, and finish again. |
+| `This wallet has scanned every area of v<x> …` | Tell the user this wallet has scanned every area of this release; the next release opens new rounds. |
+| `✗ unknown_attestation: …` (next) | The user hasn't signed yet. End the turn with the sign request: the closing message from the last `pnpm scan finish`, or Step 8c's after-filing one if you filed already. On "signed", run `pnpm scan next` again. |
+| `✗ .gleam-scan/attestation.json: … isn't a finished attestation …` (next) | Run `pnpm scan finish` until it passes and have the user sign before `pnpm scan next`. |
 | `✗ scan: Unexpected error …` | Run it again; if it repeats, tell the user. |
 
 If the user reports an error after opening the link: "isn't registered for
 Gleam Points" means they register the wallet in Gleam → Points and sign
 again; "hasn't checked in during the last 3 days" means they open Gleam,
-then sign again; "already attested" means this wallet already attested this
-release, and another wallet or the next release is needed.
+then sign again; "already scanned the <label> area" means this wallet
+scanned that area of this release: run the `pnpm scan start --area <id>`
+the message names, scan that area, and send the new link; "has scanned
+every area" means another wallet or the next release is needed.

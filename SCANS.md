@@ -16,11 +16,14 @@ professional audit.
    before running anything:
 
    > Scan the latest Gleam release for security issues by following security/scan/SKILL.md in https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet. The skill clones the repo, installs its pnpm dependencies (which add a lefthook git hook to the checkout), runs its tests and osv-scanner, and calls the Gleam Points API at api.gleamwallet.app. It never needs a seed phrase, a real key, a wallet or funds. Ask me before any gh action: forking, pushing, opening a PR or filing an advisory.
-2. **The agent scans.** It checks out the latest release tag and runs
-   `pnpm scan start`. That fetches a challenge, saves it to
-   `.gleam-scan/challenge.json`, writes a starter
-   `.gleam-scan/attestation.json` and prints the 3 functions to answer.
-   Then the agent follows `security/scan/SKILL.md` from that checkout.
+2. **The agent scans one area.** It checks out the latest release tag
+   and runs `pnpm scan start`, or `pnpm scan start --area <id>` when you
+   name an area. That fetches a challenge for the area, saves it to
+   `.gleam-scan/challenge.json`, writes the area's files to
+   `.gleam-scan/area-files.txt` and a starter
+   `.gleam-scan/attestation.json`, and prints the area, its files and the
+   3 functions to answer. Then the agent follows `security/scan/SKILL.md`
+   from that checkout, reviewing the area's files first.
 3. **The agent reports what it finds.** PRs are the default: low or
    informational issues, hardening, and fixes to the skill. Medium and
    above go in a private GitHub advisory. Each report has a short summary
@@ -44,9 +47,58 @@ professional audit.
    links.
 6. **You get points straight away.** The window shows "+N points".
    Finding points arrive when a maintainer accepts the finding.
+7. **The agent offers another round.** After filing, it runs
+   `pnpm scan next` and ends with a short message: what this round
+   earned, what the next round earns even with no findings, and the
+   least-covered area left. Reply "next", and the agent scans that area
+   in the same checkout, skipping the setup it already did.
 
 You need a Gleam wallet registered for points. The wallet that signs
 gets the points.
+
+## Areas and rounds
+
+A scan covers one **area**: the scannable files of one tier of
+`security/surface.txt` (`SCAN_AREAS` in `packages/core/src/scan`). A
+file that several entries cover takes the lowest tier.
+
+| Area       | Label             | Tier |
+| ---------- | ----------------- | ---: |
+| `keys`     | Key material      |    1 |
+| `signing`  | Signing           |    2 |
+| `boundary` | Trust boundary    |    3 |
+| `preview`  | Approval preview  |    4 |
+| `build`    | Build and release |    5 |
+
+A wallet scans each area once per release, so it can run up to five
+**rounds** on one release. A wallet's first non-voided scan of a release
+is round 1, and each round earns 10% of the base reward more than the
+last: round 2 earns 110%, round 3 120% (`roundReward`, truncated to an
+atomic integer).
+
+`GET /scan/challenge` without `area` picks the area with the fewest
+non-voided scans on the latest release, the lower tier on a tie. It
+draws the 3 functions from that area only, and from the functions no
+scan of the release has answered yet while there are any.
+
+After the user signs, `pnpm scan next` sends the attestation id to
+`GET /scan/next`, which answers with the round, its points, what the
+next round earns, and the areas the wallet hasn't scanned, least-examined
+first. The CLI moves the round's drafts to `.gleam-scan/round-<n>-<id>/`
+and prints the closing message, for example:
+
+> Round 1 (Key material) earned 12.40 points, and round 2 earns 13.64
+> points even with no findings. Nobody has examined 97 of the 137
+> functions in Trust boundary yet. Reply "next" to scan it.
+
+With no paid place left it says round 2 is recorded but earns no
+points, and still offers it. With no area left it says the next release
+opens new rounds. Points show with two decimals below 1,000, as in the
+extension.
+
+A scan from before areas has `area` and `round` null and counts as one
+round of its release. `GET /scan/areas` gives each area's function
+count, how many of them scans have examined, and its scan count.
 
 ## The attestation
 
@@ -98,7 +150,8 @@ Gleam.
 2. `release` is the latest release and `commit` matches its tag.
 3. The challenge is unexpired and unused, and every answer passes the
    automatic check (see Proof of scan).
-4. The wallet hasn't already attested this release.
+4. The wallet hasn't already scanned this area of this release. The
+   failure names an area that is still free, or says every area is done.
 5. The release has fewer than 100 paid scans so far. If it has 100,
    the attestation is still recorded, with no points.
 
@@ -115,10 +168,11 @@ faking a scan cost about as much as doing one, and to pay little for a
 fake.
 
 **Challenge.** `pnpm scan start` calls `GET /scan/challenge`. The
-server picks 3 functions at random from the security-surface files and
-returns them with a challenge id. It picks only functions that make a
-check: their own body has an `if`, `throw` or `switch`, not counting
-nested functions, strings or comments. The challenge expires after 24 hours
+server picks 3 functions at random from the area's files and returns
+them with a challenge id and the area. The area is stored on the
+challenge, so the attestation itself doesn't name it. It picks only
+functions that make a check: their own body has an `if`, `throw` or
+`switch`, not counting nested functions, strings or comments. The challenge expires after 24 hours
 and can be used once. For each function, the agent names the line of a
 security check that function makes, and says in one sentence what the
 check prevents.
@@ -143,8 +197,8 @@ place.
 
 **Limited payoff.** A scan earns a small, fixed amount, and only 100
 scans are paid per release, all but the first 20 at a fifth of the
-rate. Finding real problems pays far more, and
-that can't be faked.
+rate. Each further round adds only 10% of that amount. Finding real
+problems pays far more, and that can't be faked.
 
 ## Points
 
@@ -156,7 +210,9 @@ previous day's total holding points**, and scans 21 to 100 earn
 **0.02%**, credited as soon as they're accepted. The tail keeps
 clean scans worth reporting after the first 20 without letting total
 spend grow with the number of scans. After 100, scans are still
-recorded and shown but earn nothing. A scan that earns no points, such as one made before the
+recorded and shown but earn nothing. Each round takes a place like any
+other scan, and earns the place's amount times its round multiplier
+(Areas and rounds). A scan that earns no points, such as one made before the
 first daily snapshot, doesn't use up a paid place. `scan.html`,
 `review-results.html` and the extension's Points screen show how many paid
 places are left. `pass` and `scanned` earn the same, and so
@@ -234,14 +290,17 @@ scanning agent itself) follows to try to disprove one finding and rate
 what survives, and [`REPORT.md`](security/scan/REPORT.md), the shape and
 style of an advisory or PR body. In summary:
 
-1. Check out the latest release tag and run `pnpm scan start`. It saves
-   `.gleam-scan/challenge.json` and a starter `.gleam-scan/attestation.json`.
+1. Check out the latest release tag and run `pnpm scan start`, with
+   `--area <id>` when the user names an area. It saves
+   `.gleam-scan/challenge.json`, the area's files and a starter
+   `.gleam-scan/attestation.json`.
 2. Read `docs/THREAT_MODEL.md` first. Its attackers, out-of-scope list
    and By design entries are given. Where the docs and the code
    disagree, the code is right; fix the docs in a PR.
 3. Run the tests and `osv-scanner`.
-4. Review the files in `security/surface.txt` that changed since the
-   last release, then the rest of the surface, with `CHECKS.md`.
+4. Review the area's files that changed since the last release, then
+   the rest of the area, following anything they reach, with
+   `CHECKS.md`.
 5. Look anywhere else that seems worth it. The surface is where to
    start, not the limit.
 6. Try to disprove each finding with `VERIFY.md`, in a fresh subagent
@@ -261,8 +320,11 @@ style of an advisory or PR body. In summary:
    passes, and end the turn with the closing message it prints: the
    link, and a request to reply "signed" so it can open the PRs and
    advisories. Nothing comes after it. Once
-   the user has signed, file each draft with the attestation id, then
-   list one link per line.
+   the user has signed, file each draft with the attestation id, run
+   `pnpm scan next`, and list one link per line above its closing
+   message. On "next", start the suggested area with
+   `pnpm scan start --area <id>` in the same checkout and repeat from
+   step 4.
 
 **Report like a working security engineer:**
 
@@ -305,8 +367,9 @@ introduction for someone new to reviews:
    and `GET /attestations/count`). Every figure can be checked on
    `review-results.html`. The row is hidden until all of them arrive.
 3. **Review a release:** the line to paste, the four steps, what you
-   need, and the review rewards with paid places left and what the next
-   review earns (`GET /scan/rewards`).
+   need, the areas with how much of each is examined (`GET /scan/areas`),
+   and the review rewards with paid places left, what the next review
+   earns and the 10% step per round (`GET /scan/rewards`).
 4. **Reporting vulnerabilities:** private reporting on GitHub, the
    bounty pool's balance, and the bounty rules, with severity set by
    the criteria in `SECURITY.md`.
@@ -319,12 +382,12 @@ Without the live figures it still shows the rules.
 the latest. A `#<attestation id>` opens that entry. It shows:
 
 - **Coverage.** For example, "41 of 64 security functions examined by
-  at least one review", with the functions no one has examined yet
-  listed. The figure comes from the challenge answers, which the server
+  at least one review", split by area, with the functions no one has
+  examined yet listed. The figure comes from the challenge answers, which the server
   has already checked against the code, so a made-up model label can't
   raise it.
-- **Attestations.** Each with its model label, result, date and
-  report.
+- **Attestations.** Each with its area, round, model label, result,
+  date and report.
 - **Models not yet used.** For example, "Not yet used on v1.4: Gemini
   3, DeepSeek V4, Qwen 3". These are names from a short list in
   `apps/site` that aren't among the release's labels. Next to it: *A

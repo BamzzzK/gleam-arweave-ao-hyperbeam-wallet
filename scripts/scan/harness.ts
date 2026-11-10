@@ -19,15 +19,27 @@ export const CHALLENGE = {
   challenge: CHALLENGE_ID,
   release: "1.4.0",
   commit: COMMIT,
+  area: "keys",
   functions: FUNCTIONS,
   expiresAt: "2026-10-17T00:00:00.000Z",
 };
 
-export function fakeGit(state: { head?: string; tags?: string[]; files?: Record<string, string> } = {}): GitRunner {
-  const { head = COMMIT, tags = ["v1.4.0"], files = { "pkg/a.ts": SOURCE, "pkg/b.ts": SOURCE, "pkg/c.ts": SOURCE } } = state;
+export const SURFACE = "# tiers\n1 pkg/\n";
+
+/** `files` are readable with `git show`; `ls-files` lists them plus `paths` (files the test never reads). */
+export function fakeGit(
+  state: { head?: string; tags?: string[]; files?: Record<string, string>; paths?: string[] } = {},
+): GitRunner {
+  const {
+    head = COMMIT,
+    tags = ["v1.4.0"],
+    files = { "pkg/a.ts": SOURCE, "pkg/b.ts": SOURCE, "pkg/c.ts": SOURCE, "security/surface.txt": SURFACE },
+    paths = [],
+  } = state;
   return async (args) => {
     if (args[0] === "rev-parse") return `${head}\n`;
     if (args[0] === "tag") return tags.join("\n");
+    if (args[0] === "ls-files") return [...Object.keys(files), ...paths].join("\n");
     if (args[0] === "show") {
       const [commit, ...file] = args[1]!.split(":");
       const text = commit === COMMIT || commit === head ? files[file.join(":")] : undefined;

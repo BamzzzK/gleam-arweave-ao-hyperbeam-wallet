@@ -1,10 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { ChallengeFunction } from "../../packages/core/src/scan/index.ts";
+import { isScanAreaId, type ChallengeFunction, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
 
 export const SCAN_DIR = ".gleam-scan";
 export const CHALLENGE_FILE = `${SCAN_DIR}/challenge.json`;
 export const ATTESTATION_FILE = `${SCAN_DIR}/attestation.json`;
+/** The round's area files, one per line, so the skill's shell commands can take them as pathspecs. */
+export const AREA_FILES_FILE = `${SCAN_DIR}/area-files.txt`;
 /** Epoch milliseconds of the last `pnpm scan start`, so `finish` can report the elapsed time. */
 export const STARTED_FILE = `${SCAN_DIR}/started-at`;
 
@@ -31,13 +33,15 @@ export interface ChallengeResponse {
   challenge: string;
   release: string;
   commit: string;
+  /** The area the functions were drawn from; the scan reviews that area's files first. */
+  area: ScanAreaId;
   functions: ChallengeFunction[];
   expiresAt: string;
 }
 
 export interface Outcome {
   ok: boolean;
-  command: "start" | "finish";
+  command: "start" | "finish" | "next";
   /** Human lines printed after the issues (or alone on success). */
   lines: string[];
   issues: Problem[];
@@ -86,6 +90,7 @@ export function isChallengeResponse(value: unknown): value is ChallengeResponse 
     typeof v.release === "string" &&
     typeof v.commit === "string" &&
     typeof v.expiresAt === "string" &&
+    isScanAreaId(v.area) &&
     Array.isArray(v.functions) &&
     v.functions.every((fn) => {
       const f = fn as Record<string, unknown> | null;

@@ -264,7 +264,7 @@ describe("pnpm scan finish: server and output", () => {
   it("rejects an unknown subcommand with usage", async () => {
     const out: string[] = [];
     expect(await main(["bogus"], makeDeps(), { out: (t) => out.push(t), tty: false })).toBe(1);
-    expect(out[0]).toContain("Usage: pnpm scan start | pnpm scan finish [--json]");
+    expect(out[0]).toContain("Usage: pnpm scan start [--area <id>] | pnpm scan finish | pnpm scan next [--json]");
   });
 });
 
