@@ -203,7 +203,7 @@ const FALLBACK = {
   "no-extension": "Gleam isn't installed in this browser, so it can't sign this attestation.",
   interrupted: "Gleam stopped answering before it finished. Your attestation was not recorded as far as this page can tell, so try again.",
   "no-wallet": "Gleam has no wallet registered for points. Create one in Gleam, join Gleam Points, then come back to this link.",
-  already: "This wallet already attested this release. Each wallet attests a release once.",
+  already: "This wallet already scanned this area of the release. Each wallet scans an area once per release.",
   superseded: "A newer release is out, so this scan can't be signed. Ask your agent to scan the latest release.",
   expired: "This scan can't be signed any more. Ask your agent to start a new one.",
   busy: "Gleam is already showing an attestation to sign. Finish or close that window, then try again.",
@@ -416,6 +416,86 @@ function isListing(body) {
   );
 }
 
+// --- Areas and rounds --------------------------------------------------------
+
+/** The areas a release is scanned in, one per surface tier; the same as `SCAN_AREAS` in `@gleam/core/scan`. */
+export const SCAN_AREAS = [
+  { id: "keys", tier: 1, label: "Key material" },
+  { id: "signing", tier: 2, label: "Signing" },
+  { id: "boundary", tier: 3, label: "Trust boundary" },
+  { id: "preview", tier: 4, label: "Approval preview" },
+  { id: "build", tier: 5, label: "Build and release" },
+];
+
+/** How much more each further round of a release earns, in percent of round 1; the same as `@gleam/core/scan`. */
+export const ROUND_STEP_PERCENT = 10;
+
+/** The step a `GET /scan/rewards` body names, or the built-in one when it names none. */
+export function roundStepPercent(rewards) {
+  const step = rewards && rewards.roundStepPercent;
+  return Number.isInteger(step) && step >= 0 && step <= 1000 ? step : ROUND_STEP_PERCENT;
+}
+
+/** An attestation's area as a label. Null is a scan from before areas, which covered the whole surface. */
+export function areaLabel(id) {
+  if (id === null || id === undefined) return "Whole surface";
+  const known = SCAN_AREAS.find((area) => area.id === id);
+  return known ? known.label : String(id);
+}
+
+/** "Round 2", or null for a scan from before rounds. */
+export function roundLabel(round) {
+  return Number.isInteger(round) && round > 0 ? `Round ${round}` : null;
+}
+
+const COUNT = (value) => Number.isInteger(value) && value >= 0;
+
+function isAreaRow(row) {
+  return row !== null && typeof row === "object" && typeof row.id === "string" && typeof row.label === "string";
+}
+
+function isAreas(body) {
+  return (
+    body !== null &&
+    typeof body === "object" &&
+    typeof body.release === "string" &&
+    Array.isArray(body.areas) &&
+    body.areas.every((row) => isAreaRow(row) && COUNT(row.functions) && COUNT(row.examined) && COUNT(row.scans))
+  );
+}
+
+/**
+ * Reads `GET /scan/areas`: how much of each area of the latest release has been
+ * examined. Settles with `{ ok: true, areas }` or `{ ok: false, … }`.
+ */
+export async function fetchAreas(fetchImpl, { signal } = {}) {
+  const result = await getJson(fetchImpl, "/scan/areas", signal, isAreas);
+  return result.ok ? { ok: true, areas: result.body } : result;
+}
+
+/**
+ * The rows of an area coverage table: `{ label, examined, total, share, scans }`,
+ * `scans` null when the source doesn't count them. Takes `/scan/areas` rows
+ * (`functions`) or a listing's `coverage.byArea` (`total`); null when there's nothing to show.
+ */
+export function areaRows(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const out = [];
+  for (const row of rows) {
+    if (!isAreaRow(row)) return null;
+    const total = row.functions !== undefined ? row.functions : row.total;
+    if (!COUNT(total) || !COUNT(row.examined)) return null;
+    out.push({
+      label: row.label,
+      examined: row.examined,
+      total,
+      share: total > 0 ? Math.min(1, row.examined / total) : 0,
+      scans: COUNT(row.scans) ? row.scans : null,
+    });
+  }
+  return out;
+}
+
 /** "41 of 64 security functions examined by at least one scan", or null before the server has a figure. */
 export function coverageSummary(coverage) {
   if (!coverage || !Number.isInteger(coverage.examined) || !Number.isInteger(coverage.total) || coverage.total <= 0) return null;
@@ -424,5 +504,6 @@ export function coverageSummary(coverage) {
     share,
     text: `${coverage.examined} of ${coverage.total} security functions examined by at least one scan`,
     unexamined: Array.isArray(coverage.unexamined) ? coverage.unexamined : null,
+    byArea: areaRows(coverage.byArea),
   };
 }

@@ -304,6 +304,21 @@
 .tiers .num { text-align: right; }
 .tiers-amount { color: var(--muted); }
 
+/* Coverage by area: rows separated by spacing alone; a thin track per row shows where nobody has looked. */
+
+.areas-block { margin-top: 40px; }
+.areas-block h3 { margin-top: 0; }
+.areas { width: 100%; max-width: 520px; border-collapse: collapse; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.areas th, .areas td { padding: 7px 16px 7px 0; text-align: left; vertical-align: top; }
+.areas tr > :last-child { padding-right: 0; }
+.areas thead th { padding-top: 0; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.areas tbody th { font-weight: 500; }
+.areas .num { text-align: right; }
+.areas-examined { width: 45%; }
+.areas-bar { display: block; height: 4px; margin: 6px 0 0; border-radius: 2px; background: var(--line); overflow: hidden; }
+.areas-bar span { display: block; height: 100%; background: var(--fg); border-radius: 2px; }
+.areas-results { margin: 20px 0 0; }
+
 /* Questions */
 
 .faq details { border-top: 1px solid var(--line); }

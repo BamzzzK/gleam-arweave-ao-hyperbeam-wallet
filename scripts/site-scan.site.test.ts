@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   FULL_REWARD_SCANS as CORE_FULL_REWARD_SCANS,
   PAID_SCANS_PER_RELEASE as CORE_PAID_SCANS_PER_RELEASE,
+  ROUND_STEP_PERCENT as CORE_ROUND_STEP_PERCENT,
+  SCAN_AREAS as CORE_SCAN_AREAS,
   encodeAttestationPayload,
 } from "../packages/core/src/scan/index";
 import {
@@ -11,12 +13,17 @@ import {
   EXTENSION_ID,
   FULL_REWARD_SCANS,
   PAID_SCANS_PER_RELEASE,
+  ROUND_STEP_PERCENT,
+  SCAN_AREAS,
   STORE_EXTENSION_ID,
+  areaLabel,
+  areaRows,
   bountyTiers,
   coverageSummary,
   extensionIdFor,
   decodeAttestationFragment,
   describeOutcome,
+  fetchAreas,
   fetchCount,
   fetchListing,
   fetchRewards,
@@ -26,6 +33,8 @@ import {
   nextScanReward,
   releaseFromSearch,
   resultsHref,
+  roundLabel,
+  roundStepPercent,
   sendAttestation,
   checkGleam,
   unusedModels,
@@ -41,13 +50,13 @@ const attestation = {
   report: "Checked the signer. Didn't look at é <img src=x onerror=alert(1)> or the popup.",
 };
 
-describe("attest.html", () => {
-  it("has every element attest.js looks up", () => {
-    const script = readFileSync("apps/site/attest.js", "utf8");
-    const page = readFileSync("apps/site/attest.html", "utf8");
+describe("site pages", () => {
+  it.each(["attest", "scan", "review-results"])("%s.html has every element its script looks up", (name) => {
+    const script = readFileSync(`apps/site/${name}.js`, "utf8");
+    const page = readFileSync(`apps/site/${name}.html`, "utf8");
     const attributes = [...script.matchAll(/\$\("\[(data-[a-z-]+)\]"\)/g)].map(([, attribute]) => attribute!);
     expect(attributes.length).toBeGreaterThan(0);
-    // A lookup that misses throws before the page wires up its button.
+    // A lookup that misses throws before the page wires up the rest.
     expect(attributes.filter((attribute) => !page.includes(attribute))).toEqual([]);
   });
 });
@@ -313,10 +322,68 @@ describe("site scan lib: the points API", () => {
       share: 41 / 64,
       text: "41 of 64 security functions examined by at least one scan",
       unexamined: [{ file: "a.ts", symbol: "f" }],
+      byArea: null,
     });
     expect(coverageSummary({ examined: 3, total: 4, unexamined: null })!.unexamined).toBeNull();
+    const byArea = [{ id: "keys", label: "Key material", examined: 3, total: 4 }];
+    expect(coverageSummary({ examined: 3, total: 4, unexamined: [], byArea })!.byArea).toEqual([
+      { label: "Key material", examined: 3, total: 4, share: 0.75, scans: null },
+    ]);
     expect(coverageSummary(null)).toBeNull();
     expect(coverageSummary({ examined: 0, total: 0, unexamined: [] })).toBeNull();
+  });
+});
+
+describe("site scan lib: areas and rounds", () => {
+  const reply = (status: number, body: unknown) => vi.fn(async () => ({ ok: status < 400, status, json: async () => body }) as Response);
+  const areas = {
+    release: "1.44.0",
+    areas: [
+      { id: "keys", label: "Key material", tier: 1, functions: 20, examined: 5, scans: 2 },
+      { id: "build", label: "Build and release", tier: 5, functions: 0, examined: 0, scans: 0 },
+    ],
+  };
+
+  it("matches core's areas and round step", () => {
+    expect(SCAN_AREAS).toEqual(CORE_SCAN_AREAS);
+    expect(ROUND_STEP_PERCENT).toBe(CORE_ROUND_STEP_PERCENT);
+  });
+
+  it("reads the round step from the rewards, falling back to the built-in one", () => {
+    expect(roundStepPercent({ roundStepPercent: 15 })).toBe(15);
+    expect(roundStepPercent({})).toBe(10);
+    expect(roundStepPercent({ roundStepPercent: "10" })).toBe(10);
+    expect(roundStepPercent(null)).toBe(10);
+  });
+
+  it("names an attestation's area and round", () => {
+    expect(areaLabel("boundary")).toBe("Trust boundary");
+    expect(areaLabel(null)).toBe("Whole surface");
+    expect(areaLabel(undefined)).toBe("Whole surface");
+    expect(areaLabel("<b>new</b>")).toBe("<b>new</b>");
+    expect(roundLabel(2)).toBe("Round 2");
+    expect(roundLabel(null)).toBeNull();
+    expect(roundLabel(0)).toBeNull();
+  });
+
+  it("reads per-area coverage", async () => {
+    const fetchImpl = reply(200, areas);
+    expect(await fetchAreas(fetchImpl)).toEqual({ ok: true, areas });
+    expect(fetchImpl.mock.calls[0]![0]).toBe("https://api.gleamwallet.app/scan/areas");
+    expect(await fetchAreas(reply(200, { ...areas, areas: [{ ...areas.areas[0], scans: -1 }] }))).toMatchObject({ ok: false });
+    expect(await fetchAreas(reply(200, { release: "1.44.0" }))).toMatchObject({ ok: false });
+    expect(await fetchAreas(reply(404, { error: "Not found." }))).toEqual({ ok: false, status: 404, error: "Not found." });
+  });
+
+  it("shapes area rows from either source", () => {
+    expect(areaRows(areas.areas)).toEqual([
+      { label: "Key material", examined: 5, total: 20, share: 0.25, scans: 2 },
+      { label: "Build and release", examined: 0, total: 0, share: 0, scans: 0 },
+    ]);
+    expect(areaRows([{ id: "keys", label: "Key material", examined: 9, total: 4 }])![0]!.share).toBe(1);
+    expect(areaRows(null)).toBeNull();
+    expect(areaRows([])).toBeNull();
+    expect(areaRows([{ id: "keys", label: "Key material", examined: 1.5, total: 4 }])).toBeNull();
   });
 });
 
