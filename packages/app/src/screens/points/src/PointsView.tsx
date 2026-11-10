@@ -24,6 +24,7 @@ import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
 import { useCountUp } from "./useCountUp";
+import { useFlash } from "./useFlash";
 import { useScanStats } from "./useScanStats";
 import {
   useJoinPoints,
@@ -166,13 +167,22 @@ function JoinedView({
   const prompt = useSharePrompt({ runtime, wallet, score });
   // The join welcome belongs to the standing; the other prompts are news about the invites.
   const welcome = prompt?.kind === "joined" ? prompt.text : null;
-  const status = (welcome ? null : prompt?.text) ?? (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : null);
+  // The count shows only right after a copy, then fades; at rest the line carries prompt news.
+  const countNote = useFlash();
+  const status =
+    countNote.phase !== "hidden" && seatsLeft !== null ? invitesRemainingLine(seatsLeft) : welcome ? null : (prompt?.text ?? null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
 
   return (
     <div className="flex flex-1 flex-col gap-9 px-6 phone:px-5 pb-6 pt-6">
-      <Standing score={score} total={formatPoints(total.shown)} highlighted={total.highlighted} welcome={welcome} />
+      <Standing
+        score={score}
+        total={formatPoints(total.shown)}
+        highlighted={total.highlighted}
+        welcome={welcome}
+        holdsNothing={standing.holdsNothing}
+      />
 
       {standing.linkedElsewhere ? (
         <ReconnectNotice runtime={runtime} wallet={wallet} />
@@ -182,27 +192,41 @@ function JoinedView({
             <h2 id="ways-to-earn" className="text-body text-foreground">
               {t("points.waysToEarn")}
             </h2>
-            <div className="flex flex-col gap-6 rounded-xl bg-mist px-5 py-5">
-              <EarnItem label={t("points.invite")} title={t("points.inviteFriend")}>
+            <div className="flex flex-col gap-6 rounded-xl bg-mist p-4">
+              <EarnItem label={t("points.invite")}>
                 <p className="text-label text-muted">
                   {t("points.referralBefore")}
                   {REFERRAL_PERCENT}%{t("points.referralAfter")}
                 </p>
-                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  {full ? null : (
+                {full ? (
+                  <p className="mt-1.5 text-label text-foreground">{t("points.invitesFull")}</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <button
                       type="button"
                       className={cn(ACTION_LINK, copied && "text-positive")}
                       onClick={() => {
                         copy();
                         prompt?.finish();
+                        countNote.flash();
                       }}
                     >
-                      {copied ? t("points.copied") : t("points.copyInvite")}
+                      {copied ? t("points.copied") : t("points.inviteFriend")}
+                      {copied ? <CheckIcon /> : <CopyIcon />}
                     </button>
-                  )}
-                  {status ? <span className="text-label text-muted">{status}</span> : null}
-                </div>
+                    {status ? (
+                      <span
+                        role="status"
+                        className={cn(
+                          "text-label text-muted transition-opacity duration-700 motion-reduce:transition-none",
+                          countNote.phase === "fading" && "opacity-0",
+                        )}
+                      >
+                        {status}
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               </EarnItem>
               <ReviewItem runtime={runtime} />
             </div>
@@ -227,8 +251,9 @@ function JoinedView({
 }
 
 /**
- * The place leads because it's what a member acts on; the total and
- * percentile sit under it as context. Before the first snapshot ranks the
+ * The place leads because it's what a member acts on, with the gap to the
+ * next place under it. The total reads as a balance in the top corner and
+ * turns into the percentile on a tap, so only one of them is on screen. Before the first snapshot ranks the
  * wallet, the total leads instead, with the join welcome in the line the
  * gap to the next rank uses later.
  */
@@ -237,11 +262,13 @@ function Standing({
   total,
   highlighted,
   welcome,
+  holdsNothing,
 }: {
   score: PointsWalletScore | null | undefined;
   total: string;
   highlighted: boolean;
   welcome: string | null;
+  holdsNothing: boolean;
 }) {
   const t = useT();
   const rank = score?.rank ?? null;
@@ -249,25 +276,59 @@ function Standing({
     rank !== null && score?.pointsToNextRankAtomic != null
       ? t("points.toNextRank", { amount: formatPoints(score.pointsToNextRankAtomic), next: rank - 1 })
       : null;
-  // The leader skips "Top N%" because an only ranked wallet is also "Top 100%".
-  const percent = rank !== 1 && score?.topPercent != null ? t("points.top", { percent: score.topPercent }) : null;
   const totalText = (
-    <span className={cn("font-mono tabular-nums transition-colors duration-700 motion-reduce:transition-none", highlighted && "text-positive")}>
+    <span className={cn("tabular-nums transition-colors duration-700 motion-reduce:transition-none", highlighted && "text-positive")}>
       {total}
     </span>
   );
+  // The leader skips "Top N%" because an only ranked wallet is also "Top 100%".
+  const percent = rank !== 1 && score?.topPercent != null ? t("points.top", { percent: score.topPercent }) : null;
+  const [showPercent, setShowPercent] = useState(false);
   const line = welcome ?? toNext;
 
   return (
-    <section aria-label={t("points.standing")} className="flex flex-col gap-2">
+    <section aria-label={t("points.standing")} className="relative flex flex-col gap-2">
+      <Beam className="mb-2 w-10" />
       {rank !== null ? (
-        <p className="font-mono text-[44px] font-light leading-none tracking-[-0.04em] tabular-nums text-foreground">
-          {t("points.rank", { rank })}
-        </p>
+        <>
+          <p className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">
+            {t("points.rank", { rank })}
+          </p>
+          {/* After the rank in reading order, drawn on the beam's row. */}
+          <div className="absolute right-0 top-[1.5px] -translate-y-1/2 text-body text-muted">
+            {percent ? (
+              // The dashed underline says the figure has another reading: the percentile.
+              <button
+                type="button"
+                aria-pressed={showPercent}
+                onClick={() => setShowPercent((value) => !value)}
+                className="underline decoration-line decoration-dashed underline-offset-4 hover:text-foreground hover:decoration-faint phone:min-h-11"
+              >
+                {showPercent ? (
+                  percent
+                ) : (
+                  <>
+                    <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
+                    <span aria-hidden="true">
+                      {totalText} {t("points.unit")}
+                    </span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <p>
+                <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
+                <span aria-hidden="true">
+                  {totalText} {t("points.unit")}
+                </span>
+              </p>
+            )}
+          </div>
+        </>
       ) : (
         <p className="flex items-baseline gap-2 text-foreground">
           <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-          <span aria-hidden="true" className="text-[44px] font-light leading-none tracking-[-0.04em]">
+          <span aria-hidden="true" className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em]">
             {totalText}
           </span>
           <span aria-hidden="true" className="text-body text-muted">
@@ -276,17 +337,8 @@ function Standing({
         </p>
       )}
       {line ? <p className="text-h3 text-foreground">{line}</p> : null}
-      {rank !== null ? (
-        <p className="text-body text-muted">
-          <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
-          <span aria-hidden="true">
-            {totalText} {t("points.unit")}
-          </span>
-          {percent ? <span aria-hidden="true" className="px-1.5 text-faint">·</span> : null}
-          {percent ? <span>{percent}</span> : null}
-        </p>
-      ) : score ? (
-        <p className="text-body text-muted">{t("points.unrankedHint")}</p>
+      {rank === null && score ? (
+        <p className="text-body text-muted">{t(holdsNothing ? "points.holdToEarn" : "points.unrankedHint")}</p>
       ) : null}
       {score?.originalFounder ? <p className="text-label text-faint">{t("points.earlyMember")}</p> : null}
     </section>
@@ -319,19 +371,18 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
   );
 }
 
-/** One way to earn: its title, what it pays, then its action. */
-function EarnItem({ label, title, children }: { label: string; title: string; children: ReactNode }) {
+/** One way to earn: what it pays, then its action, which names it. */
+function EarnItem({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section aria-label={label} className="flex flex-col gap-1">
-      <h3 className="text-body text-foreground">{title}</h3>
       {children}
     </section>
   );
 }
 
-/** Earn actions are underlined text, so nothing competes with the place above. */
+/** Earn actions are text, not buttons, so nothing competes with the place above. */
 const ACTION_LINK =
-  "self-start text-body text-foreground underline decoration-faint underline-offset-4 hover:decoration-foreground";
+  "self-start text-body font-medium text-foreground hover:underline phone:min-h-11";
 
 /**
  * Reviews need a registered wallet, so only members see this. The button
@@ -348,7 +399,7 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const paying = placesLeft !== null && placesLeft > 0;
 
   return (
-    <EarnItem label={t("points.review")} title={t("points.reviewRelease")}>
+    <EarnItem label={t("points.review")}>
       <p className="text-label text-muted">
         <span>
           {paying && rewardAtomic
@@ -529,5 +580,25 @@ function DeviceApprovalNote() {
     <p role="status" className="text-center text-caption text-muted">
       {t("points.deviceApproval")}
     </p>
+  );
+}
+
+/** Sized and aligned to sit after an earn action's text, like the scan link's ↗. */
+const ACTION_ICON = "ml-1.5 inline-block align-[-0.125em]";
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={ACTION_ICON}>
+      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={ACTION_ICON}>
+      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

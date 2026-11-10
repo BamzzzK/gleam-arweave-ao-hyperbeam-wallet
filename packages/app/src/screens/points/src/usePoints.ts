@@ -137,6 +137,8 @@ export type PointsStanding =
       /** Settled total projected forward to now; ticks while mounted. */
       estimateAtomic: string;
       dailyRateAtomic: string;
+      /** This wallet's balances loaded with no AR or AO, so no snapshot will credit it. */
+      holdsNothing: boolean;
     };
 
 /**
@@ -181,7 +183,9 @@ export function usePointsStanding(runtime: RuntimePort, wallet: WalletSummary): 
 
   const linkedElsewhere = scores.data != null && score === null;
 
-  return { status: "joined", membership, score, linkedElsewhere, estimateAtomic, dailyRateAtomic };
+  const holdsNothing = balances[0]?.isSuccess === true && ownRaw === 0n;
+
+  return { status: "joined", membership, score, linkedElsewhere, estimateAtomic, dailyRateAtomic, holdsNothing };
 }
 
 function rawOf(balances: WalletBalances | undefined): bigint {

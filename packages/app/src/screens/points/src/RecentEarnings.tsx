@@ -33,7 +33,7 @@ export function RecentEarnings({
   const label = (row: PointsRecentEntry): { title: string; detail: string | null } => {
     switch (row.kind) {
       case "holding":
-        return { title: t("points.sourceHolding"), detail: t("points.sourceHoldingDetail") };
+        return { title: t("points.sourceHolding"), detail: null };
       case "invited":
         return { title: t("points.sourceInvited"), detail: null };
       case "founder":
@@ -61,22 +61,19 @@ export function RecentEarnings({
         aria-expanded={open}
         aria-controls="points-recent"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-baseline justify-between gap-4 py-1 text-body text-foreground"
+        className="flex items-baseline justify-between gap-4 py-1 text-body text-foreground phone:min-h-11 phone:items-center"
       >
         <span className="flex items-center gap-1.5">
           {t("points.recent")}
           <ChevronIcon open={open} />
         </span>
-        <span className="font-mono text-label tabular-nums">+{formatPoints(sum.toString())}</span>
+        <span className="text-label font-medium tabular-nums">+{formatPoints(sum.toString())}</span>
       </button>
       {open ? (
         <div id="points-recent" className="flex flex-col gap-5">
           {days.map((day) => (
             <section key={day.day} aria-label={t(`points.${day.day}`)} className="flex flex-col gap-1">
-              <h3 className="flex justify-between text-label text-muted">
-                <span>{t(`points.${day.day}`)}</span>
-                <span className="font-mono tabular-nums">+{formatPoints(day.totalAtomic)}</span>
-              </h3>
+              <h3 className="text-label text-muted">{t(`points.${day.day}`)}</h3>
               <ul className="flex flex-col">
                 {day.rows.map((row, index) => {
                   const { title, detail } = label(row);
@@ -91,7 +88,7 @@ export function RecentEarnings({
                         {detail ? <span className="text-label text-muted">{detail}</span> : null}
                       </span>
                       {"amountAtomic" in row ? (
-                        <span className="whitespace-nowrap font-mono text-label tabular-nums text-foreground">
+                        <span className="whitespace-nowrap text-body tabular-nums text-foreground">
                           +{formatPoints(row.amountAtomic)}
                         </span>
                       ) : null}
