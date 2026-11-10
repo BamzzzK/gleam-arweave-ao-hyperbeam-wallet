@@ -197,7 +197,7 @@ export function WalletDetailView({
                 {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
               </button>
             </div>
-            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
           </div>
         </div>
 
