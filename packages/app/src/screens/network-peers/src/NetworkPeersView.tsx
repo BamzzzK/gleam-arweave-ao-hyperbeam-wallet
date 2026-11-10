@@ -384,7 +384,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     setNewGatewayUrl(event.target.value);
                     setGatewayError(null);
                   }}
-                  className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+                  className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                 />
                 {gatewayError ? (
                   <span role="alert" className="text-caption text-warning">
@@ -516,7 +516,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         setNewPeerUrl(event.target.value);
                         setAddError(null);
                       }}
-                      className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+                      className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                     />
                     {addError ? (
                       <span role="alert" className="text-caption text-warning">

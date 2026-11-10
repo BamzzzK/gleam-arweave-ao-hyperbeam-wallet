@@ -100,7 +100,7 @@ export function Import({ onBack, onValidJWK }: ImportProps) {
             if (event.target.value.trim().length > 0) tryParse(event.target.value);
           }}
           placeholder='{"kty":"RSA","n":"…'
-          className="min-h-[84px] resize-none rounded-md border border-line bg-background p-3 font-mono text-caption leading-relaxed text-foreground placeholder:font-sans placeholder:text-faint focus:border-foreground focus:outline-none"
+          className="min-h-[84px] resize-none rounded-md border border-line bg-background p-3 font-mono text-caption leading-relaxed text-foreground placeholder:font-sans placeholder:text-faint focus:border-foreground/25 focus:outline-none"
         />
 
         <ScreenFooter className="mt-8">

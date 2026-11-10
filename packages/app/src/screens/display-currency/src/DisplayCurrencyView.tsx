@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { FIAT_CURRENCIES, TOKEN_CURRENCIES, type DisplayCurrency, type RuntimePort } from "@gleam/core";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
 import { OptionSection } from "@gleam/ui/src/primitives/option-list.tsx";
-import { TextField } from "@gleam/ui/src/primitives/text-field.tsx";
+import { SearchField } from "@gleam/ui/src/primitives/search-field.tsx";
 import { useDisplaySettings } from "../../../display-settings";
 import { useLocale, useT } from "../../../i18n";
 
@@ -94,8 +94,7 @@ export function DisplayCurrencyView({ runtime, onBack }: DisplayCurrencyViewProp
       <ScreenHeader title={t("displayCurrency.title")} onBack={onBack} />
 
       <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
-        <TextField
-          type="search"
+        <SearchField
           aria-label={t("displayCurrency.searchLabel")}
           placeholder={t("displayCurrency.searchPlaceholder")}
           value={query}

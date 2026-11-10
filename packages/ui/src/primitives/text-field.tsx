@@ -39,7 +39,7 @@ export const TextField = React.forwardRef<HTMLInputElement, TextFieldProps>(
           aria-invalid={Boolean(errorMessage)}
           aria-describedby={errorId}
           className={cn(
-            "w-full rounded-md border border-line bg-background px-3.5 py-3 text-body text-foreground placeholder:text-faint focus:border-foreground focus:outline-none",
+            "w-full border-0 border-b border-line bg-transparent px-0 py-3 text-body text-foreground placeholder:text-faint focus:outline-none",
             errorMessage && "border-warning",
             className,
           )}
