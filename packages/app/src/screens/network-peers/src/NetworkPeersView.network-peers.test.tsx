@@ -353,6 +353,23 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(screen.getByRole("switch", { name: "Enable state.forward.computer" })).toBeTruthy();
   });
 
+  it("shows a lookalike peer's whole host, port included, wrapped rather than cut", async () => {
+    const lookalike = "state.forward.computer.aaaaaaaaaaaaaa.evil.com:8443";
+    const send = vi.fn().mockResolvedValueOnce({
+      gatewayUrl: "https://arweave.net",
+      peers: [
+        { url: "https://state.forward.computer", enabled: true },
+        { url: `https://${lookalike}`, enabled: true },
+      ],
+      activePeerUrl: "https://state.forward.computer",
+    } satisfies NetworkSettings);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    const host = await screen.findByText(lookalike);
+    expect(host.className).toContain("break-all");
+    expect(host.className).not.toContain("truncate");
+  });
+
   it("adding a peer requests permission for its origin, and on grant normalizes the URL and appends it enabled by default", async () => {
     permissionsRequest.mockResolvedValue(true);
     const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
