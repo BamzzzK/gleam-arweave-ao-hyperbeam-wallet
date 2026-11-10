@@ -342,7 +342,7 @@ describe("PointsView", () => {
 
     expect(screen.getByRole("region", { name: "Invite" })).toBeTruthy();
     expect(screen.queryByText("3 invites remaining")).toBeNull();
-    expect(screen.getByRole("region", { name: "Ways to earn" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "More ways to earn" })).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Invite" })).getByText(sentence("Earn an extra 10% daily for every friend who joins."))).toBeTruthy();
     const writeText = vi.fn(async () => {});
     Object.assign(navigator, { clipboard: { writeText } });
@@ -417,7 +417,7 @@ describe("PointsView", () => {
       "Invites3 friends · 10% of their points+75.00",
     ]);
     expect(recent.getByRole("link", { name: /Finding/ }).getAttribute("href")).toBe("https://github.com/o/r/pull/142");
-    const ways = screen.getByRole("region", { name: "Ways to earn" });
+    const ways = screen.getByRole("region", { name: "More ways to earn" });
     expect(ways.compareDocumentPosition(screen.getByRole("region", { name: "Recent earnings" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -467,8 +467,6 @@ describe("PointsView", () => {
 
     expect(await screen.findByText("All your invites are used. You get two more when a friend you invited joins Points.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Invite a friend" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
-    expect(screen.getByText("You get two more when a friend you invited joins Points.")).toBeTruthy();
   });
 
   it("shows why a join failed", async () => {
@@ -503,13 +501,13 @@ describe("PointsView", () => {
     const notice = within(await screen.findByRole("region", { name: "Left on another browser" }));
     expect(notice.getByRole("heading", { name: "Left on another browser" })).toBeTruthy();
     expect(screen.queryByText(/Top \d+%/)).toBeNull();
-    expect(screen.queryByRole("region", { name: "Ways to earn" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "More ways to earn" })).toBeNull();
     fireEvent.click(notice.getByRole("button", { name: "Join again" }));
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id } }),
     );
-    expect(await screen.findByRole("region", { name: "Ways to earn" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "More ways to earn" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Left on another browser" })).toBeNull();
   });
 
@@ -591,8 +589,6 @@ describe("PointsView", () => {
 
     expect(await screen.findByText("You're ranked once a daily snapshot credits your points.")).toBeTruthy();
     expect(screen.queryByText(/Rank #|Unranked|points to pass/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
-    expect(screen.getByText("Snapshots run just after midnight UTC.")).toBeTruthy();
   });
 
   it("asks an unranked wallet with no AR or AO to hold some", async () => {

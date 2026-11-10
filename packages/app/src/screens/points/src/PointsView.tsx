@@ -240,7 +240,7 @@ function JoinedView({
         </>
       )}
 
-      <AboutPoints className="mt-auto" notes={[t("points.twoMore"), t("points.snapshotTime")]}>
+      <AboutPoints className="mt-auto">
         <LeaveControl
           runtime={runtime}
           wallet={wallet}
@@ -338,6 +338,7 @@ function Standing({
         </p>
       )}
       {line ? <p className="text-h3 text-foreground">{line}</p> : null}
+      {!welcome && toNext ? <p className="text-label text-muted">{t("points.holdToClimb")}</p> : null}
       {rank === null && score ? (
         <p className="text-body text-muted">{t(holdsNothing ? "points.holdToEarn" : "points.unrankedHint")}</p>
       ) : null}
@@ -428,11 +429,9 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
  */
 function AboutPoints({
   className,
-  notes,
   children,
 }: {
   className?: string;
-  notes?: string[];
   children?: ReactNode;
 }) {
   const t = useT();
@@ -465,11 +464,6 @@ function AboutPoints({
               detail={t("points.futureDetail")}
             />
           </ul>
-          {notes?.map((note) => (
-            <p key={note} className="px-4 text-caption text-muted phone:px-0">
-              {note}
-            </p>
-          ))}
           {children ? (
             <div className="flex justify-center">{children}</div>
           ) : null}
