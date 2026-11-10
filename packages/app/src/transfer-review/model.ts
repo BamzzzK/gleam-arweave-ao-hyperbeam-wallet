@@ -43,6 +43,8 @@ export interface SignedPart {
 export interface OtherItem extends SignedPart {
   target: string | null;
   payloadHash: string;
+  /** This item is the token transfer the wallet couldn't read. */
+  unreadableTokenTransfer?: boolean;
 }
 
 export interface TransferRequest {
@@ -116,7 +118,13 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
         const { token, tokenTicker, tokenDenomination, amount, recipient } = item.transfer;
         transfers.push({ ...line(token, tokenTicker, tokenDenomination, amount, recipient), part, index });
       } else {
-        others.push({ ...part, target: item.target, payloadHash: item.payloadHash, index });
+        others.push({
+          ...part,
+          target: item.target,
+          payloadHash: item.payloadHash,
+          index,
+          ...(item.unreadableTokenTransfer ? { unreadableTokenTransfer: true } : {}),
+        });
       }
     });
     const unreadable = items.some((item) => item.unreadableTokenTransfer === true);

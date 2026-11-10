@@ -492,6 +492,12 @@ describe("SigningApprovalScreen: requests that move nothing", () => {
     unreadableTokenTransfer: true,
   };
 
+  function expectOnlyItemMarkedUnreadable(number: number) {
+    const [marker, ...rest] = screen.getAllByText("Unreadable transfer");
+    expect(rest).toHaveLength(0);
+    expect(marker!.parentElement!.textContent).toContain(`Item ${number}`);
+  }
+
   it("warns about a single data item that may be a token transfer it can't read, turns Sign red and shows its tags", () => {
     renderScreen({ preview: { ...MESSAGE_PREVIEW, items: [UNREADABLE_ITEM] } });
     expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
@@ -510,6 +516,7 @@ describe("SigningApprovalScreen: requests that move nothing", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/may be a token transfer Gleam can't read/);
     expect(screen.getByRole("button", { name: /sign messages \(2\)/i }).className).toContain("bg-warning");
     expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+    expectOnlyItemMarkedUnreadable(2);
   });
 
   it("warns about a batch with transfers when another item may be one it can't read", () => {
@@ -525,6 +532,7 @@ describe("SigningApprovalScreen: requests that move nothing", () => {
     expect(alert.textContent).toMatch(/may be a token transfer Gleam can't read/);
     expect(primary("Sign 2").className).toContain("bg-warning");
     expect(screen.getByText(SECOND_RECIPIENT)).toBeTruthy();
+    expectOnlyItemMarkedUnreadable(2);
   });
 
   it.each(["sign", "dispatch"] as const)("shows the fee of a %s with no recipient", (kind) => {

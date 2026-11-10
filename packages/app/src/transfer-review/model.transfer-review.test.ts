@@ -179,6 +179,7 @@ describe("showsWarning", () => {
     });
     const warned = transferRequestFromPreview(batch(true))!;
     expect(warned.unreadableTokenTransfer).toBe(true);
+    expect(warned.others).toEqual([expect.objectContaining({ index: 1, unreadableTokenTransfer: true })]);
     expect(showsWarning(warned, null)).toBe(true);
     expect(showsWarning(transferRequestFromPreview(batch(false))!, null)).toBe(false);
   });
