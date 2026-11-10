@@ -44,6 +44,15 @@ describe("pickChallenge", () => {
     expect(new Set((await pickChallenge(pool, "seed")).map((fn) => fn.symbol))).toEqual(new Set(["one", "two", "three"]));
   });
 
+  it("draws the first function from the preferred ones that are in the pool", async () => {
+    const unexamined = { file: "c.ts", symbol: "two" };
+    for (const seed of ["a", "b", "c", "d", "e"]) {
+      const picked = await pickChallenge(functions, seed, [unexamined, { file: "gone.ts", symbol: "x" }]);
+      expect(picked[0]).toEqual(unexamined);
+      expect(new Set(picked.map((fn) => `${fn.file}#${fn.symbol}`)).size).toBe(3);
+    }
+  });
+
   it("ignores repeated entries and refuses too few functions or an empty seed", async () => {
     const one = { file: "a.ts", symbol: "one" };
 
