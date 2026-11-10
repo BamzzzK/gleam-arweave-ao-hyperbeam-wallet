@@ -10,7 +10,6 @@ import type { DeviceSignPanels } from "../approval/device-panels";
 export type HardwareWalletCapabilities = Record<HardwareWalletMethod, boolean>;
 
 export interface AppCapabilities {
-  sidePanel: boolean;
   passkey: boolean;
   biometrics: boolean;
   /** Which hardware wallets the shell can reach. Use `hasHardwareWallet` for "any". */
@@ -178,6 +177,17 @@ export interface NoticePort {
   subscribe(onNotice: (message: string) => void): () => void;
 }
 
+/**
+ * Moves the wallet between the browser's popup and its side panel. The
+ * surface the call came from closes once the other one is open.
+ */
+export interface SidePanelPort {
+  /** Whether this surface is the side panel. */
+  docked: boolean;
+  /** Must be called from a click: the browser opens either surface only for a user gesture. */
+  toggle(): Promise<void>;
+}
+
 /** A rectangle in the app's CSS pixels, as `getBoundingClientRect()` reports it. */
 export interface DappBrowserFrame {
   x: number;
@@ -240,4 +250,6 @@ export interface AppPlatform {
   approvalSheet?: ApprovalSheetPort;
   /** Omitted where the host has nothing to say outside the app's screens. */
   notices?: NoticePort;
+  /** Omitted where the host has no side panel. */
+  sidePanel?: SidePanelPort;
 }
