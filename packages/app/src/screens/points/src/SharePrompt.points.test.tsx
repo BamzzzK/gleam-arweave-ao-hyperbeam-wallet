@@ -137,7 +137,9 @@ describe("share prompts on the Points screen", () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
     const runtime = setup({ revealSeen: [] });
 
-    expect(await screen.findByText("You're in and earning Gleam Points.")).toBeTruthy();
+    const standing = within(await screen.findByRole("region", { name: "Standing" }));
+    expect(await standing.findByText("You're in and earning Gleam Points.")).toBeTruthy();
+    expect(invite().queryByText("You're in and earning Gleam Points.")).toBeNull();
     fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
 
     await waitFor(() =>
