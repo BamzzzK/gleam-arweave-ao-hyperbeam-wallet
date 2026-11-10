@@ -924,7 +924,7 @@ export function MainScreenView({
             aria-selected={activeTab === "tokens"}
             onClick={() => selectTab("tokens")}
             className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
-              activeTab === "tokens" ? "text-foreground" : "text-muted hover:text-foreground"
+              activeTab === "tokens" ? "bg-mist text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
             {t("mainScreen.tabTokens")}
@@ -935,7 +935,7 @@ export function MainScreenView({
             aria-selected={activeTab === "collectibles"}
             onClick={() => selectTab("collectibles")}
             className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
-              activeTab === "collectibles" ? "text-foreground" : "text-muted hover:text-foreground"
+              activeTab === "collectibles" ? "bg-mist text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
             {t("mainScreen.tabCollectibles")}
@@ -946,7 +946,7 @@ export function MainScreenView({
             aria-selected={activeTab === "activity"}
             onClick={() => selectTab("activity")}
             className={`rounded-md px-2.5 py-1 text-label phone:hit-target ${
-              activeTab === "activity" ? "text-foreground" : "text-muted hover:text-foreground"
+              activeTab === "activity" ? "bg-mist text-foreground" : "text-muted hover:text-foreground"
             }`}
           >
             {t("mainScreen.tabActivity")}
@@ -954,7 +954,7 @@ export function MainScreenView({
         </div>
 
         {activeTab === "tokens" ? (
-          <div className="min-h-60 border-t border-line phone:min-h-0 phone:border-t-0">
+          <div className="min-h-60 phone:min-h-0">
             {loading && !hasLoadedOnce ? (
               <>
                 <SkeletonRow />
@@ -1038,7 +1038,7 @@ export function MainScreenView({
                   const { processId } = row;
                   if (processId !== undefined && confirmingIgnore === processId) {
                     return (
-                      <div key={row.key} className="flex flex-col gap-2 border-b border-line px-3.5 py-3 last:border-b-0 phone:border-b-0 phone:px-0">
+                      <div key={row.key} className="flex flex-col gap-2 px-3.5 py-3 phone:px-0">
                         <p className="text-caption leading-relaxed text-muted">
                           {t("mainScreen.ignoreConfirm", { label: row.label })}
                         </p>
@@ -1070,7 +1070,7 @@ export function MainScreenView({
                   const actionClassName =
                     "rounded-md bg-mist px-2 py-1 text-caption font-semibold text-muted hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3.5";
                   return (
-                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative border-b border-line last:border-b-0 phone:border-b-0">
+                    <div key={row.key} data-editing={hiddenExpanded || undefined} className="group relative">
                       {row.node}
                       {hiddenExpanded ? (
                         <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100 phone:right-0 phone:opacity-100">
@@ -1155,7 +1155,7 @@ export function MainScreenView({
           </div>
         ) : activeTab === "collectibles" ? (
           <div
-            className={`min-h-60 border-t border-line pt-3.5 transition-opacity duration-500 ease-out phone:min-h-0 phone:border-t-0 phone:pt-1 ${
+            className={`min-h-60 pt-3.5 transition-opacity duration-500 ease-out phone:min-h-0 phone:pt-1 ${
               collectiblesCached ? (collectiblesQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
             }`}
           >
@@ -1172,7 +1172,7 @@ export function MainScreenView({
         ) : (
           <>
             <div
-              className={`min-h-60 border-t border-line transition-opacity duration-500 ease-out phone:min-h-0 phone:border-t-0 ${
+              className={`min-h-60 transition-opacity duration-500 ease-out phone:min-h-0 ${
                 activityCached ? (activityQuery.isFetching ? "gleam-cached-pulse" : "opacity-70") : ""
               }`}
             >
@@ -1221,13 +1221,7 @@ export function MainScreenView({
                     title={title}
                     subtitle={subtitle}
                     amountLabel={amountLabel}
-                    amountTone={
-                      entry.type === "receive" && !entry.unverified
-                        ? "positive"
-                        : entry.type === "send" && entry.status !== "failed" && entry.amount
-                          ? "negative"
-                          : "neutral"
-                    }
+                    amountTone={entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
                         ? { name: collectibleLabel(t, entry.collectible), imageUrl: entry.collectible.imageUrl }
