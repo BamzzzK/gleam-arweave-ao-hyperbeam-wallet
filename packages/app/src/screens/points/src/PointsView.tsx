@@ -35,6 +35,7 @@ import {
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { errorText } from "../../../i18n/errors";
+import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -212,7 +213,7 @@ function JoinedView({
                       }}
                     >
                       {copied ? t("points.copied") : t("points.inviteFriend")}
-                      {copied ? <CheckIcon /> : <CopyIcon />}
+                      {copied ? <CheckIcon className={ACTION_ICON} /> : <CopyIcon className={ACTION_ICON} />}
                     </button>
                     {status ? (
                       <span
@@ -586,19 +587,3 @@ function DeviceApprovalNote() {
 /** Sized and aligned to sit after an earn action's text, like the scan link's ↗. */
 const ACTION_ICON = "ml-1.5 inline-block align-[-0.125em]";
 
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={ACTION_ICON}>
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" className={ACTION_ICON}>
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

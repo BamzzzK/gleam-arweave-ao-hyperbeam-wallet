@@ -10,6 +10,7 @@ import { DataItemCard } from "../transfer-review/DataItemCard";
 import { RequestHeader } from "../transfer-review/RequestHeader";
 import { ReviewButtons, TransferReview } from "../transfer-review/TransferReview";
 import { requestTypeText, transferRequestFromPreview, type TransferContext } from "../transfer-review/model";
+import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 /**
  * The highest-stakes screen in the product. A request that moves value
@@ -231,11 +232,3 @@ function AddrBlock({ label, copyLabel, value }: { label: string; copyLabel: stri
   );
 }
 
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
