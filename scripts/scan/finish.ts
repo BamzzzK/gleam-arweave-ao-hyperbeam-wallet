@@ -1,25 +1,41 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import {
   attestationId,
   checkAnswers,
-  encodeAttestationPayload,
   findFunction,
   isJsxPath,
+  isScanAreaId,
+  nextScanIsFull,
   parseAttestation,
+  roundReward,
+  scanArea,
+  type ParsedAttestation,
   type AttestationAnswer,
+  type ScanAreaId,
   type ScanIssue,
 } from "../../packages/core/src/scan/index.ts";
 import { callApi } from "./api.ts";
-import { advisoryDrafts, draftWarnings, prDrafts } from "./readability.ts";
+import { draftWarnings } from "./readability.ts";
 import {
-  ATTESTATION_FILE,
-  CHALLENGE_FILE,
+  fetchAreas,
+  freeAreas,
+  listRounds,
+  roundOffer,
+  roundReports,
+  signedRoundBase,
+} from "./rounds.ts";
+import {
+  closingJson,
+  closingLines,
   fail,
+  formatElapsed,
   gitOrUndefined,
   isChallengeResponse,
   jsonParseProblem,
+  readCurrent,
   readText,
-  STARTED_FILE,
-  formatElapsed,
+  roundPaths,
   showAtCommit,
   writeJson,
   type ChallengeResponse,
@@ -28,33 +44,49 @@ import {
   type Problem,
 } from "./shared.ts";
 
-const START_FIRST = "run `pnpm scan start` first";
+/** Server codes that mean the round's challenge can't be signed any more, so the area has to be answered again. */
+const DEAD_CHALLENGE = new Set(["challenge_unknown", "challenge_expired", "challenge_used", "challenge_wrong_release", "challenge_wrong_commit"]);
 
-/** Heads the closing message, which the agent shows the user as the last thing in its turn. */
-export const CLOSING_HEADER = "Show the user exactly this, as the last thing you write:";
+export type Validated =
+  | { ok: false; notes: string[]; issues: Problem[] }
+  | { ok: true; notes: string[]; attestation: ParsedAttestation; id: string; challenge: ChallengeResponse; paidPlacesLeft: number | undefined };
 
-/**
- * The message that ends the agent's turn: the signing link and the one reply
- * the agent waits for. `drafts` counts the advisory and PR drafts saved in
- * `.gleam-scan/`; a `scanned` result with none saved there still has drafts
- * somewhere, so it gets the uncounted line.
- */
-export function closingMessage(link: string, result: "pass" | "scanned", drafts: number): string[] {
-  const reports = drafts > 0 || result === "scanned";
-  const first =
-    drafts > 0
-      ? `Scan done. I have ${drafts} ${drafts === 1 ? "report" : "reports"} ready to file.`
-      : reports
-        ? "Scan done. I have reports ready to file."
-        : "Scan done.";
-  const reply = reports ? '2. Reply "signed" and I\'ll open the PRs and advisories.' : '2. Reply "signed" when you\'re done.';
-  return [first, "", `1. Open this link and click Sign: ${link}`, reply];
+/** A failure that says nothing about the round: retrying the same command can pass. */
+export function isTransient(issue: Problem): boolean {
+  return (
+    issue.path === "network" ||
+    issue.path === "rate_limited" ||
+    issue.path.startsWith("http_") ||
+    issue.code === "rate_limited" ||
+    issue.code === "github_unavailable"
+  );
 }
 
-export async function runFinish(deps: Deps): Promise<Outcome> {
-  const challengeText = await readText(deps, CHALLENGE_FILE);
+/** A failure that means the round's challenge can't be signed, so the area has to be answered again. */
+export function isDeadChallenge(issue: Problem): boolean {
+  return issue.code !== undefined && DEAD_CHALLENGE.has(issue.code);
+}
+
+/**
+ * Checks one round's attestation locally, then with `POST /attestations/check`.
+ * `then` is what the agent runs after re-answering a dead challenge. A round
+ * the check rejects is open again, so `start` may replace its challenge; a
+ * network or server hiccup leaves it waiting, or a retry would drop it.
+ */
+export async function validateRound(deps: Deps, area: ScanAreaId, rerun: string, then: string): Promise<Validated> {
+  const result = await validate(deps, area, rerun, then);
+  if (!result.ok && !result.issues.every(isTransient)) await rm(join(deps.root, roundPaths(area).finished), { force: true });
+  return result;
+}
+
+async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: string): Promise<Validated> {
+  const paths = roundPaths(area);
+  const restart = `run \`pnpm scan start --area ${area}\`, answer its 3 new functions, copy model, result and report from the backup it names, then run ${then}`;
+  const failed = (issues: Problem[], notes: string[] = []): Validated => ({ ok: false, notes, issues });
+
+  const challengeText = await readText(deps, paths.challenge);
   if (challengeText === undefined) {
-    return fail("finish", [{ path: CHALLENGE_FILE, message: `There is no challenge yet; ${START_FIRST}.` }]);
+    return failed([{ path: paths.challenge, message: `There is no challenge for ${scanArea(area).label}; run \`pnpm scan start --area ${area}\` first.` }]);
   }
   let challengeJson: unknown;
   try {
@@ -63,19 +95,19 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     challengeJson = undefined;
   }
   if (!isChallengeResponse(challengeJson)) {
-    return fail("finish", [{ path: CHALLENGE_FILE, message: `${CHALLENGE_FILE} is unreadable; delete .gleam-scan/ and run \`pnpm scan start\` again.` }]);
+    return failed([{ path: paths.challenge, message: `${paths.challenge} is unreadable; run \`pnpm scan start --area ${area}\` again.` }]);
   }
   const challenge: ChallengeResponse = challengeJson;
 
-  const text = await readText(deps, ATTESTATION_FILE);
+  const text = await readText(deps, paths.attestation);
   if (text === undefined) {
-    return fail("finish", [{ path: ATTESTATION_FILE, message: `There is no attestation file; ${START_FIRST}.` }]);
+    return failed([{ path: paths.attestation, message: `There is no attestation file; run \`pnpm scan start --area ${area}\` first.` }]);
   }
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return fail("finish", [jsonParseProblem(ATTESTATION_FILE, text, error)]);
+    return failed([jsonParseProblem(paths.attestation, text, error)]);
   }
 
   const issues: Problem[] = [];
@@ -87,13 +119,13 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     raw !== null && typeof raw === "object" && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
   const head = await gitOrUndefined(deps, ["rev-parse", "HEAD"]);
   if (head === undefined) {
-    push("git", "This isn't a git checkout; run `pnpm scan finish` from the Gleam checkout you scanned.");
+    push("git", `This isn't a git checkout; run \`${rerun}\` from the Gleam checkout you scanned.`);
   } else {
     const tags = (await gitOrUndefined(deps, ["tag", "--points-at", "HEAD"]))?.split("\n").map((t) => t.trim()) ?? [];
     const releases = tags.flatMap((tag) => /^v(\d+\.\d+\.\d+)$/.exec(tag)?.[1] ?? []);
     const release = releases.includes(challenge.release) ? challenge.release : releases[0];
     if (release === undefined) {
-      push("git", `HEAD (${head.slice(0, 7)}) has no v<x.y.z> release tag; run \`git checkout v${challenge.release}\` and \`pnpm scan finish\` again.`);
+      push("git", `HEAD (${head.slice(0, 7)}) has no v<x.y.z> release tag; run \`git checkout v${challenge.release}\` and \`${rerun}\` again.`);
     } else {
       fill(draft, "release", release, notes);
       fill(draft, "commit", head, notes);
@@ -101,26 +133,26 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     if (head !== challenge.commit || (release !== undefined && release !== challenge.release)) {
       push(
         "commit",
-        `HEAD is ${head.slice(0, 7)} but the challenge is for v${challenge.release} (${challenge.commit.slice(0, 7)}); run \`git checkout v${challenge.release}\` and \`pnpm scan finish\` again.`,
+        `HEAD is ${head.slice(0, 7)} but the challenge is for v${challenge.release} (${challenge.commit.slice(0, 7)}); run \`git checkout v${challenge.release}\` and \`${rerun}\` again.`,
       );
     }
   }
   if (draft.challenge === undefined || draft.challenge === "") draft.challenge = challenge.challenge;
   else if (draft.challenge !== challenge.challenge) {
-    push("challenge", `challenge differs from ${CHALLENGE_FILE}; set it to "${challenge.challenge}", or run \`pnpm scan start\` again and re-answer.`);
+    push("challenge", `challenge differs from ${paths.challenge}; set it to "${challenge.challenge}".`);
   }
 
   // Code at the attested commit, for the answer check and for naming line spans.
   const commit = head ?? challenge.commit;
   const files = new Map<string, string>();
-  const paths = new Set(challenge.functions.map((fn) => fn.file));
+  const filePaths = new Set(challenge.functions.map((fn) => fn.file));
   if (Array.isArray(draft.answers)) {
     for (const answer of draft.answers) {
       const file = (answer as { file?: unknown } | null)?.file;
-      if (typeof file === "string") paths.add(file);
+      if (typeof file === "string") filePaths.add(file);
     }
   }
-  for (const file of paths) {
+  for (const file of filePaths) {
     const content = await showAtCommit(deps, commit, file);
     if (content !== undefined) files.set(file, content);
   }
@@ -165,10 +197,8 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     push(issue.path, issue.message);
   }
 
-  if (deps.now() >= Date.parse(challenge.expiresAt)) {
-    push("challenge", `The challenge expired at ${challenge.expiresAt}; run \`pnpm scan start\` again and copy your answers into the new ${ATTESTATION_FILE}.`);
-  }
-  if (issues.length > 0 || !parsed.ok) return { ok: false, command: "finish", lines: notes, issues, json: {} };
+  if (deps.now() >= Date.parse(challenge.expiresAt)) push("challenge", `The challenge expired at ${challenge.expiresAt}; ${restart}.`);
+  if (issues.length > 0 || !parsed.ok) return failed(issues, notes);
 
   // Local checks pass, so ask the server (latest release, unexpired and unused challenge).
   const attestation = parsed.attestation;
@@ -176,45 +206,137 @@ export async function runFinish(deps: Deps): Promise<Outcome> {
     deps,
     "/attestations/check",
     { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ attestation }) },
-    "pnpm scan finish",
+    rerun,
   );
-  if (!sent.ok) return { ok: false, command: "finish", lines: notes, issues: sent.issues, json: {} };
+  if (!sent.ok) {
+    // The server's sentence says "run `pnpm scan start`", which would start another area; name this one.
+    const fixed = sent.issues.map((issue) =>
+      isDeadChallenge(issue)
+        ? { ...issue, message: `${issue.message.replace(/;.*$/, "")}; ${restart}.` }
+        : issue,
+    );
+    return failed(fixed, notes);
+  }
   const result = sent.body as { attestationId?: unknown; paidPlacesLeft?: unknown } | null;
   const id = await attestationId(attestation);
   if (typeof result?.attestationId !== "string" || result.attestationId !== id) {
-    return fail("finish", [
-      { path: "attestationId", message: "The server computed a different attestation id than this checkout; update the checkout (`git pull`) and run `pnpm scan finish` again." },
+    return failed([
+      { path: "attestationId", message: `The server computed a different attestation id than this checkout; update the checkout (\`git pull\`) and run \`${rerun}\` again.` },
     ]);
   }
-  const paidPlacesLeft = typeof result.paidPlacesLeft === "number" ? result.paidPlacesLeft : undefined;
+  await writeJson(deps, paths.attestation, attestation);
+  return {
+    ok: true,
+    notes,
+    attestation,
+    id,
+    challenge,
+    paidPlacesLeft: typeof result.paidPlacesLeft === "number" ? result.paidPlacesLeft : undefined,
+  };
+}
 
-  await writeJson(deps, ATTESTATION_FILE, attestation);
-  const startedAt = Number((await readText(deps, STARTED_FILE))?.trim());
+/** `GET /scan/rewards`, or undefined when it can't be read: the offer then leaves the amount out. */
+async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string; tail: string } | undefined> {
+  const fetched = await callApi(deps, "/scan/rewards", undefined, "pnpm scan finish");
+  const body = fetched.ok ? (fetched.body as Record<string, unknown> | null) : null;
+  const atomic = (v: unknown): v is string => typeof v === "string" && /^\d{1,40}$/.test(v);
+  if (!body || !atomic(body.scanRewardAtomic) || !atomic(body.tailScanRewardAtomic)) return undefined;
+  return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic, tail: body.tailScanRewardAtomic };
+}
+
+/** Resolves `--area`, or the current round, to an area id. */
+export async function resolveArea(deps: Deps, command: Outcome["command"], area: string | undefined): Promise<ScanAreaId | Outcome> {
+  if (area !== undefined) {
+    if (isScanAreaId(area)) return area;
+    const named = area === "" ? "--area needs an area id" : `${JSON.stringify(area)} isn't a scan area`;
+    return fail(command, [{ path: "area", message: `${named}; use the area \`pnpm scan start\` printed, or leave out --area for the current round.` }]);
+  }
+  const current = await readCurrent(deps);
+  if (current === undefined) return fail(command, [{ path: "round", message: "There is no round yet; run `pnpm scan start` first." }]);
+  return current;
+}
+
+export async function runFinish(deps: Deps, options: { area?: string } = {}): Promise<Outcome> {
+  const area = await resolveArea(deps, "finish", options.area);
+  if (typeof area !== "string") return area;
+  const paths = roundPaths(area);
+  const label = scanArea(area).label;
+  if ((await readText(deps, paths.signed)) !== undefined) {
+    return fail("finish", [{ path: "round", message: `The ${label} round is signed already; run \`pnpm scan next\`.` }]);
+  }
+
+  const rerun = options.area === undefined ? "pnpm scan finish" : `pnpm scan finish --area ${area}`;
+  const checked = await validateRound(deps, area, rerun, `\`pnpm scan finish --area ${area}\``);
+  if (!checked.ok) return { ok: false, command: "finish", lines: checked.notes, issues: checked.issues, json: {} };
+  const { attestation, id, paidPlacesLeft } = checked;
+  await writeJson(deps, paths.finished, { attestationId: id });
+
+  const rounds = await listRounds(deps);
+  const waiting = rounds.filter((round) => round.status === "waiting");
+  const base = signedRoundBase(rounds);
+  const number = base + waiting.findIndex((round) => round.area === area) + 1;
+  let reports = 0;
+  for (const round of waiting) reports += (await roundReports(deps, round)).unfiled;
+
+  const taken = new Set(rounds.map((round) => round.area));
+  const areas = await fetchAreas(deps, rerun);
+  const suggestion = freeAreas(areas.ok ? areas.areas : undefined, taken)[0];
+  const nextRound = base + waiting.length + 1;
+  let nextAmountAtomic: string | undefined;
+  if (suggestion !== undefined) {
+    // Every waiting round takes a paid place when it is signed, before the next round does.
+    const placesAfter = paidPlacesLeft === undefined ? undefined : paidPlacesLeft - waiting.length;
+    if (placesAfter !== undefined && placesAfter <= 0) nextAmountAtomic = "0";
+    else {
+      const rewards = await fetchRewards(deps);
+      if (rewards !== undefined) {
+        const place = placesAfter === undefined || nextScanIsFull(placesAfter) ? rewards.full : rewards.tail;
+        nextAmountAtomic = roundReward(BigInt(place), nextRound).toString();
+      }
+    }
+  }
+
+  const startedAt = Number((await readText(deps, paths.startedAt))?.trim());
   const elapsedMs = Number.isFinite(startedAt) && startedAt > 0 ? deps.now() - startedAt : undefined;
-  const warnings = await draftWarnings(deps);
-  const link = `${deps.siteUrl.replace(/\/*$/, "/")}attest.html#${encodeAttestationPayload(attestation)}`;
-  const drafts = (await advisoryDrafts(deps)).length + (await prDrafts(deps)).length;
-  const closing = closingMessage(link, attestation.result, drafts);
+  const warnings = await draftWarnings(deps, paths.dir);
+  const closing = roundOffer({
+    round: number,
+    label,
+    release: attestation.release,
+    waiting: waiting.length,
+    reports,
+    nextRound,
+    nextAmountAtomic,
+    suggestion,
+  });
   const lines = [
-    ...notes,
-    `Attestation valid for Gleam v${attestation.release}.`,
+    ...checked.notes,
+    `Attestation valid for Gleam v${attestation.release}, area ${label}.`,
     `Attestation id: ${id}`,
     ...(elapsedMs === undefined ? [] : [`Scan time: ${formatElapsed(elapsedMs)}.`]),
     ...(paidPlacesLeft === undefined ? [] : [`Paid places left: ${paidPlacesLeft}`]),
-    ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this scan will be recorded but earns no points."] : []),
-    `Once the user has signed, put the attestation id ${id} in every PR and advisory you draft for this scan.`,
+    ...(paidPlacesLeft === 0 ? ["Warning: no paid places are left, so this round will be recorded but earns no points."] : []),
     ...warnings,
-    "",
-    CLOSING_HEADER,
-    "",
-    ...closing,
+    ...closingLines(closing),
   ];
   return {
     ok: true,
     command: "finish",
     lines,
     issues: [],
-    json: { challenge: challenge.challenge, attestationId: id, link, closingHeader: CLOSING_HEADER, userMessage: closing.join("\n"), ...(warnings.length === 0 ? {} : { warnings }), ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }), ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }) },
+    json: {
+      area,
+      round: number,
+      challenge: checked.challenge.challenge,
+      attestationId: id,
+      waiting: waiting.map((round) => round.area),
+      ...(suggestion === undefined ? {} : { suggested: suggestion.id }),
+      ...(nextAmountAtomic === undefined ? {} : { nextRound, nextRewardAtomic: nextAmountAtomic }),
+      ...(warnings.length === 0 ? {} : { warnings }),
+      ...(elapsedMs === undefined ? {} : { elapsedMs, elapsed: formatElapsed(elapsedMs) }),
+      ...(paidPlacesLeft === undefined ? {} : { paidPlacesLeft }),
+      ...closingJson(closing),
+    },
   };
 }
 

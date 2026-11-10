@@ -1,7 +1,7 @@
 /* global AbortController, URL */
 // review-results.html. Everything from the points API (labels, reports,
 // function names) is untrusted text: nodes are built with textContent, never markup.
-import { coverageSummary, fetchListing, idFromHash, releaseFromSearch, unusedModels } from "./scan-lib.js";
+import { areaLabel, coverageSummary, fetchListing, idFromHash, releaseFromSearch, roundLabel, unusedModels } from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 const PAGES_UP_FRONT = 5;
@@ -51,6 +51,7 @@ function renderCoverage(listing) {
   const none = $("[data-unexamined-none]");
   details.hidden = true;
   none.hidden = true;
+  renderAreas(summary ? summary.byArea : null);
   if (!summary) {
     text.textContent = "Coverage isn't available right now.";
     $("[data-coverage-figure]").textContent = "–";
@@ -74,6 +75,30 @@ function renderCoverage(listing) {
   for (const fn of summary.unexamined) list.appendChild(el("li", "", `${fn.file} → ${fn.symbol}`));
 }
 
+function renderAreas(rows) {
+  const table = $("[data-areas]");
+  table.hidden = rows === null;
+  if (rows === null) return;
+  const tbody = $("[data-areas-rows]");
+  tbody.textContent = "";
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const label = el("th", "", row.label);
+    label.scope = "row";
+    tr.appendChild(label);
+    const examined = el("td", "areas-examined");
+    examined.appendChild(el("span", "", `${row.examined} of ${row.total}`));
+    const bar = el("span", "areas-bar");
+    bar.setAttribute("aria-hidden", "true");
+    const fill = el("span");
+    fill.style.width = `${(row.share * 100).toFixed(1)}%`;
+    bar.appendChild(fill);
+    examined.appendChild(bar);
+    tr.appendChild(examined);
+    tbody.appendChild(tr);
+  }
+}
+
 // A small arrow-out-of-box glyph: no icon font, just an inline SVG path.
 const LINK_ICON_PATH = "M7 1h6v6M13 1 6 8M4 3H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2";
 
@@ -93,7 +118,8 @@ function renderAttestation(att) {
   const tag = el("span", "att-tag", result);
   if (RESULTS.has(result)) tag.dataset.result = result;
   summary.appendChild(tag);
-  summary.appendChild(el("span", "att-meta", [formatDate(att.createdAt), att.paid ? "paid" : "no points"].filter(Boolean).join(" · ")));
+  const meta = [formatDate(att.createdAt), areaLabel(att.area), roundLabel(att.round), att.paid ? "paid" : "no points"];
+  summary.appendChild(el("span", "att-meta", meta.filter(Boolean).join(" · ")));
   details.appendChild(summary);
 
   const body = el("div", "att-body");

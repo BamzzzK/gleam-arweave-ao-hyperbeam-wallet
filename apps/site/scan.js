@@ -3,14 +3,17 @@
 // built with textContent, never markup.
 import {
   AGENT_LINE,
+  areaRows,
   bountyTiers,
   coverageSummary,
+  fetchAreas,
   fetchCount,
   fetchListing,
   fetchRewards,
   formatPoints,
   nextScanReward,
   resultsHref,
+  roundStepPercent,
 } from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -134,6 +137,39 @@ function renderPool(rewards) {
   renderTiers(rewards.bountyPoolAtomic);
 }
 
+function renderRoundStep(rewards) {
+  const step = roundStepPercent(rewards);
+  $("[data-round-step]").textContent = String(step);
+  $("[data-round-third]").textContent = String(100 + 2 * step);
+}
+
+/** Where nobody has looked yet: each area's functions examined and scans, in tier order. */
+function renderAreas(body) {
+  const rows = areaRows(body.areas);
+  if (!rows) return;
+  const tbody = $("[data-areas-rows]");
+  tbody.textContent = "";
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const label = el("th", "", row.label);
+    label.scope = "row";
+    tr.appendChild(label);
+    const examined = el("td", "areas-examined");
+    examined.appendChild(el("span", "", `${row.examined} of ${row.total}`));
+    const bar = el("span", "areas-bar");
+    bar.setAttribute("aria-hidden", "true");
+    const fill = el("span");
+    fill.style.width = `${(row.share * 100).toFixed(1)}%`;
+    bar.appendChild(fill);
+    examined.appendChild(bar);
+    tr.appendChild(examined);
+    tr.appendChild(el("td", "num", String(row.scans)));
+    tbody.appendChild(tr);
+  }
+  $("[data-areas-title]").textContent = `Coverage of v${body.release} by area`;
+  $("[data-areas]").hidden = false;
+}
+
 // The record is what anyone can check on the results page, so it shows only when every figure arrived.
 function renderRecord(listing, count) {
   const coverage = coverageSummary(listing.coverage);
@@ -148,11 +184,16 @@ function renderRecord(listing, count) {
 
 async function loadFigures() {
   // One attestation is enough: the listing's paid places, coverage and models cover the whole release.
-  const [rewards, listing] = await Promise.all([
+  const [rewards, listing, areas] = await Promise.all([
     withTimeout((signal) => fetchRewards(window.fetch.bind(window), { signal })),
     withTimeout((signal) => fetchListing(window.fetch.bind(window), { limit: 1, signal })),
+    withTimeout((signal) => fetchAreas(window.fetch.bind(window), { signal })),
   ]);
-  if (rewards.ok) renderPool(rewards.rewards);
+  if (rewards.ok) {
+    renderPool(rewards.rewards);
+    renderRoundStep(rewards.rewards);
+  }
+  if (areas.ok) renderAreas(areas.areas);
   if (!listing.ok) return;
 
   const href = resultsHref(listing.listing.release);

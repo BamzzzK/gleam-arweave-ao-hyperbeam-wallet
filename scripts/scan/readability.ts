@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { readText, SCAN_DIR, type Deps } from "./shared.ts";
+import { readText, type Deps } from "./shared.ts";
 
 /** The limits `security/scan/REPORT.md` sets for the part of an advisory above `<details>`. */
 export const MAX_WORDS = 200;
@@ -119,30 +119,30 @@ export function draftWarning(file: string, markdown: string): string | undefined
   return `! ${file}: ${problems.join(", ")}; ${fixes.join(", and ")} (security/scan/REPORT.md).`;
 }
 
-/** The advisory drafts in `.gleam-scan/`, sorted, as paths relative to the checkout. */
-export async function advisoryDrafts(deps: Deps): Promise<string[]> {
-  return listDrafts(deps, /^advisory-.*\.md$/);
+/** The advisory drafts in a round folder, sorted, as paths relative to the checkout. */
+export async function advisoryDrafts(deps: Deps, dir: string): Promise<string[]> {
+  return listDrafts(deps, dir, /^advisory-.*\.md$/);
 }
 
-/** The PR body drafts in `.gleam-scan/`, sorted, as paths relative to the checkout. */
-export async function prDrafts(deps: Deps): Promise<string[]> {
-  return listDrafts(deps, /^pr-.*\.md$/);
+/** The PR body drafts in a round folder, sorted, as paths relative to the checkout. */
+export async function prDrafts(deps: Deps, dir: string): Promise<string[]> {
+  return listDrafts(deps, dir, /^pr-.*\.md$/);
 }
 
-async function listDrafts(deps: Deps, pattern: RegExp): Promise<string[]> {
+async function listDrafts(deps: Deps, dir: string, pattern: RegExp): Promise<string[]> {
   let names: string[];
   try {
-    names = await readdir(join(deps.root, SCAN_DIR));
+    names = await readdir(join(deps.root, dir));
   } catch {
     return [];
   }
-  return names.filter((name) => pattern.test(name)).sort().map((name) => `${SCAN_DIR}/${name}`);
+  return names.filter((name) => pattern.test(name)).sort().map((name) => `${dir}/${name}`);
 }
 
-/** A warning line per advisory draft that breaks REPORT.md's title rules or limits. Never fails the scan. */
-export async function draftWarnings(deps: Deps): Promise<string[]> {
+/** A warning line per advisory draft in a round folder that breaks REPORT.md's title rules or limits. Never fails the scan. */
+export async function draftWarnings(deps: Deps, dir: string): Promise<string[]> {
   const out: string[] = [];
-  for (const file of await advisoryDrafts(deps)) {
+  for (const file of await advisoryDrafts(deps, dir)) {
     const text = await readText(deps, file);
     const warning = text === undefined ? undefined : draftWarning(file, text);
     if (warning !== undefined) out.push(warning);

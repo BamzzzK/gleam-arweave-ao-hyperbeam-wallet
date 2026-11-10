@@ -32,19 +32,20 @@ export async function callApi(deps: Deps, path: string, init: RequestInit | unde
   if (Array.isArray(object.issues) && object.issues.length > 0) {
     const issues = object.issues.flatMap((issue): Problem[] => {
       const i = issue as Record<string, unknown> | null;
-      return i && typeof i.message === "string" ? [{ path: typeof i.path === "string" ? i.path : "$", message: i.message }] : [];
+      if (!i || typeof i.message !== "string") return [];
+      return [{ path: typeof i.path === "string" ? i.path : "$", message: i.message, ...(typeof i.code === "string" ? { code: i.code } : {}) }];
     });
     if (issues.length > 0) return { ok: false, issues };
   }
   if (typeof object.code === "string") {
     const message = typeof object.error === "string" ? object.error : `The points API refused the request (${object.code}); run \`${rerun}\` again.`;
-    return { ok: false, issues: [{ path: object.code, message }] };
+    return { ok: false, issues: [{ path: object.code, message, code: object.code }] };
   }
   const status = response.status;
   if (status === 404) {
     return {
       ok: false,
-      issues: [{ path: "http_404", message: `${deps.apiUrl} has no ${path} endpoint; community scans may not be live on this server yet. Check https://gleamwallet.app/scan.html, or set GLEAM_POINTS_API.` }],
+      issues: [{ path: "http_404", message: `${deps.apiUrl} has no ${path.split("?")[0]} endpoint; community scans may not be live on this server yet. Check https://gleamwallet.app/scan.html, or set GLEAM_POINTS_API.` }],
     };
   }
   if (status >= 500) {

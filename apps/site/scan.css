@@ -8,7 +8,7 @@
 .sc .line { max-width: 34em; }
 
 /* .button sets display, which would otherwise win over the hidden attribute */
-.sc [hidden] { display: none !important; }
+.sc [hidden] { display: none; }
 
 .sc-mono { font-family: var(--mono); font-size: 0.8125rem; letter-spacing: 0; overflow-wrap: anywhere; }
 .sc-note { margin: 16px 0 0; max-width: 40em; }
@@ -247,7 +247,7 @@
 @keyframes figures-glint { to { background-position: 0 0; opacity: 0; } }
 .sc-intro + .figures { margin-top: 24px; }
 .sc-hero-figures { margin: 28px 0 0; }
-.figures-pending { font-size: 0.9375rem !important; font-weight: 500 !important; }
+.figures-pending { font-size: 0.9375rem; font-weight: 500; }
 .figures-pending .figures-unit { display: none; }
 
 .sc-report-action { margin: 0 0 16px; }
@@ -303,6 +303,21 @@
 .tiers tbody th { font-weight: 500; }
 .tiers .num { text-align: right; }
 .tiers-amount { color: var(--muted); }
+
+/* Coverage by area: rows separated by spacing alone; a thin track per row shows where nobody has looked. */
+
+.areas-block { margin-top: 40px; }
+.areas-block h3 { margin-top: 0; }
+.areas { width: 100%; max-width: 520px; border-collapse: collapse; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.areas th, .areas td { padding: 7px 16px 7px 0; text-align: left; vertical-align: top; }
+.areas tr > :last-child { padding-right: 0; }
+.areas thead th { padding-top: 0; font-size: 0.8125rem; font-weight: 500; color: var(--muted); }
+.areas tbody th { font-weight: 500; }
+.areas .num { text-align: right; }
+.areas-examined { width: 45%; }
+.areas-bar { display: block; height: 4px; margin: 6px 0 0; border-radius: 2px; background: var(--line); overflow: hidden; }
+.areas-bar span { display: block; height: 100%; background: var(--fg); border-radius: 2px; }
+.areas-results { margin: 20px 0 0; }
 
 /* Questions */
 
@@ -400,9 +415,32 @@
 .facts dd { margin: 0; overflow-wrap: anywhere; }
 
 .sign { margin: 32px 0 0; }
+.sign-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .sign .button { min-width: 200px; justify-content: center; }
 .sign .small { margin: 14px 0 0; max-width: 34em; }
-.sign .sign-step { margin: 0 0 16px; }
+.sign .sign-step, .sign .sign-status { margin: 0 0 16px; }
+.sign-status { color: var(--fg); }
+.sign-status:focus { outline: none; }
+
+/* attest.html with several rounds: spacing separates them; a sky tick marks the one the button signs. */
+
+.rounds { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 28px; }
+.round { padding-left: 16px; box-shadow: inset 2px 0 0 transparent; }
+.round[data-current] { box-shadow: inset 2px 0 0 var(--beam-sky); }
+.round p { margin: 0; }
+.round-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.round-label { font-weight: 600; }
+.round-state { color: var(--muted); font-size: 0.875rem; }
+.round[data-status="signed"] .round-state { color: #15803d; }
+.round[data-status="error"] .round-state, .round[data-status="final"] .round-state, .round[data-status="damaged"] .round-state { color: #b91c1c; }
+.round .round-summary { margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
+.round .round-result { margin-top: 8px; overflow-wrap: anywhere; }
+.round .round-actions { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; font-size: 0.9375rem; }
+.round .round-actions[hidden] { display: none; }
+.round .sc-more { margin-top: 10px; }
+.round .facts { margin: 14px 0 16px; }
+.round .report { max-height: 260px; }
+.round .round-answers-title { margin: 14px 0 6px; font-weight: 600; }
 
 /* The outcome. Colour marks the state: sky for done, red for needs attention. */
 
@@ -438,6 +476,7 @@
   .copybox-actions .button { width: 100%; }
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
   .sign .button, .result .button { width: 100%; justify-content: center; }
+  .round { padding-left: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

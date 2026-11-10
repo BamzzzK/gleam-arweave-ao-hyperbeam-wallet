@@ -16,3 +16,12 @@ export function scanRewards(issuedAtomic: bigint): { fullAtomic: bigint; tailAto
 export function nextScanIsFull(paidPlacesLeft: number): boolean {
   return paidPlacesLeft > PAID_SCANS_PER_RELEASE - FULL_REWARD_SCANS;
 }
+
+/** Each further round a wallet scans in one release earns this much more than the base reward, per round. */
+export const ROUND_STEP_PERCENT = 10;
+
+/** What round `round` (1 for a wallet's first scan of a release) earns on a place worth `baseAtomic`, truncated. */
+export function roundReward(baseAtomic: bigint, round: number): bigint {
+  if (!Number.isInteger(round) || round < 1) throw new Error(`A round is a whole number from 1, got ${round}.`);
+  return (baseAtomic * BigInt(100 + ROUND_STEP_PERCENT * (round - 1))) / 100n;
+}

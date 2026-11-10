@@ -13,10 +13,17 @@ export interface ChallengeFunction {
  *
  * Each draw is SHA-256(seed ‖ counter) read as a 48-bit integer, with
  * rejection sampling so every candidate is equally likely.
+ *
+ * When `prefer` names functions in the pool (those no scan has examined
+ * yet), the first function comes from them, so coverage grows with each
+ * scan. Only the first: drawing all three from a shrinking set would hand
+ * consecutive scans the same functions, and one scan's answers to another
+ * wallet.
  */
 export async function pickChallenge(
   functions: readonly ChallengeFunction[],
   seed: string | Uint8Array,
+  prefer: readonly ChallengeFunction[] = [],
 ): Promise<ChallengeFunction[]> {
   const seedBytes = typeof seed === "string" ? new TextEncoder().encode(seed) : seed;
   if (seedBytes.length === 0) throw new Error("The challenge seed must not be empty.");
@@ -43,6 +50,13 @@ export async function pickChallenge(
 
   const picked: ChallengeFunction[] = [];
   const usedFiles = new Set<string>();
+  const preferred = new Set(prefer.map((fn) => `${fn.file}\n${fn.symbol}`));
+  const firstPool = pool.filter((fn) => preferred.has(`${fn.file}\n${fn.symbol}`));
+  if (firstPool.length > 0) {
+    const choice = firstPool[await draw(firstPool.length)]!;
+    picked.push(choice);
+    usedFiles.add(choice.file);
+  }
   while (picked.length < CHALLENGE_SIZE) {
     const fromNewFiles = pool.filter((fn) => !usedFiles.has(fn.file));
     const candidates = fromNewFiles.length > 0 ? fromNewFiles : pool.filter((fn) => !picked.includes(fn));

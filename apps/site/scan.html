@@ -109,10 +109,10 @@
             <li><p>Your agent clones Gleam's public code at the release tag and runs its tests.</p></li>
             <li><p>It runs <a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's
                   OSV-Scanner</a> to check for publicly reported vulnerabilities in Gleam's dependencies.</p></li>
-            <li><p>It scans Gleam's security-relevant code and answers challenges about specific functions, to show it
-                read the code.</p></li>
-            <li><p>You open a link in your Gleam wallet and sign the scan's attestation, which records the release,
-                model and result.</p></li>
+            <li><p>It scans one area of Gleam's security-relevant code and answers challenges about specific functions,
+                to show it read the code. That's one round.</p></li>
+            <li><p>After each round, you choose another area or stop.</p></li>
+            <li><p>At the end, you open one link and sign each round's attestation with your Gleam wallet.</p></li>
           </ol>
         </details>
       </div>
@@ -134,12 +134,27 @@
           <ul class="sc-prose">
             <li>Each release has 100 paid scans.</li>
             <li>Scans 1 to 20 earn 0.1% of the GLEAM points minted the previous day. Scans 21 to 100 earn 0.02%.</li>
-            <li>Each wallet can submit one scan per release.</li>
+            <li>Each release has five areas: Key material, Signing, Trust boundary, Approval preview, and Build and
+              release.</li>
+            <li>Each wallet can scan each area once per release. Each scan is a round.</li>
+            <li>Each further round in the same release earns <span data-round-step>10</span>% more than your first,
+              so your third earns <span data-round-third>120</span>%.</li>
             <li>After 100, scans are still recorded and published, but they earn nothing unless they find a
               vulnerability.</li>
             <li>Paid places reset with each new release.</li>
           </ul>
         </details>
+      </div>
+
+      <div class="areas-block" data-areas hidden>
+        <h3 data-areas-title>Coverage by area</h3>
+        <table class="areas">
+          <caption class="visually-hidden">Functions examined and scans per area</caption>
+          <thead>
+            <tr><th scope="col">Area</th><th scope="col">Functions examined</th><th scope="col" class="num">Scans</th></tr>
+          </thead>
+          <tbody data-areas-rows></tbody>
+        </table>
       </div>
     </section>
 
