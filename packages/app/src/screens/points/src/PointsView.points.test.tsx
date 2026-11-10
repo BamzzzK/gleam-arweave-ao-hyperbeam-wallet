@@ -467,8 +467,6 @@ describe("PointsView", () => {
 
     expect(await screen.findByText("All your invites are used. You get two more when a friend you invited joins Points.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Invite a friend" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
-    expect(screen.getByText("You get two more when a friend you invited joins Points.")).toBeTruthy();
   });
 
   it("shows why a join failed", async () => {
@@ -591,8 +589,6 @@ describe("PointsView", () => {
 
     expect(await screen.findByText("You're ranked once a daily snapshot credits your points.")).toBeTruthy();
     expect(screen.queryByText(/Rank #|Unranked|points to pass/)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
-    expect(screen.getByText("Snapshots run just after midnight UTC.")).toBeTruthy();
   });
 
   it("asks an unranked wallet with no AR or AO to hold some", async () => {

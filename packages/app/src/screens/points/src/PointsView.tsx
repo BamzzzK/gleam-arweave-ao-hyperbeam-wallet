@@ -240,7 +240,7 @@ function JoinedView({
         </>
       )}
 
-      <AboutPoints className="mt-auto" notes={[t("points.twoMore"), t("points.snapshotTime")]}>
+      <AboutPoints className="mt-auto">
         <LeaveControl
           runtime={runtime}
           wallet={wallet}
@@ -429,11 +429,9 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
  */
 function AboutPoints({
   className,
-  notes,
   children,
 }: {
   className?: string;
-  notes?: string[];
   children?: ReactNode;
 }) {
   const t = useT();
@@ -466,11 +464,6 @@ function AboutPoints({
               detail={t("points.futureDetail")}
             />
           </ul>
-          {notes?.map((note) => (
-            <p key={note} className="px-4 text-caption text-muted phone:px-0">
-              {note}
-            </p>
-          ))}
           {children ? (
             <div className="flex justify-center">{children}</div>
           ) : null}
