@@ -1,5 +1,4 @@
 import { useId, type ReactNode } from "react";
-import { cn } from "./cn";
 
 /**
  * A labelled group of `OptionRow`s, for screens where the user picks one
@@ -14,7 +13,7 @@ export interface OptionSectionProps {
 export function OptionSection({ title, children }: OptionSectionProps) {
   return (
     <section aria-label={title}>
-      <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted phone:pb-0">
+      <div className="pb-1.5 text-caption font-semibold uppercase tracking-wide text-muted phone:pb-0.5">
         {title}
       </div>
       <div className="flex flex-col">{children}</div>
@@ -37,8 +36,6 @@ export interface OptionRowProps {
   count?: number;
   onClick?: () => void;
   disabled?: boolean;
-  /** Draws a line between rows. Turn off for plain lists of settings. */
-  divided?: boolean;
   /** Opens a page outside Gleam: an arrow out replaces the chevron. */
   external?: boolean;
 }
@@ -50,7 +47,6 @@ export function OptionRow({
   count,
   onClick,
   disabled = false,
-  divided = true,
   external = false,
 }: OptionRowProps) {
   const titleId = useId();
@@ -63,10 +59,7 @@ export function OptionRow({
       onClick={onClick}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      className={cn(
-        "flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50",
-        divided && "border-b border-line last:border-b-0 phone:border-b-0",
-      )}
+      className="flex w-full items-center gap-2.5 py-3.5 text-left hover:enabled:bg-mist phone:min-h-[3.75rem] phone:py-2.5 phone:active:enabled:bg-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground disabled:cursor-default disabled:opacity-50"
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span id={titleId} className="text-label font-semibold text-foreground">

@@ -143,7 +143,7 @@ export function ManageTokensView({ runtime, address, onBack }: ManageTokensViewP
                 const processId = newProcessId.trim();
                 if (processId.length > 0 && !PROCESS_ID.test(processId)) void handlePreview(processId);
               }}
-              className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+              className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
             />
             {addError ? (
               <span role="alert" className="text-caption text-warning">

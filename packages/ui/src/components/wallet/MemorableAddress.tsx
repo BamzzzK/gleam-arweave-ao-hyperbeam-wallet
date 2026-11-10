@@ -1,4 +1,4 @@
-import type { ClipboardEvent } from "react";
+import type { ClipboardEvent, ReactNode } from "react";
 import { chunkAddress } from "@gleam/core";
 import { cn } from "../../primitives/cn";
 import { AccountAvatar } from "./AccountAvatar";
@@ -11,6 +11,8 @@ export interface MemorableAddressProps {
   avatarSvg?: string;
   /** `confirm` is the last look before signing: a size larger, with heavier emphasis. */
   tone?: "default" | "confirm";
+  /** Placed in the grid's next cell, so it sits at the end of the last row. */
+  trailing?: ReactNode;
   className?: string;
 }
 
@@ -30,6 +32,7 @@ export function MemorableAddress({
   emphasisPick,
   avatarSvg,
   tone = "default",
+  trailing,
   className,
 }: MemorableAddressProps) {
   const confirm = tone === "confirm";
@@ -71,6 +74,7 @@ export function MemorableAddress({
               {chunk.text}
             </span>
           ))}
+          {trailing ? <span className="flex items-center pl-[0.35ch]">{trailing}</span> : null}
         </span>
       </span>
     </span>

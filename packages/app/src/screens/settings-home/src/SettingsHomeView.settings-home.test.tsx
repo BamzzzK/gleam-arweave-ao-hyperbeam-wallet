@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { renderWithPlatform as render } from "../../../app-platform/testing";
+import { fakeAppPlatform, renderWithPlatform as render } from "../../../app-platform/testing";
+import type { AppPlatform } from "../../../app-platform/types";
 import type { DisplaySettings, LockSettings, NetworkSettings, RuntimePort, ThemeSettings } from "@gleam/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SettingsHomeView } from "./SettingsHomeView";
@@ -38,7 +39,7 @@ function successfulSend(overrides: { theme?: ThemeSettings["theme"]; setTheme?: 
   }) as RuntimePort["send"];
 }
 
-function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeView>[0]> = {}) {
+function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeView>[0]> = {}, platform?: AppPlatform) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <SettingsHomeView
@@ -52,10 +53,34 @@ function renderSettingsHome(overrides: Partial<Parameters<typeof SettingsHomeVie
         {...overrides}
       />
     </QueryClientProvider>,
+    platform,
   );
 }
 
 describe("SettingsHomeView", () => {
+  it("moves the wallet to the side panel from the header", async () => {
+    const toggle = vi.fn(async () => {});
+    renderSettingsHome({}, fakeAppPlatform({ sidePanel: { docked: false, toggle } }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Open in side panel" }));
+    expect(toggle).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+  });
+
+  it("offers the popup from the side panel", async () => {
+    renderSettingsHome({}, fakeAppPlatform({ sidePanel: { docked: true, toggle: vi.fn(async () => {}) } }));
+
+    expect(screen.getByRole("button", { name: "Open as popup" })).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+  });
+
+  it("has no side panel button where the host has no side panel", async () => {
+    renderSettingsHome();
+
+    await waitFor(() => expect(screen.getByText("arweave.net")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Open in side panel" })).toBeNull();
+  });
+
   it("shows the auto-lock time on Security and the gateway on Network", async () => {
     renderSettingsHome();
 

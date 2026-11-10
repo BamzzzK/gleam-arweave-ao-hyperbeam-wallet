@@ -88,7 +88,19 @@ export function SettingsHomeView({
 
   return (
     <div className="flex min-h-full flex-col">
-      <ScreenHeader title={t("settingsHome.title")} onBack={onBack} />
+      <ScreenHeader
+        title={t("settingsHome.title")}
+        onBack={onBack}
+        end={
+          platform.sidePanel ? (
+            <SidePanelToggle
+              docked={platform.sidePanel.docked}
+              label={t(platform.sidePanel.docked ? "settingsHome.openAsPopup" : "settingsHome.openInSidePanel")}
+              onToggle={platform.sidePanel.toggle}
+            />
+          ) : undefined
+        }
+      />
 
       <div className="flex flex-1 flex-col gap-6 px-6 pb-4 pt-4 phone:px-5">
         <div className="flex flex-col">
@@ -104,20 +116,17 @@ export function SettingsHomeView({
           />
           {onOpenLockSettings ? (
             <OptionRow
-              divided={false}
               title={t("settingsHome.security")}
               value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
           <OptionRow
-            divided={false}
             title={t("settingsHome.appearance")}
             value={display ? [display.currency, languageName].filter(Boolean).join(" · ") : undefined}
             onClick={onOpenAppearance}
           />
           <OptionRow
-            divided={false}
             title={t("settingsHome.networkTitle")}
             value={state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"}
             onClick={onOpenNetworkPeers}
@@ -126,16 +135,33 @@ export function SettingsHomeView({
 
         <div className="flex flex-col">
           <OptionRow
-            divided={false}
             title={t("settingsHome.connectedApps")}
             count={state.connectedApps ?? undefined}
             onClick={onOpenConnectedApps}
           />
-          <OptionRow divided={false} external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />
+          <OptionRow external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />
         </div>
 
         <AboutBuild runtime={runtime} version={version} />
       </div>
     </div>
+  );
+}
+
+function SidePanelToggle({ docked, label, onToggle }: { docked: boolean; label: string; onToggle: () => Promise<void> }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={() => void onToggle().catch(() => {})}
+      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
+        <path d="M15 4v16" stroke="currentColor" strokeWidth="2" />
+        {docked ? <path d="M15 5h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3z" fill="currentColor" /> : null}
+      </svg>
+    </button>
   );
 }

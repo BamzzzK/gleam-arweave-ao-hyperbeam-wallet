@@ -12,7 +12,12 @@ export function DataItemCard({ index, item }: { index: number; item: OtherItem }
   const targetAvatarSvg = item.target ? identity.avatarSvg(item.target) : undefined;
   return (
     <div className="flex flex-col gap-1.5 rounded-md border border-line p-3">
-      <span className="text-caption font-semibold text-foreground">{t("approval.itemNumber", { number: index + 1 })}</span>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-caption font-semibold text-foreground">{t("approval.itemNumber", { number: index + 1 })}</span>
+        {item.unreadableTokenTransfer ? (
+          <span className="text-caption font-semibold text-warning">{t("approval.unreadableItem")}</span>
+        ) : null}
+      </div>
 
       {item.target !== null ? (
         <div className="flex flex-col gap-0.5">

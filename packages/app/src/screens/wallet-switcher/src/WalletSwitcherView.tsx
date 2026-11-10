@@ -21,7 +21,7 @@ const WALLET_METHOD_LABEL: Record<Exclude<WalletSummary["method"], "watch">, str
 /**
  * The sheet opened from the main screen's account pill. Lists every stored
  * wallet from `getState()` in saved order, marks the active one with a
- * green checkmark, and
+ * checkmark, and
  * switches on tap via `switchWallet`.
  *
  * "Add wallet" hands off to the add-wallet flow through `onAddWallet`. The
@@ -36,6 +36,9 @@ const WALLET_METHOD_LABEL: Record<Exclude<WalletSummary["method"], "watch">, str
  */
 export interface WalletSwitcherViewProps {
   runtime: RuntimePort;
+  /** Shown at once, so the remount that follows a switch doesn't flash a skeleton. */
+  initialWallets?: WalletSummary[];
+  initialActiveWalletId?: string | null;
   onSwitched: (walletId: string) => void;
   onBack: () => void;
   onAddWallet: () => void;
@@ -49,18 +52,18 @@ interface LoadState {
   error: string | null;
 }
 
-export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
+export function WalletSwitcherView({ runtime, initialWallets, initialActiveWalletId = null, onSwitched, onBack, onAddWallet, onManage }: WalletSwitcherViewProps) {
   const t = useT();
   const [state, setState] = useState<LoadState>({
-    wallets: [],
-    activeWalletId: null,
-    loading: true,
+    wallets: initialWallets ?? [],
+    activeWalletId: initialActiveWalletId,
+    loading: !initialWallets?.length,
     error: null,
   });
   const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState((prev) => ({ ...prev, loading: prev.wallets.length === 0, error: null }));
     try {
       const result = await runtime.send<void, WalletState>({ type: "getState", payload: undefined });
       setState({
@@ -87,6 +90,7 @@ export function WalletSwitcherView({ runtime, onSwitched, onBack, onAddWallet, o
     setSwitchingId(walletId);
     try {
       await runtime.send<{ walletId: string }, void>({ type: "switchWallet", payload: { walletId } });
+      setState((prev) => ({ ...prev, activeWalletId: walletId }));
       onSwitched(walletId);
     } catch (error) {
       setState((prev) => ({
@@ -158,15 +162,21 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const avatarSvg = identity.avatarSvg(wallet.address);
   const methodLabel = wallet.method === "watch" ? t("common.watchOnly") : WALLET_METHOD_LABEL[wallet.method];
   const { copied, copy } = useCopy(wallet.address);
+  const activeBadge = active ? (
+    <span className="shrink-0 whitespace-pre">
+      <span className="text-faint"> · </span>
+      <span className="font-medium text-positive">{t("walletSwitcher.active")}</span>
+    </span>
+  ) : null;
 
   return (
     // The row bleeds 8px past the list edge so the hover fill has room
-    // around its content while text stays aligned with the header. Only
-    // the "Active" label marks the active row: a fill would read as hover. Copy
-    // floats beside the chevron instead of taking a column, so the address
-    // keeps the full width for its 7-chunk first row.
+    // around its content while text stays aligned with the header. A green
+    // fill and label mark the active row; grey is hover. Copy floats beside
+    // the chevron instead of taking a column, so the address keeps the full
+    // width for its 7-chunk first row.
     <div
-      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "" : "hover:bg-mist"}`}
+      className={`group relative -mx-2 flex items-center gap-1 rounded-xl pl-2 pr-1 ${active ? "bg-positive/[0.06]" : "hover:bg-mist"}`}
     >
       <button
         type="button"
@@ -177,31 +187,15 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
       >
         <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-label font-semibold text-foreground">
+          <span className="flex min-w-0 items-baseline text-label">
+            <span className="truncate font-semibold text-foreground">
               {wallet.name}
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
-            {active ? (
-              <span className="flex-shrink-0 text-caption font-medium text-positive">
-                {t("walletSwitcher.active")}
-              </span>
-            ) : (
-              // Hidden on phone: tapping the row is the expected way to switch,
-              // and the text would take the width the name needs.
-              <span className="flex-shrink-0 text-caption font-medium text-muted opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 phone:hidden">
-                {t("walletSwitcher.makeActive")}
-              </span>
-            )}
+            {/* Outside the truncating span so a long name can't clip it. */}
+            {activeBadge}
           </span>
-          {/* A pointer shortcut to the manage button beside the row, which keyboard and screen-reader users reach directly. */}
-          <span
-            onClick={(event) => {
-              event.stopPropagation();
-              onManage();
-            }}
-            className="cursor-pointer"
-          >
+          <span>
             {/* The phone's copy and manage tap targets leave too little width for the chunked address, so it runs as plain wrapped text there. */}
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:hidden" />
             <span translate="no" className="hidden break-all font-mono text-caption leading-relaxed text-muted phone:block">

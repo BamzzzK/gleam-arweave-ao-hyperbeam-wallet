@@ -169,13 +169,14 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     expect(onManage).toHaveBeenCalledWith("wallet-2");
   });
 
-  it("opens a wallet's details, not a switch, when its address is tapped", async () => {
+  it("switches, not opens details, when a wallet's address is tapped", async () => {
     const onManage = vi.fn();
-    const send = vi.fn().mockResolvedValue(STATE);
+    const onSwitched = vi.fn();
+    const send = vi.fn().mockImplementation(async (message: { type: string }) => (message.type === "getState" ? STATE : undefined));
     render(
       <WalletSwitcherView
         runtime={fakeRuntime({ send })}
-        onSwitched={vi.fn()}
+        onSwitched={onSwitched}
         onBack={vi.fn()}
         onAddWallet={vi.fn()}
         onManage={onManage}
@@ -184,7 +185,7 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
 
     await waitFor(() => expect(screen.getByText("Trading")).toBeTruthy());
     fireEvent.click(screen.getByText(STATE.wallets[1]!.address));
-    expect(onManage).toHaveBeenCalledWith("wallet-2");
-    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "switchWallet" }));
+    await waitFor(() => expect(onSwitched).toHaveBeenCalledWith("wallet-2"));
+    expect(onManage).not.toHaveBeenCalled();
   });
 });

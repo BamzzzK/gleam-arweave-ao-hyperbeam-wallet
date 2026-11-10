@@ -52,6 +52,7 @@ const BLOCKED_HOST_SUFFIXES = [
   ".ngrok.dev",
   ".loca.lt",
   ".sslip.io",
+  ".nip.io",
 ];
 
 function isPrivateIpv4(host: string): boolean {
@@ -88,6 +89,9 @@ export function normalizePeerUrl(raw: string): string | null {
   if (url.username || url.password || url.search || url.hash) return null;
   if (url.pathname !== "/" && url.pathname !== "") return null;
   const host = url.hostname.toLowerCase();
+  // A fully-qualified "localhost." or "x.local." would slip past every exact
+  // and suffix check below, and no public node is announced that way.
+  if (host.endsWith(".")) return null;
   if (host === "localhost" || host.startsWith("[")) return null;
   if (isPrivateIpv4(host)) return null;
   if (BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix) || host === suffix.slice(1))) return null;

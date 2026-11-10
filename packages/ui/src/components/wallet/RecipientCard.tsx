@@ -51,7 +51,7 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
       </span>
     </>
   );
-  const frame = "flex w-full items-center gap-3.5 phone:gap-3 rounded-md border border-line bg-background py-3 pl-3.5 pr-3 text-left phone:pl-3";
+  const frame = "flex w-full items-center gap-3.5 phone:gap-3 rounded-md bg-foreground/[0.03] py-3 pl-3.5 pr-3 text-left phone:pl-3";
 
   if (onEdit) {
     return (
@@ -59,7 +59,7 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
         type="button"
         onClick={onEdit}
         aria-label={labels.change(name ?? null)}
-        className={cn(frame, "transition-colors hover:border-faint focus-visible:border-foreground focus-visible:outline-none", className)}
+        className={cn(frame, "transition-colors hover:bg-foreground/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground", className)}
       >
         {body}
       </button>

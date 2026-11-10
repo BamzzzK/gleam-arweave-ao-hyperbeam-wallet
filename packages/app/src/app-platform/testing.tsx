@@ -44,7 +44,6 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     runtime: overrides.runtime ?? UNWIRED_RUNTIME,
     buildInfo: { version: "1.2.3", foundingGate: true, ...overrides.buildInfo },
     capabilities: {
-      sidePanel: true,
       passkey: true,
       biometrics: false,
       dappBrowser: false,
@@ -91,6 +90,7 @@ export function fakeAppPlatform(overrides: FakeAppPlatformOverrides = {}): AppPl
     ...(overrides.backButton ? { backButton: overrides.backButton } : {}),
     ...(overrides.approvalSheet ? { approvalSheet: overrides.approvalSheet } : {}),
     ...(overrides.notices ? { notices: overrides.notices } : {}),
+    ...(overrides.sidePanel ? { sidePanel: overrides.sidePanel } : {}),
   };
 }
 

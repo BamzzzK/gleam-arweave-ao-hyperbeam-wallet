@@ -89,7 +89,6 @@ export async function createMobileAppPlatform({ onInviteGateChanged }: MobileApp
     runtime,
     buildInfo: { version, foundingGate },
     capabilities: {
-      sidePanel: false,
       passkey: false,
       biometrics: preview?.capabilities.biometrics ?? true,
       hardwareWallets: { ledger: false, keystone: true },

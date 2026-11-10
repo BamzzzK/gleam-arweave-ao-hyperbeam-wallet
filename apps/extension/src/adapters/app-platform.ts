@@ -8,6 +8,7 @@ import { openPasskeyWindow } from "@/src/passkey/open-window";
 import { STORE_REVIEWS_URL } from "@gleam/core";
 import { createExtensionQueryCache } from "./query-cache";
 import { runtimePort } from "./runtime";
+import { createSidePanelPort } from "./side-panel";
 
 /**
  * The background keeps each tab's other-wallet report in session storage
@@ -45,7 +46,6 @@ export function createExtensionAppPlatform(
       foundingGate: import.meta.env.WXT_FOUNDING_GATE !== "false",
     },
     capabilities: {
-      sidePanel: true,
       passkey: true,
       biometrics: false,
       hardwareWallets: { ledger: true, keystone: true },
@@ -90,6 +90,7 @@ export function createExtensionAppPlatform(
       signPanels: options.signPanels ?? null,
     },
     dappBrowser: unavailableDappBrowser,
+    ...(surface === "window" ? {} : { sidePanel: createSidePanelPort(surface) }),
     storeReview: {
       opensPage: true,
       request: async () => {

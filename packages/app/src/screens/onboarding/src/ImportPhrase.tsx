@@ -256,7 +256,7 @@ export function ImportPhrase({ onBack, onValidJWK, derive = defaultDerive }: Imp
                     }
                   }}
                   className={cn(
-                    "w-full rounded-md border border-line bg-background py-2 pl-7 pr-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none",
+                    "w-full rounded-md border border-line bg-background py-2 pl-7 pr-2 font-mono text-label text-foreground focus:border-foreground/25 focus:outline-none",
                     unknown && "border-warning",
                     !(revealed || focused === index) && MASKED,
                   )}

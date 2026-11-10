@@ -413,10 +413,10 @@ internal class DappWebView(
         if (closed || leavePrompt != null || declinedToLeave || activity.isFinishing) return
         val intent = externalIntent(url) ?: return
         // For an intent: link, show what will launch rather than the raw link.
-        val link = intent.dataString ?: url
-        val target = intent.`package`?.let { "$link\n($it)" } ?: link
+        // Only the link is cut, so a long one can't hide the app that opens.
+        val link = (intent.dataString ?: url).let { if (it.length > 120) it.take(119) + "…" else it }
+        val shown = intent.`package`?.let { "$link\n($it)" } ?: link
         val site = webView?.url?.let { Uri.parse(it).host } ?: "This page"
-        val shown = if (target.length > 120) target.take(119) + "…" else target
         val dialog = AlertDialog.Builder(activity)
             .setTitle("Open another app?")
             .setMessage("$site wants to open this link outside Gleam:\n\n$shown")

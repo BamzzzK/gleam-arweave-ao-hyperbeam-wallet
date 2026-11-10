@@ -99,10 +99,7 @@ export function AddressDisplay({
         // Holding would otherwise select the text or open the OS menu.
         onContextMenu={(event) => event.preventDefault()}
         aria-label={copied ? labels.copied : labels.copy(address)}
-        className={cn(
-          "flex w-full select-none justify-center rounded-lg border bg-mist px-4 py-3 transition-colors [-webkit-touch-callout:none]",
-          copied ? "border-positive" : "border-line hover:border-faint",
-        )}
+        className="flex w-full select-none justify-center rounded-lg border border-line bg-foreground/[0.03] px-4 py-3 transition-colors [-webkit-touch-callout:none] hover:bg-foreground/[0.05] focus:outline-none focus-visible:border-foreground"
       >
         <MemorableAddress address={address} emphasisPick={emphasisPick} className="justify-center" />
       </button>

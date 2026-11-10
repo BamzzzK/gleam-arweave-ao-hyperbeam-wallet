@@ -223,7 +223,7 @@ export function WalletDetailView({
             type="button"
             onClick={() => setStep({ kind: "export-password", submitting: false })}
             aria-describedby="keyfile-backup-status"
-            className="flex w-full items-center gap-2.5 rounded-lg border border-line px-3.5 py-3 text-left hover:bg-mist"
+            className="flex w-full items-center gap-2.5 rounded-lg bg-foreground/[0.03] px-3.5 py-3 text-left transition-colors hover:bg-foreground/[0.05]"
           >
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="text-label font-semibold text-foreground">{t("walletDetail.backUpKeyfile")}</span>

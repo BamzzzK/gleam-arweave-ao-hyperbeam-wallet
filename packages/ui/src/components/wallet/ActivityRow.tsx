@@ -57,7 +57,7 @@ export function ActivityRow({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "flex w-full flex-col gap-2 border-b border-line px-3.5 py-3 text-left last:border-b-0 phone:border-b-0 phone:px-0 phone:py-3.5",
+        "flex w-full flex-col gap-2 px-3.5 py-3 text-left phone:px-0 phone:py-3.5",
         onClick && "cursor-pointer hover:bg-mist phone:active:bg-mist",
         className,
       )}
@@ -66,7 +66,7 @@ export function ActivityRow({
         <div
           aria-hidden="true"
           className={cn(
-            "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full border border-line bg-mist",
+            "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-mist",
             ICON_TONE_CLASSES[activityType],
           )}
         >

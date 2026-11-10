@@ -42,6 +42,15 @@ describe("dApp view plugin", () => {
     }
   });
 
+  it("cuts only the link in the open-another-app prompt, never the app it names", () => {
+    const prompt = kotlin.slice(kotlin.indexOf("private fun askToOpenElsewhere"), kotlin.indexOf(".setMessage("));
+    const cut = prompt.indexOf(".take(119)");
+    const named = prompt.indexOf("intent.`package`");
+    expect(cut).toBeGreaterThan(-1);
+    expect(named).toBeGreaterThan(cut);
+    expect(prompt.slice(named)).not.toContain(".take(");
+  });
+
   it("emits the events the API declares", () => {
     for (const event of ["message", "navigation", "loadError"]) {
       expect(swift).toContain(`notifyListeners("${event}"`);

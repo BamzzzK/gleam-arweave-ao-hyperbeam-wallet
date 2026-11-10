@@ -56,9 +56,10 @@ function gatewayHostname(gatewayUrl: string): string {
   }
 }
 
-function peerHostname(peerUrl: string): string {
+/** Host and port in full: a lookalike peer can differ only at the end. */
+function peerHost(peerUrl: string): string {
   try {
-    return new URL(peerUrl).hostname;
+    return new URL(peerUrl).host;
   } catch {
     return peerUrl;
   }
@@ -384,7 +385,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     setNewGatewayUrl(event.target.value);
                     setGatewayError(null);
                   }}
-                  className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+                  className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                 />
                 {gatewayError ? (
                   <span role="alert" className="text-caption text-warning">
@@ -460,11 +461,11 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default phone:hit-target"
                       >
                         <span
-                          className={`truncate font-mono text-label font-semibold ${
+                          className={`break-all font-mono text-label font-semibold ${
                             peer.enabled ? "text-foreground" : "text-faint"
                           }`}
                         >
-                          {peerHostname(peer.url)}
+                          {peerHost(peer.url)}
                         </span>
                         <span className={`text-caption ${isActive ? "text-positive" : "text-muted"}`}>
                           {isActive ? t("networkPeers.active") : peer.enabled ? t("networkPeers.enabled") : t("networkPeers.disabled")}
@@ -475,7 +476,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                           type="button"
                           role="switch"
                           aria-checked={peer.enabled}
-                          aria-label={t("networkPeers.enablePeer", { host: peerHostname(peer.url) })}
+                          aria-label={t("networkPeers.enablePeer", { host: peerHost(peer.url) })}
                           disabled={saving}
                           onClick={() => handleToggleEnabled(peer.url)}
                           className={`relative flex h-5 w-[34px] flex-shrink-0 items-center rounded-full border px-0.5 transition-colors disabled:opacity-60 phone:hit-target ${
@@ -492,7 +493,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         {isHardcodedPeer(peer.url) ? null : (
                           <button
                             type="button"
-                            aria-label={t("networkPeers.removePeer", { host: peerHostname(peer.url) })}
+                            aria-label={t("networkPeers.removePeer", { host: peerHost(peer.url) })}
                             disabled={saving}
                             onClick={() => handleRemovePeer(peer.url)}
                             className="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-warning disabled:opacity-60"
@@ -516,7 +517,7 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                         setNewPeerUrl(event.target.value);
                         setAddError(null);
                       }}
-                      className="w-full rounded-md border border-line bg-background px-3 py-2 font-mono text-label text-foreground focus:border-foreground focus:outline-none"
+                      className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
                     />
                     {addError ? (
                       <span role="alert" className="text-caption text-warning">
