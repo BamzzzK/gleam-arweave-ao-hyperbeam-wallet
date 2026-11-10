@@ -79,7 +79,7 @@ export function ActivityRow({
         {collectible ? (
           <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-[30px] flex-shrink-0 rounded-md" />
         ) : (
-          <div className="flex-shrink-0 text-label font-medium tabular-nums text-foreground">
+          <div className="flex-shrink-0 text-label font-normal tabular-nums text-foreground">
             <span className={amountTone === "positive" ? "text-positive" : amountTone === "negative" ? "text-negative" : undefined}>
               {amountLabel}
             </span>

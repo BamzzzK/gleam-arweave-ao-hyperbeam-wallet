@@ -146,15 +146,19 @@ export async function queryActivityTransactions(
   ]);
 
   // Keyed by id: gateways can return the same node twice, and a self-send
-  // shows up on both sides (kept as the send).
+  // shows up on both sides (kept as the send). The second copy of a mined
+  // transaction can come back with no block, so it never replaces one
+  // that has a block.
   const byId = new Map<string, ActivityEntry>();
+  const keep = (node: GraphQLTransactionNode) => {
+    if (!node.block && byId.get(node.id)?.status === "confirmed") return;
+    byId.set(node.id, toActivityEntry(node, address));
+  };
   for (const node of received) {
-    if (node.owner.address !== address && BigInt(node.quantity.winston || "0") > 0n) {
-      byId.set(node.id, toActivityEntry(node, address));
-    }
+    if (node.owner.address !== address && BigInt(node.quantity.winston || "0") > 0n) keep(node);
   }
   for (const node of sent) {
-    if (node.owner.address === address) byId.set(node.id, toActivityEntry(node, address));
+    if (node.owner.address === address) keep(node);
   }
   return [...byId.values()];
 }

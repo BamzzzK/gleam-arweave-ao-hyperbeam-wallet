@@ -67,6 +67,36 @@ describe("queryActivityTransactions", () => {
     expect(entry?.address).toBe("otherAddr");
   });
 
+  it("keeps a mined receive confirmed when the gateway lists it again with no block", async () => {
+    const fetchImpl = fakeSidedFetch(
+      [],
+      [
+        edge({ id: "tx2", ownerAddress: "otherAddr", recipient: ADDRESS, winston: "42", timestamp: 200 }),
+        edge({ id: "tx2", ownerAddress: "otherAddr", recipient: ADDRESS, winston: "42", timestamp: null }),
+      ],
+    );
+
+    const entries = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.status).toBe("confirmed");
+    expect(entries[0]?.timestamp).toBe(200_000);
+  });
+
+  it("keeps a mined send confirmed when the gateway lists it again with no block", async () => {
+    const fetchImpl = fakeSidedFetch(
+      [
+        edge({ id: "tx1", ownerAddress: ADDRESS, recipient: "otherAddr", winston: "500", timestamp: 100 }),
+        edge({ id: "tx1", ownerAddress: ADDRESS, recipient: "otherAddr", winston: "500", timestamp: null }),
+      ],
+      [],
+    );
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry?.status).toBe("confirmed");
+  });
+
   it("preserves amount as an atomic-integer string", async () => {
     const fetchImpl = fakeGraphQLFetch([
       edge({ id: "tx3", ownerAddress: ADDRESS, recipient: "x", winston: "9007199254740993000", timestamp: 1 }),
