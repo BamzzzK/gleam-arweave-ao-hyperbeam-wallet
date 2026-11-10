@@ -33,7 +33,7 @@ export function RecentEarnings({
   const label = (row: PointsRecentEntry): { title: string; detail: string | null } => {
     switch (row.kind) {
       case "holding":
-        return { title: t("points.sourceHolding"), detail: null };
+        return { title: t("points.sourceHolding"), detail: t("points.sourceHoldingDetail") };
       case "invited":
         return { title: t("points.sourceInvited"), detail: null };
       case "founder":

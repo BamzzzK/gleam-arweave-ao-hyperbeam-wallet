@@ -338,6 +338,7 @@ function Standing({
         </p>
       )}
       {line ? <p className="text-h3 text-foreground">{line}</p> : null}
+      {!welcome && toNext ? <p className="text-label text-muted">{t("points.holdToClimb")}</p> : null}
       {rank === null && score ? (
         <p className="text-body text-muted">{t(holdsNothing ? "points.holdToEarn" : "points.unrankedHint")}</p>
       ) : null}
