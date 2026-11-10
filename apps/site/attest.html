@@ -48,10 +48,19 @@
         <summary data-f-answers-summary>Challenge answers</summary>
         <ol class="answers" data-f-answers></ol>
       </details>
+    </div>
 
-      <div class="sign">
-        <p class="line sign-step" data-sign-step hidden></p>
+    <div data-batch hidden>
+      <p class="line">Sign each round with Gleam. Gleam opens its own window for each one.</p>
+      <ol class="rounds" data-rounds></ol>
+    </div>
+
+    <div class="sign" data-sign-block hidden>
+      <p class="line sign-step" data-sign-step hidden></p>
+      <p class="line sign-status" data-batch-status role="status" aria-live="polite" tabindex="-1" hidden></p>
+      <div class="sign-actions">
         <button class="button" type="button" data-sign disabled>Checking for Gleam…</button>
+        <button class="button button-quiet" type="button" data-skip hidden></button>
         <a class="button" data-install hidden>Add Gleam to Chrome</a>
         <a class="button" data-open-app hidden>Open in Gleam</a>
       </div>

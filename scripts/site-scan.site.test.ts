@@ -21,7 +21,9 @@ import {
   bountyTiers,
   coverageSummary,
   extensionIdFor,
+  appAttestHref,
   decodeAttestationFragment,
+  decodeAttestationLink,
   describeOutcome,
   fetchAreas,
   fetchCount,
@@ -35,7 +37,9 @@ import {
   resultsHref,
   roundLabel,
   roundStepPercent,
+  roundSummary,
   sendAttestation,
+  sumPoints,
   checkGleam,
   unusedModels,
 } from "../apps/site/scan-lib.js";
@@ -77,6 +81,55 @@ describe("site scan lib: link payload", () => {
     bad(`#${btoa("\xff\xfe").replace(/=+$/, "")}`); // invalid UTF-8
     bad(`#${btoa(JSON.stringify({ ...attestation, result: "fail" })).replace(/=+$/, "")}`);
     bad(`#${btoa(JSON.stringify({ ...attestation, answers: [{ file: 1 }] })).replace(/=+$/, "")}`);
+  });
+});
+
+describe("site scan lib: a link with several rounds", () => {
+  const payload = (report: string) => encodeAttestationPayload({ ...attestation, report } as never);
+  const reports = ["## Coverage\n\nArea: Key material (tier 1).", "Area: Signing (tier 2).", "- **Area:** `Trust boundary`"];
+
+  it("decodes each payload in order, and a single payload as one round", () => {
+    const parts = reports.map(payload);
+    const decoded = decodeAttestationLink(`#${parts.join(".")}`);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.rounds.map((round) => round.ok && round.attestation.report)).toEqual(reports);
+    expect(decoded.rounds.map((round) => round.payload)).toEqual(parts);
+    expect(decodeAttestationLink(`#${parts[0]}`)).toEqual({ ok: true, rounds: [{ ok: true, payload: parts[0], attestation: { ...attestation, report: reports[0] } }] });
+  });
+
+  it("marks one bad payload as a damaged round and keeps the others", () => {
+    const decoded = decodeAttestationLink(`#${payload(reports[0]!)}.e30.${payload(reports[1]!)}`);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.rounds.map((round) => round.ok)).toEqual([true, false, true]);
+    expect(decoded.rounds[1]).toMatchObject({ ok: false, payload: "e30", error: expect.stringMatching(/damaged/) });
+  });
+
+  it("rejects a link with too many rounds, an empty round, or no round that decodes", () => {
+    const tooMany = decodeAttestationLink(`#${Array.from({ length: SCAN_AREAS.length + 1 }, () => payload("x")).join(".")}`);
+    expect(tooMany).toEqual({ ok: false, error: expect.stringMatching(/more rounds than a release has areas/) });
+    expect(decodeAttestationLink(`#${Array.from({ length: SCAN_AREAS.length }, () => payload("x")).join(".")}`).ok).toBe(true);
+    expect(decodeAttestationLink(`#${payload("x")}.`).ok).toBe(false);
+    expect(decodeAttestationLink(`#${payload("x")}..${payload("y")}`).ok).toBe(false);
+    expect(decodeAttestationLink("#e30.e30").ok).toBe(false);
+    expect(decodeAttestationLink("").ok).toBe(false);
+    // A single bad payload fails the same way it always has.
+    expect(decodeAttestationLink("#e30")).toEqual(decodeAttestationFragment("#e30"));
+  });
+
+  it("labels a round with the report's first line that isn't a heading", () => {
+    const summary = (report: string) => roundSummary({ ...attestation, report });
+    expect(summary(reports[0]!)).toBe("Area: Key material (tier 1).");
+    expect(summary(reports[2]!)).toBe("Area: Trust boundary");
+    expect(summary("# Only a heading\n\n")).toBe("claude-opus-5-5, pass");
+    expect(summary("x".repeat(200))).toHaveLength(90);
+  });
+
+  it("links each round to the app on its own and adds up points", () => {
+    expect(appAttestHref("abc")).toBe("https://open.gleamwallet.app/attest#abc");
+    expect(sumPoints(["1000000000000", "2500000000000", "0", "<b>", undefined])).toBe("3500000000000");
+    expect(sumPoints([])).toBe("0");
   });
 });
 

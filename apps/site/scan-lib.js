@@ -90,7 +90,9 @@ export function idFromHash(hash) {
 
 // --- attest.html: the link's payload ---------------------------------------
 
-const BAD_LINK = "This link isn't a Gleam attestation. Open the link `pnpm scan finish` printed, unchanged.";
+const BAD_LINK = "This link isn't a Gleam attestation. Open the link your agent printed, unchanged.";
+const TOO_MANY_ROUNDS = "This link has more rounds than a release has areas. Open the link your agent printed, unchanged.";
+const DAMAGED_ROUND = "This round's part of the link is damaged, so it can't be signed.";
 
 /**
  * Decodes `attest.html#<payload>`: base64url (no padding) of UTF-8 JSON, the
@@ -111,6 +113,57 @@ export function decodeAttestationFragment(hash) {
   }
   if (!isShowable(value)) return { ok: false, error: BAD_LINK };
   return { ok: true, attestation: value };
+}
+
+/**
+ * Decodes `attest.html#<p1>.<p2>…`, one payload per round (`.` is outside the
+ * base64url alphabet). A payload that doesn't decode is a damaged round, so
+ * the rest can still be signed; the link fails as a whole only when it is
+ * empty, malformed, carries more rounds than a release has areas, or has no
+ * round that decodes. Settles with `{ ok: true, rounds }`, each round
+ * `{ ok: true, payload, attestation }` or `{ ok: false, payload, error }`, or
+ * with `{ ok: false, error }`.
+ */
+export function decodeAttestationLink(hash) {
+  const parts = hash.replace(/^#/, "").split(".");
+  if (parts.length > SCAN_AREAS.length) return { ok: false, error: TOO_MANY_ROUNDS };
+  if (parts.some((part) => part === "")) return { ok: false, error: BAD_LINK };
+  const rounds = parts.map((payload) => {
+    const decoded = decodeAttestationFragment(payload);
+    return decoded.ok ? { ok: true, payload, attestation: decoded.attestation } : { ok: false, payload, error: DAMAGED_ROUND };
+  });
+  if (!rounds.some((round) => round.ok)) return { ok: false, error: BAD_LINK };
+  return { ok: true, rounds };
+}
+
+/** The app's attest link for one payload: the app takes one attestation per link. */
+export function appAttestHref(payload) {
+  return `https://open.gleamwallet.app/attest#${payload}`;
+}
+
+const SUMMARY_MAX = 90;
+
+/**
+ * A one-line label for a round: the report's first line that isn't a heading
+ * (its "Area: …" line, as the skill writes it), without list or emphasis
+ * marks; the model and result when the report has no such line.
+ */
+export function roundSummary(attestation) {
+  for (const raw of attestation.report.split("\n")) {
+    const trimmed = raw.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const line = trimmed.replace(/^(?:[-*+]|\d+\.)\s+/, "").replace(/\*\*|`/g, "").trim();
+    if (line === "") continue;
+    return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX - 1).trimEnd()}\u2026` : line;
+  }
+  return `${attestation.model}, ${attestation.result}`;
+}
+
+/** The sum of atomic point amounts; anything that isn't one counts as 0. */
+export function sumPoints(amounts) {
+  let total = 0n;
+  for (const amount of amounts) if (typeof amount === "string" && /^\d{1,40}$/.test(amount)) total += BigInt(amount);
+  return total.toString();
 }
 
 function isShowable(value) {
