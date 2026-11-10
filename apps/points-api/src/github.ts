@@ -1,10 +1,13 @@
 import {
   MAX_SCAN_FILE_BYTES,
   RELEASE_PATTERN,
+  areaOfTier,
   isScannablePath,
   listSurfaceFunctions,
   parseSurfaceText,
+  surfaceFileTiers,
   surfaceFiles,
+  type ScanAreaId,
   type SurfaceFunction,
 } from "@gleam/core/src/scan/index.ts";
 
@@ -17,11 +20,16 @@ export interface Release {
   commit: string;
 }
 
+/** A surface function and the area (its file's tier) it is scanned in. */
+export interface ReleaseFunction extends SurfaceFunction {
+  area: ScanAreaId;
+}
+
 /** The security-surface files at a commit, read once and kept. */
 export interface ReleaseFiles {
   files: ReadonlyMap<string, string>;
   /** Every function a challenge may name, and the coverage denominator. */
-  functions: readonly SurfaceFunction[];
+  functions: readonly ReleaseFunction[];
 }
 
 export interface GithubClient {
@@ -241,7 +249,12 @@ export function createGithubClient(options: GithubClientOptions = {}): GithubCli
       }),
     );
     try {
-      return { files: texts, functions: listSurfaceFunctions(wanted.map((path) => ({ path, text: texts.get(path)! }))) };
+      const tiers = surfaceFileTiers(entries, wanted);
+      const functions = listSurfaceFunctions(wanted.map((path) => ({ path, text: texts.get(path)! }))).map((fn) => ({
+        ...fn,
+        area: areaOfTier(tiers.get(fn.file)!).id,
+      }));
+      return { files: texts, functions };
     } catch (cause) {
       throw new GithubUnavailableError(`The surface files couldn't be read: ${String(cause)}`);
     }

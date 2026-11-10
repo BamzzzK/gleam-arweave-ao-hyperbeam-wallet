@@ -5,21 +5,27 @@ import {
   type PointsProofKind,
 } from "@gleam/core/src/points/index.ts";
 import {
+  SCAN_AREAS,
   attestationId,
   checkAnswers,
   isRelease,
+  isScanAreaId,
   nextScanIsFull,
   PAID_SCANS_PER_RELEASE,
   parseAttestation,
+  roundReward,
+  scanArea,
   scanRewards,
   type AttestationAnswer,
   type ChallengeFunction,
   type ParsedAttestation,
+  type ScanAreaId,
   type ScanIssue,
 } from "@gleam/core/src/scan/index.ts";
 import type { Db, Queryable } from "./db";
-import { GithubUnavailableError, type GithubClient } from "./github";
+import { GithubUnavailableError, type GithubClient, type ReleaseFunction } from "./github";
 import { BASE64URL, MAX_MESSAGE_LENGTH, MAX_OWNER_LENGTH, MAX_SIGNATURE_LENGTH } from "./register";
+import { answeredFunctions, areaSummaries, areasLeft, functionKey, walletAreas, type AreaSummary } from "./scan-areas";
 import {
   GITHUB_UNAVAILABLE,
   NO_RELEASE,
@@ -70,6 +76,8 @@ export interface CheckResult {
   /** What the wallet signs. */
   message: string;
   paidPlacesLeft: number;
+  /** The area the challenge was drawn from. */
+  area: ScanAreaId;
 }
 
 /** Why a scan earned nothing: its release's paid places were gone, or no daily snapshot exists yet to base points on. */
@@ -83,6 +91,10 @@ export interface SubmitResult {
   /** Null when `paid`, and for a scan recorded before the reason was kept. */
   unpaidReason: UnpaidReason | null;
   paidPlacesLeft: number;
+  /** Null only when retrying a scan recorded before areas. */
+  area: ScanAreaId | null;
+  /** 1 for the wallet's first scan of the release; null only when retrying a scan recorded before rounds. */
+  round: number | null;
 }
 
 interface ChallengeRow {
@@ -91,6 +103,13 @@ interface ChallengeRow {
   functions: ChallengeFunction[];
   expires_at: Date;
   used_by_attestation: string | null;
+  area: string | null;
+}
+
+interface Checked {
+  ok: true;
+  functions: readonly ReleaseFunction[];
+  area: ScanAreaId;
 }
 
 /**
@@ -103,7 +122,7 @@ async function checkAgainstRelease(
   github: GithubClient,
   attestation: ParsedAttestation,
   now: Date,
-): Promise<{ ok: true; functionTotal: number } | ScanFailure> {
+): Promise<Checked | ScanFailure> {
   const latest = await github.latestRelease();
   if (!latest) return NO_RELEASE;
 
@@ -125,7 +144,7 @@ async function checkAgainstRelease(
   }
 
   const { rows } = await db.query<ChallengeRow>(
-    "SELECT release, commit, functions, expires_at, used_by_attestation FROM challenges WHERE id = $1",
+    "SELECT release, commit, functions, expires_at, used_by_attestation, area FROM challenges WHERE id = $1",
     [attestation.challenge],
   );
   const challenge = rows[0];
@@ -133,6 +152,7 @@ async function checkAgainstRelease(
     add("challenge_unknown", "challenge", `This challenge id is unknown; ${restart}.`);
   } else {
     if (challenge.expires_at.getTime() <= now.getTime()) add("challenge_expired", "challenge", `This challenge expired; ${restart}.`);
+    else if (!isScanAreaId(challenge.area)) add("challenge_expired", "challenge", `This challenge was issued before scan areas; ${restart}.`);
     if (challenge.used_by_attestation !== null) add("challenge_used", "challenge", `This challenge was already used; ${restart}.`);
     if (challenge.release !== attestation.release) {
       add("challenge_wrong_release", "challenge", `This challenge was issued for v${challenge.release}, not v${attestation.release}; ${restart}.`);
@@ -145,14 +165,14 @@ async function checkAgainstRelease(
     }
   }
 
-  if (issues.length > 0 || !challenge) return failureFromIssues(issues);
+  if (issues.length > 0 || !challenge || !isScanAreaId(challenge.area)) return failureFromIssues(issues);
 
   const { files, functions } = await github.filesAt(latest.commit);
   const answerIssues = checkAnswers(attestation.answers, challenge.functions, files);
   if (answerIssues.length > 0) {
     return { ok: false, status: 422, code: "answers_failed", error: answerIssues[0]!.message, issues: answerIssues };
   }
-  return { ok: true, functionTotal: functions.length };
+  return { ok: true, functions, area: challenge.area };
 }
 
 function invalidAttestation(issues: ScanIssue[]): ScanFailure {
@@ -176,7 +196,7 @@ async function distinctModels(db: Queryable, release: string): Promise<string[]>
   return rows.map((row) => row.model);
 }
 
-async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
+export async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
   const { rows } = await db.query<{ taken: string }>(
     "SELECT count(*)::text AS taken FROM attestations WHERE release = $1 AND paid AND voided_at IS NULL",
     [release],
@@ -184,7 +204,7 @@ async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
   return Math.max(0, PAID_SCANS_PER_RELEASE - Number(rows[0]!.taken));
 }
 
-/** Everything `POST /attestations` checks except the signature, wallet liveness and registration; the one-per-release rule only when the request names the wallet. */
+/** Everything `POST /attestations` checks except the signature, wallet liveness and registration; the one-per-area rule only when the request names the wallet. */
 export async function checkAttestation(
   db: Queryable,
   github: GithubClient,
@@ -197,11 +217,8 @@ export async function checkAttestation(
     const checked = await checkAgainstRelease(db, github, parsed.attestation, now);
     if (!checked.ok) return checked;
     if (request.address !== undefined) {
-      const attested = await db.query("SELECT 1 FROM attestations WHERE address = $1 AND release = $2", [
-        request.address,
-        parsed.attestation.release,
-      ]);
-      if (attested.rows.length > 0) return alreadyAttested(parsed.attestation.release);
+      const refused = await refuseScannedArea(db, request.address, parsed.attestation.release, checked);
+      if (refused) return refused;
     }
     const id = await attestationId(parsed.attestation);
     return {
@@ -210,6 +227,7 @@ export async function checkAttestation(
         attestationId: id,
         message: buildAttestMessage(parsed.attestation.release, id),
         paidPlacesLeft: await paidPlacesLeft(db, parsed.attestation.release),
+        area: checked.area,
       },
     };
   } catch (error) {
@@ -222,7 +240,8 @@ export async function checkAttestation(
  * Accepts a signed attestation and credits its points, in the order
  * SCANS.md lists the checks. Everything that changes state happens in one
  * transaction under a per-release lock, so two scans can't both take the
- * last paid place, and a challenge or a wallet's one scan can't be used twice.
+ * last paid place or the same round, and a challenge or a wallet's scan of
+ * an area can't be used twice.
  */
 export async function submitAttestation(
   db: Db,
@@ -268,22 +287,34 @@ export async function submitAttestation(
   }
 
   // A retry after a lost response gets the original answer back.
-  const earlier = await db.query<{ paid: boolean; unpaid_reason: UnpaidReason | null; points: string }>(
-    `SELECT a.paid, a.unpaid_reason, coalesce((SELECT sum(amount_atomic) FROM scan_points WHERE attestation_id = a.id AND kind = 'scan'), 0)::text AS points
+  const earlier = await db.query<{ paid: boolean; unpaid_reason: UnpaidReason | null; points: string; area: string | null; round: number | null }>(
+    `SELECT a.paid, a.unpaid_reason, a.area, a.round,
+            coalesce((SELECT sum(amount_atomic) FROM scan_points WHERE attestation_id = a.id AND kind = 'scan'), 0)::text AS points
        FROM attestations a WHERE a.id = $1 AND a.address = $2`,
     [id, address],
   );
   if (earlier.rows[0]) {
-    const { paid, points, unpaid_reason: unpaidReason } = earlier.rows[0];
-    return { ok: true, result: { attestationId: id, points, paid, unpaidReason, paidPlacesLeft: await paidPlacesLeft(db, attestation.release) } };
+    const { paid, points, unpaid_reason: unpaidReason, area, round } = earlier.rows[0];
+    return {
+      ok: true,
+      result: {
+        attestationId: id,
+        points,
+        paid,
+        unpaidReason,
+        paidPlacesLeft: await paidPlacesLeft(db, attestation.release),
+        area: isScanAreaId(area) ? area : null,
+        round,
+      },
+    };
   }
 
   // 2 and 3. Release, commit, challenge and answers.
-  let functionTotal: number;
+  let checked: Checked;
   try {
-    const checked = await checkAgainstRelease(db, github, attestation, now);
-    if (!checked.ok) return checked;
-    functionTotal = checked.functionTotal;
+    const outcome = await checkAgainstRelease(db, github, attestation, now);
+    if (!outcome.ok) return outcome;
+    checked = outcome;
   } catch (error) {
     if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
     throw error;
@@ -303,25 +334,25 @@ export async function submitAttestation(
       return failure(409, "challenge_used", "challenge", "This challenge was already used; run `pnpm scan start` for a new one.");
     }
 
-    // 4. One scan per wallet per release.
-    const attested = await tx.query("SELECT 1 FROM attestations WHERE address = $1 AND release = $2", [address, attestation.release]);
-    if (attested.rows.length > 0) {
-      return alreadyAttested(attestation.release);
-    }
+    // 4. One scan per wallet per area of a release.
+    const refused = await refuseScannedArea(tx, address, attestation.release, checked);
+    if (refused) return refused;
 
-    // 5. Paid places. A scan past them is still recorded. A scan that
-    // earns nothing (no snapshot day yet) doesn't use one up.
+    // 5. Paid places, shared by every round. A scan past them is still
+    // recorded. A scan that earns nothing (no snapshot day yet) doesn't use
+    // one up. Each further round pays ROUND_STEP_PERCENT more of the place.
+    const round = (await walletRoundsDone(tx, address, attestation.release)) + 1;
     const left = await paidPlacesLeft(tx, attestation.release);
-    const points = left > 0 ? await scanReward(tx, now, left) : 0n;
+    const points = left > 0 ? roundReward(await scanReward(tx, now, left), round) : 0n;
     const paid = points > 0n;
     const unpaidReason: UnpaidReason | null = paid ? null : left > 0 ? "no_snapshot" : "places_taken";
 
     await tx.query(
-      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at, function_total, unpaid_reason)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at, function_total, unpaid_reason, area, round)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
-        id, attestation.release, attestation.commit, attestation.challenge, address, request.owner,
-        request.signature, request.proof, request.message, JSON.stringify(attestation), paid, now, functionTotal, unpaidReason,
+        id, attestation.release, attestation.commit, attestation.challenge, address, request.owner, request.signature, request.proof,
+        request.message, JSON.stringify(attestation), paid, now, checked.functions.length, unpaidReason, checked.area, round,
       ],
     );
     await tx.query("UPDATE challenges SET used_by_attestation = $2 WHERE id = $1", [attestation.challenge, id]);
@@ -333,20 +364,43 @@ export async function submitAttestation(
     }
     return {
       ok: true,
-      result: { attestationId: id, points: points.toString(), paid, unpaidReason, paidPlacesLeft: paid ? left - 1 : left },
+      result: {
+        attestationId: id,
+        points: points.toString(),
+        paid,
+        unpaidReason,
+        paidPlacesLeft: paid ? left - 1 : left,
+        area: checked.area,
+        round,
+      },
     };
   });
   if (outcome.ok) listings.clear();
   return outcome;
 }
 
-function alreadyAttested(release: string): ScanFailure {
-  return failure(
-    409,
-    "already_attested",
-    "owner",
-    `This wallet already attested v${release}; each wallet can attest a release once, so wait for the next release.`,
+/** The wallet's non-voided scans of the release; the next one is this plus one. */
+export async function walletRoundsDone(db: Queryable, address: string, release: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    "SELECT count(*)::text AS n FROM attestations WHERE address = $1 AND release = $2 AND voided_at IS NULL",
+    [address, release],
   );
+  return Number(rows[0]!.n);
+}
+
+/** `already_attested` when the wallet has scanned the challenge's area, naming the least-covered area it can scan instead. */
+async function refuseScannedArea(db: Queryable, address: string, release: string, checked: Checked): Promise<ScanFailure | null> {
+  const scanned = await walletAreas(db, address, release);
+  if (!scanned.has(checked.area)) return null;
+  const next = areasLeft(await areaSummaries(db, release, checked.functions), scanned)[0];
+  return alreadyAttested(release, checked.area, next);
+}
+
+function alreadyAttested(release: string, area: ScanAreaId, next: AreaSummary | undefined): ScanFailure {
+  const message = next
+    ? `This wallet already scanned the ${scanArea(area).label} area of v${release}; run \`pnpm scan start --area ${next.id}\` to scan ${next.label} instead.`
+    : `This wallet has scanned every area of v${release}; wait for the next release.`;
+  return failure(409, "already_attested", "owner", message);
 }
 
 function notRegistered(): ScanFailure {
@@ -383,7 +437,8 @@ export async function scanRewardBasis(db: Queryable, now: Date): Promise<ScanRew
   return { day: rows[0]!.day, issuedAtomic, rewardAtomic: fullAtomic, tailRewardAtomic: tailAtomic };
 }
 
-async function scanReward(tx: Queryable, now: Date, placesLeft: number): Promise<bigint> {
+/** What the next paid place earns before its round's step: the full reward for the first places, the tail one after. */
+export async function scanReward(tx: Queryable, now: Date, placesLeft: number): Promise<bigint> {
   const basis = await scanRewardBasis(tx, now);
   return nextScanIsFull(placesLeft) ? basis.rewardAtomic : basis.tailRewardAtomic;
 }
@@ -492,7 +547,13 @@ export interface AttestationListing {
    * null for a release that isn't the latest: its function list isn't
    * fetched from GitHub, so only the counts are known.
    */
-  coverage: { examined: number; total: number; unexamined: { file: string; symbol: string }[] | null } | null;
+  coverage: {
+    examined: number;
+    total: number;
+    unexamined: { file: string; symbol: string }[] | null;
+    /** In tier order; null when `unexamined` is. */
+    byArea: { id: ScanAreaId; label: string; examined: number; total: number }[] | null;
+  } | null;
   /** Newest first. */
   attestations: {
     id: string;
@@ -504,6 +565,10 @@ export interface AttestationListing {
     paid: boolean;
     /** Null when `paid`, and for a scan recorded before the reason was kept. */
     unpaidReason: UnpaidReason | null;
+    /** Null for a whole-surface scan recorded before areas. */
+    area: ScanAreaId | null;
+    /** Null for a scan recorded before rounds. */
+    round: number | null;
     owner: string;
     signature: string;
     proof: PointsProofKind;
@@ -598,12 +663,14 @@ export async function listAttestations(
         created_at: Date;
         paid: boolean;
         unpaid_reason: UnpaidReason | null;
+        area: string | null;
+        round: number | null;
         owner: string;
         signature: string;
         proof: PointsProofKind;
         message: string;
       }>(
-        `SELECT id, body, created_at, paid, unpaid_reason, owner, signature, proof, message FROM attestations
+        `SELECT id, body, created_at, paid, unpaid_reason, area, round, owner, signature, proof, message FROM attestations
           WHERE release = $1 AND voided_at IS NULL
             AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3))
           ORDER BY created_at DESC, id DESC LIMIT $4`,
@@ -629,6 +696,8 @@ export async function listAttestations(
         createdAt: row.created_at.toISOString(),
         paid: row.paid,
         unpaidReason: row.unpaid_reason,
+        area: isScanAreaId(row.area) ? row.area : null,
+        round: row.round,
         owner: row.owner,
         signature: row.signature,
         proof: row.proof,
@@ -659,20 +728,18 @@ async function coverageOf(
   github: GithubClient,
   release: { release: string; commit: string; isLatest: boolean; storedTotal: number | null },
 ): Promise<NonNullable<AttestationListing["coverage"]>> {
-  const answered = await db.query<{ file: string; symbol: string }>(
-    `SELECT DISTINCT a->>'file' AS file, a->>'symbol' AS symbol
-       FROM attestations, jsonb_array_elements(body->'answers') a
-      WHERE release = $1 AND voided_at IS NULL`,
-    [release.release],
-  );
-  const seen = new Set(answered.rows.map((row) => `${row.file}\n${row.symbol}`));
-  const countsOnly = (total: number) => ({ examined: seen.size, total, unexamined: null });
+  const seen = await answeredFunctions(db, release.release);
+  const countsOnly = (total: number) => ({ examined: seen.size, total, unexamined: null, byArea: null });
 
   if (release.isLatest) {
     try {
       const { functions } = await github.filesAt(release.commit);
-      const unexamined = functions.filter((fn) => !seen.has(`${fn.file}\n${fn.symbol}`)).map(({ file, symbol }) => ({ file, symbol }));
-      return { examined: functions.length - unexamined.length, total: functions.length, unexamined };
+      const unexamined = functions.filter((fn) => !seen.has(functionKey(fn))).map(({ file, symbol }) => ({ file, symbol }));
+      const byArea = SCAN_AREAS.map(({ id, label }) => {
+        const own = functions.filter((fn) => fn.area === id);
+        return { id, label, examined: own.filter((fn) => seen.has(functionKey(fn))).length, total: own.length };
+      });
+      return { examined: functions.length - unexamined.length, total: functions.length, unexamined, byArea };
     } catch (error) {
       if (!(error instanceof GithubUnavailableError) || release.storedTotal === null) throw error;
       return countsOnly(release.storedTotal);

@@ -1,4 +1,5 @@
-import { listSurfaceFunctions, type SurfaceFunction } from "@gleam/core/src/scan/index.ts";
+import { areaOfTier, listSurfaceFunctions, parseSurfaceText, surfaceFileTiers, surfaceFiles } from "@gleam/core/src/scan/index.ts";
+import type { ReleaseFunction } from "./github";
 
 export const TEST_REPO = "owner/repo";
 export const COMMIT = "c".repeat(40);
@@ -27,6 +28,25 @@ export function surfaceFilesFor(variant = ""): Record<string, string> {
     "lib/notes.md": "# notes\n",
     "package.json": "{}\n",
     "src/outside.ts": guard("outsideSurface", "number"),
+  };
+}
+
+/**
+ * Areas of every size: `keys` (src/) and `signing` (lib/) have four
+ * functions in two files each, `boundary` (app/) three, and `preview`
+ * (web/) one, too few to challenge.
+ */
+export function areaFilesFor(): Record<string, string> {
+  return {
+    "security/surface.txt": "1 src/\n2 lib/\n3 app/\n4 web/\n5 package.json\n",
+    "src/a.ts": `${guard("guardA1", "number")}\n${guard("guardA2", "string")}`,
+    "src/k.ts": `${guard("guardK1", "number")}\n${guard("guardK2", "string")}`,
+    "lib/b.ts": `${guard("guardB1", "number")}\n${guard("guardB2", "string")}`,
+    "lib/c.ts": `${guard("guardC1", "number")}\n${guard("guardC2", "string")}`,
+    "app/d.ts": `${guard("guardD1", "number")}\n${guard("guardD2", "string")}`,
+    "app/e.ts": guard("guardE1", "number"),
+    "web/f.ts": guard("guardF1", "number"),
+    "package.json": "{}\n",
   };
 }
 
@@ -110,8 +130,13 @@ export function fakeGithub(releases: Record<string, FakeRelease>, latest: string
   return state;
 }
 
-/** The functions a challenge can name in `files`. */
-export function functionsOf(files: Record<string, string>): SurfaceFunction[] {
-  const wanted = ["src/a.ts", "lib/b.ts", "lib/c.ts"];
-  return listSurfaceFunctions(wanted.map((path) => ({ path, text: files[path]! })));
+/** The functions a challenge can name in `files`, each with its area. */
+export function functionsOf(files: Record<string, string>): ReleaseFunction[] {
+  const entries = parseSurfaceText(files["security/surface.txt"]!);
+  const wanted = surfaceFiles(entries, Object.keys(files));
+  const tiers = surfaceFileTiers(entries, wanted);
+  return listSurfaceFunctions(wanted.map((path) => ({ path, text: files[path]! }))).map((fn) => ({
+    ...fn,
+    area: areaOfTier(tiers.get(fn.file)!).id,
+  }));
 }

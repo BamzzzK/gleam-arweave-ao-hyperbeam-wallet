@@ -1,3 +1,4 @@
+import { ROUND_STEP_PERCENT } from "@gleam/core/src/scan/index.ts";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
@@ -22,8 +23,10 @@ import { parseLeaveRequest, leave } from "./leave";
 import { createPriceService, parseFxQuery, parseHistoryQuery, parseSpotQuery, type PriceService } from "./prices";
 import { RateLimiter } from "./rate-limit";
 import { parseRegisterRequest, register } from "./register";
-import { issueChallenge } from "./scan-challenge";
+import type { AreaSummary } from "./scan-areas";
+import { issueChallenge, parseChallengeQuery } from "./scan-challenge";
 import type { ScanFailure } from "./scan-errors";
+import { listAreas, scanNext } from "./scan-rounds";
 import { scoresForDevice } from "./score";
 
 const MOBILE_ORIGINS = new Set(["https://localhost", "capacitor://localhost"]);
@@ -47,6 +50,7 @@ interface ScanRewards {
   scanRewardAtomic: string;
   tailScanRewardAtomic: string;
   bountyPoolAtomic: string;
+  roundStepPercent: number;
 }
 
 const HOUR_MS = 3_600_000;
@@ -80,7 +84,10 @@ export function createApp(deps: AppDeps): Hono {
   const attestByIp = new RateLimiter(20, HOUR_MS);
   const attestationsListByIp = new RateLimiter(600, HOUR_MS);
   const rewardsByIp = new RateLimiter(600, HOUR_MS);
+  const areasByIp = new RateLimiter(600, HOUR_MS);
+  const nextByIp = new RateLimiter(120, HOUR_MS);
   let rewardsCache: { body: ScanRewards; expiresAt: number } | null = null;
+  let areasCache: { body: { release: string; areas: AreaSummary[] }; expiresAt: number } | null = null;
   let statsCache: { foundingMembers: number; expiresAt: number } | null = null;
 
   const app = new Hono();
@@ -101,7 +108,7 @@ export function createApp(deps: AppDeps): Hono {
 
   // Scan endpoints are open to any origin: the CLI sends no origin, the site
   // reads the list and rewards, and the signature (not the origin) authorises a submission.
-  for (const path of [...ATTESTATION_PATHS, "/attestations/count", "/scan/challenge", "/scan/rewards"]) app.use(path, cors({ origin: "*" }));
+  for (const path of [...ATTESTATION_PATHS, "/attestations/count", "/scan/challenge", "/scan/rewards", "/scan/areas", "/scan/next"]) app.use(path, cors({ origin: "*" }));
 
   app.get("/health", async (c) => {
     await deps.db.query("SELECT 1");
@@ -207,8 +214,27 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get("/scan/challenge", async (c) => {
     if (!challengeByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, challengeByIp, now().getTime());
-    const outcome = await issueChallenge(deps.db, github, now());
+    const query = parseChallengeQuery(c.req.query());
+    if ("ok" in query) return scanFailure(c, query);
+    const outcome = await issueChallenge(deps.db, github, now(), query.area);
     return outcome.ok ? c.json(outcome.challenge) : scanFailure(c, outcome);
+  });
+
+  app.get("/scan/areas", async (c) => {
+    if (!areasByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, areasByIp, now().getTime());
+    if (!areasCache || now().getTime() >= areasCache.expiresAt) {
+      const outcome = await listAreas(deps.db, github);
+      if (!outcome.ok) return scanFailure(c, outcome);
+      areasCache = { body: outcome.body, expiresAt: now().getTime() + STATS_TTL_MS };
+    }
+    c.header("Cache-Control", "public, max-age=60");
+    return c.json(areasCache.body);
+  });
+
+  app.get("/scan/next", async (c) => {
+    if (!nextByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, nextByIp, now().getTime());
+    const outcome = await scanNext(deps.db, github, c.req.query(), now());
+    return outcome.ok ? c.json(outcome.body) : scanFailure(c, outcome);
   });
 
   app.get("/scan/rewards", async (c) => {
@@ -222,6 +248,7 @@ export function createApp(deps: AppDeps): Hono {
           scanRewardAtomic: basis.rewardAtomic.toString(),
           tailScanRewardAtomic: basis.tailRewardAtomic.toString(),
           bountyPoolAtomic: pool.toString(),
+          roundStepPercent: ROUND_STEP_PERCENT,
         },
         expiresAt: now().getTime() + STATS_TTL_MS,
       };

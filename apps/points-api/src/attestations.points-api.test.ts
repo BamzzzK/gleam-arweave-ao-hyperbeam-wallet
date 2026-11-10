@@ -4,7 +4,7 @@ import { createApp } from "./app";
 import type { Db } from "./db";
 import { createGithubClient } from "./github";
 import { admitInstall, createTestDb } from "./test-db";
-import { COMMIT, TEST_REPO, fakeGithub, functionsOf, surfaceFilesFor } from "./test-github";
+import { COMMIT, TEST_REPO, areaFilesFor, fakeGithub, functionsOf, surfaceFilesFor } from "./test-github";
 import { attestBody, createTestDevice, createTestWallet, leaveBody, registerBody, type TestWallet } from "./test-signers";
 
 const NOW = new Date("2026-10-08T12:00:00Z");
@@ -23,6 +23,7 @@ interface Challenge {
   challenge: string;
   release: string;
   commit: string;
+  area?: string;
   functions: { file: string; symbol: string }[];
   expiresAt?: string;
 }
@@ -41,14 +42,19 @@ interface Json {
   points: string;
   paid: boolean;
   paidPlacesLeft: number;
-  coverage: { examined: number; total: number; unexamined: { file: string; symbol: string }[] };
-  attestations: { id: string; proof: string; signature: string }[];
+  coverage: {
+    examined: number;
+    total: number;
+    unexamined: { file: string; symbol: string }[];
+    byArea: { id: string; label: string; examined: number; total: number }[] | null;
+  };
+  attestations: { id: string; proof: string; signature: string; area: string | null; round: number | null }[];
   [key: string]: unknown;
 }
 
-async function setup(options: { latest?: string | null } = {}) {
+async function setup(options: { latest?: string | null; files?: Record<string, string> } = {}) {
   const db = await createTestDb();
-  const files = surfaceFilesFor();
+  const files = options.files ?? surfaceFilesFor();
   const github = fakeGithub({ "1.0.0": { commit: COMMIT, files } }, options.latest === undefined ? "v1.0.0" : options.latest);
   let clock = NOW.getTime();
   const client = createGithubClient({ fetchImpl: github.fetch, repo: TEST_REPO, now: () => clock });
@@ -74,7 +80,7 @@ async function setup(options: { latest?: string | null } = {}) {
     await admitInstall(db, device);
     await post("/register", await registerBody(wallet, device, { issuedAt: NOW_SECONDS }));
   };
-  const challenge = async () => (await get("/scan/challenge")).json as Challenge;
+  const challenge = async (area?: string) => (await get(area ? `/scan/challenge?area=${area}` : "/scan/challenge")).json as Challenge;
 
   const advance = (ms: number) => (clock += ms);
 
@@ -139,23 +145,24 @@ async function fillPaidPlaces(db: Db, release: string, n: number, commit = COMMI
 }
 
 describe("GET /scan/challenge", () => {
-  it("issues three functions at the latest release's commit and stores the challenge", async () => {
+  it("issues three functions of one area at the latest release's commit and stores the challenge", async () => {
     const s = await setup();
     const { status, json } = await s.get("/scan/challenge");
 
+    // src/a.ts alone is too few functions for the keys area, so lib/ (signing) is drawn from.
     expect(status).toBe(200);
-    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, expiresAt: "2026-10-09T12:00:00.000Z" });
+    expect(json).toMatchObject({ release: "1.0.0", commit: COMMIT, area: "signing", expiresAt: "2026-10-09T12:00:00.000Z" });
     expect(json.challenge).toMatch(/^[A-Za-z0-9_-]{22,43}$/);
     expect(json.functions).toHaveLength(3);
-    const known = functionsOf(s.files).map((fn) => `${fn.file}:${fn.symbol}`);
+    const known = functionsOf(s.files).filter((fn) => fn.area === "signing").map((fn) => `${fn.file}:${fn.symbol}`);
     for (const fn of json.functions) expect(known).toContain(`${fn.file}:${fn.symbol}`);
-    expect(new Set(json.functions.map((fn: { file: string }) => fn.file)).size).toBe(3);
+    expect(new Set(json.functions.map((fn: { file: string }) => fn.file)).size).toBe(2);
 
-    const { rows } = await s.db.query<{ release: string; commit: string; used_by_attestation: string | null }>(
-      "SELECT release, commit, used_by_attestation FROM challenges WHERE id = $1",
+    const { rows } = await s.db.query<{ release: string; commit: string; used_by_attestation: string | null; area: string }>(
+      "SELECT release, commit, used_by_attestation, area FROM challenges WHERE id = $1",
       [json.challenge],
     );
-    expect(rows[0]).toEqual({ release: "1.0.0", commit: COMMIT, used_by_attestation: null });
+    expect(rows[0]).toEqual({ release: "1.0.0", commit: COMMIT, used_by_attestation: null, area: "signing" });
   });
 
   it("gives each request its own challenge", async () => {
@@ -986,7 +993,7 @@ describe("GET /attestations", () => {
 
       const { status, json } = await s.get("/attestations?release=1.0.0");
       expect(status).toBe(200);
-      expect(json.coverage).toEqual({ examined: 3, total: 6, unexamined: null });
+      expect(json.coverage).toEqual({ examined: 3, total: 6, unexamined: null, byArea: null });
       expect(s.github.calls.filter((url) => url.includes("git/trees/") || url.includes("raw."))).toHaveLength(0);
     });
 
@@ -1112,7 +1119,7 @@ describe("GET /scan/rewards", () => {
     const s = await setup();
     const { status, json, headers } = await s.get("/scan/rewards");
     expect(status).toBe(200);
-    expect(json).toEqual({ day: null, issuedAtomic: "0", scanRewardAtomic: "0", tailScanRewardAtomic: "0", bountyPoolAtomic: "0" });
+    expect(json).toEqual({ day: null, issuedAtomic: "0", scanRewardAtomic: "0", tailScanRewardAtomic: "0", bountyPoolAtomic: "0", roundStepPercent: 10 });
     expect(headers.get("cache-control")).toBe("public, max-age=60");
   });
 
@@ -1177,5 +1184,290 @@ describe("GET /scan/rewards", () => {
     const { status, json } = await s.get("/scan/rewards");
     expect(status).toBe(429);
     expect(json.code).toBe("rate_limited");
+  });
+});
+
+describe("scan areas and rounds", () => {
+  /** The area fixture with alice and bob registered and a previous day worth 10,000 a full place. */
+  async function areas() {
+    const s = await setup({ files: areaFilesFor() });
+    await s.register(alice);
+    await s.register(bob);
+    await creditPreviousDay(s.db);
+    return s;
+  }
+
+  async function scan(s: Setup, wallet: TestWallet, area?: string) {
+    return s.post("/attestations", await attestBody(wallet, attestationFor(s, await s.challenge(area))));
+  }
+
+  /** Records a scan of `area` straight into the database, answering `answers`. */
+  async function recordScan(db: Db, n: number, area: string, answers: { file: string; symbol: string }[] = [], voided = false) {
+    await db.query(
+      "INSERT INTO challenges (id, release, commit, functions, created_at, expires_at, area) VALUES ($1, '1.0.0', $2, '[]', now(), now(), $3)",
+      [`recorded-${n}`, COMMIT, area],
+    );
+    await db.query(
+      `INSERT INTO attestations (id, release, commit, challenge_id, address, owner, signature, proof, message, body, paid, created_at, area, round, voided_at)
+       VALUES ($1, '1.0.0', $2, $3, $4, 'o', 's', 'message', 'm', $5, false, now(), $6, 1, $7)`,
+      [
+        `e${n}`.padStart(64, "0"), COMMIT, `recorded-${n}`, `recorded-${n}`,
+        JSON.stringify({ model: "x", result: "pass", report: "r", answers }), area, voided ? new Date() : null,
+      ],
+    );
+  }
+
+  describe("GET /scan/challenge", () => {
+    it("draws from the area asked for and stores it", async () => {
+      const s = await areas();
+      const { status, json } = await s.get("/scan/challenge?area=signing");
+
+      expect(status).toBe(200);
+      expect(json.area).toBe("signing");
+      for (const fn of json.functions) expect(fn.file.startsWith("lib/")).toBe(true);
+      const { rows } = await s.db.query<{ area: string }>("SELECT area FROM challenges WHERE id = $1", [json.challenge]);
+      expect(rows[0]?.area).toBe("signing");
+    });
+
+    it("picks the area with the fewest scans, then the lower tier, among those it can challenge", async () => {
+      const s = await areas();
+      expect((await s.challenge()).area).toBe("keys");
+      await recordScan(s.db, 1, "keys");
+      expect((await s.challenge()).area).toBe("signing");
+      await recordScan(s.db, 2, "signing");
+      expect((await s.challenge()).area).toBe("boundary");
+      // A voided scan doesn't count, and preview (one function) is never picked.
+      await recordScan(s.db, 3, "boundary", [], true);
+      expect((await s.challenge()).area).toBe("boundary");
+      await recordScan(s.db, 4, "boundary");
+      expect((await s.challenge()).area).toBe("keys");
+    });
+
+    it("draws the first function from the area's unexamined ones", async () => {
+      const s = await areas();
+      await recordScan(s.db, 1, "keys", [
+        { file: "src/a.ts", symbol: "guardA1" },
+        { file: "src/a.ts", symbol: "guardA2" },
+        { file: "src/k.ts", symbol: "guardK1" },
+      ]);
+      for (let i = 0; i < 5; i++) expect((await s.challenge("keys")).functions[0]).toEqual({ file: "src/k.ts", symbol: "guardK2" });
+    });
+
+    it("400 malformed_request for an unknown area", async () => {
+      const s = await areas();
+      const { status, json } = await s.get("/scan/challenge?area=everything");
+      expect(status).toBe(400);
+      expect(json.code).toBe("malformed_request");
+      expect(json.issues[0]?.path).toBe("area");
+    });
+
+    it("503 challenge_unavailable for an area with fewer than three functions", async () => {
+      const s = await areas();
+      const { status, json } = await s.get("/scan/challenge?area=preview");
+      expect(status).toBe(503);
+      expect(json.code).toBe("challenge_unavailable");
+      expect(json.error).toContain("Approval preview");
+    });
+  });
+
+  describe("POST /attestations", () => {
+    it("accepts a second scan in another area as round 2, paying 10% more", async () => {
+      const s = await areas();
+      const first = await scan(s, alice, "keys");
+      const second = await scan(s, alice, "signing");
+
+      expect(first.json).toMatchObject({ ok: true, area: "keys", round: 1, points: "10000", paidPlacesLeft: 99 });
+      expect(second.json).toMatchObject({ ok: true, area: "signing", round: 2, points: "11000", paidPlacesLeft: 98 });
+      const { rows } = await s.db.query<{ area: string; round: number }>("SELECT area, round FROM attestations ORDER BY round");
+      expect(rows).toEqual([{ area: "keys", round: 1 }, { area: "signing", round: 2 }]);
+      // Another wallet's first scan is its own round 1.
+      expect((await scan(s, bob, "keys")).json).toMatchObject({ round: 1, points: "10000" });
+    });
+
+    it("counts rounds over non-voided scans only", async () => {
+      const s = await areas();
+      const first = await scan(s, alice, "keys");
+      await s.db.query("UPDATE attestations SET voided_at = now() WHERE id = $1", [first.json.attestationId]);
+      expect((await scan(s, alice, "signing")).json).toMatchObject({ round: 1, points: "10000" });
+    });
+
+    it("409 already_attested for the same area, naming the least-covered area left", async () => {
+      const s = await areas();
+      await scan(s, alice, "keys");
+      const again = attestationFor(s, await s.challenge("keys"));
+      const expected = "This wallet already scanned the Key material area of v1.0.0; run `pnpm scan start --area signing` to scan Signing instead.";
+
+      const { status, json } = await s.post("/attestations", await attestBody(alice, again));
+      expect(status).toBe(409);
+      expect(json).toMatchObject({ code: "already_attested", error: expected });
+      expect(await count(s.db, "attestations")).toBe(1);
+
+      const dry = await s.post("/attestations/check", { attestation: again, address: alice.address });
+      expect([dry.status, dry.json.error]).toEqual([409, expected]);
+      const forBob = await s.post("/attestations/check", { attestation: again, address: bob.address });
+      expect(forBob.json).toMatchObject({ ok: true, area: "keys" });
+
+      // Once signing is better covered, boundary is the one named.
+      await recordScan(s.db, 1, "signing", [{ file: "lib/b.ts", symbol: "guardB1" }]);
+      expect((await s.post("/attestations", await attestBody(alice, again))).json.error).toContain("--area boundary");
+    });
+
+    it("409 already_attested once every area that can be challenged is scanned", async () => {
+      const s = await areas();
+      for (const area of ["keys", "signing", "boundary"]) expect((await scan(s, alice, area)).status).toBe(200);
+
+      const { status, json } = await scan(s, alice, "keys");
+      expect(status).toBe(409);
+      expect(json.error).toBe("This wallet has scanned every area of v1.0.0; wait for the next release.");
+    });
+
+    it("refuses a challenge issued before areas", async () => {
+      const s = await areas();
+      const challenge = await s.challenge();
+      await s.db.query("UPDATE challenges SET area = NULL WHERE id = $1", [challenge.challenge]);
+      const { status, json } = await s.post("/attestations", await attestBody(alice, attestationFor(s, challenge)));
+      expect([status, json.code]).toEqual([409, "challenge_expired"]);
+      expect(json.error).toContain("before scan areas");
+    });
+  });
+
+  describe("GET /scan/areas", () => {
+    it("lists the latest release's areas in tier order, kept for a minute", async () => {
+      const s = await areas();
+      await scan(s, alice, "keys");
+      const { status, json, headers } = await s.get("/scan/areas");
+
+      expect(status).toBe(200);
+      expect(headers.get("access-control-allow-origin")).toBe("*");
+      expect(headers.get("cache-control")).toBe("public, max-age=60");
+      expect(json).toEqual({
+        release: "1.0.0",
+        areas: [
+          { id: "keys", label: "Key material", tier: 1, functions: 4, examined: 3, scans: 1 },
+          { id: "signing", label: "Signing", tier: 2, functions: 4, examined: 0, scans: 0 },
+          { id: "boundary", label: "Trust boundary", tier: 3, functions: 3, examined: 0, scans: 0 },
+          { id: "preview", label: "Approval preview", tier: 4, functions: 1, examined: 0, scans: 0 },
+          { id: "build", label: "Build and release", tier: 5, functions: 0, examined: 0, scans: 0 },
+        ],
+      });
+
+      await recordScan(s.db, 1, "signing");
+      expect((await s.get("/scan/areas")).json.areas).toEqual(json.areas);
+      s.advance(60_000);
+      expect((await s.get("/scan/areas")).json.areas).toContainEqual(expect.objectContaining({ id: "signing", scans: 1 }));
+    });
+
+    it("says there is no release yet", async () => {
+      const s = await setup({ latest: null });
+      expect((await s.get("/scan/areas")).json.code).toBe("no_release");
+    });
+  });
+
+  describe("GET /scan/next", () => {
+    it("says what the scan earned and what the next round earns, least-covered area first", async () => {
+      const s = await areas();
+      const { json: scanned } = await scan(s, alice, "keys");
+      const { status, json, headers } = await s.get(`/scan/next?attestation=${scanned.attestationId}`);
+
+      expect(status).toBe(200);
+      expect(headers.get("access-control-allow-origin")).toBe("*");
+      expect(json).toEqual({
+        release: "1.0.0",
+        area: "keys",
+        round: 1,
+        points: "10000",
+        nextRound: 2,
+        nextRewardAtomic: "11000",
+        nextPaid: true,
+        areasLeft: [
+          { id: "signing", label: "Signing", functions: 4, examined: 0 },
+          { id: "boundary", label: "Trust boundary", functions: 3, examined: 0 },
+        ],
+        suggested: "signing",
+      });
+
+      await scan(s, bob, "signing");
+      const after = await s.get(`/scan/next?attestation=${scanned.attestationId}`);
+      expect(after.json.areasLeft).toEqual([
+        { id: "boundary", label: "Trust boundary", functions: 3, examined: 0 },
+        { id: "signing", label: "Signing", functions: 4, examined: 3 },
+      ]);
+      expect(after.json.suggested).toBe("boundary");
+    });
+
+    it("pays the tail reward's next round after the first 20 places", async () => {
+      const s = await areas();
+      await fillPaidPlaces(s.db, "1.0.0", 19);
+      const { json: scanned } = await scan(s, alice, "keys");
+      expect(scanned).toMatchObject({ points: "10000", paidPlacesLeft: 80 });
+      expect((await s.get(`/scan/next?attestation=${scanned.attestationId}`)).json).toMatchObject({ nextRound: 2, nextRewardAtomic: "2200" });
+    });
+
+    it("offers no area once the wallet has scanned every one", async () => {
+      const s = await areas();
+      let last = "";
+      for (const area of ["keys", "signing", "boundary"]) last = (await scan(s, alice, area)).json.attestationId;
+      const { json } = await s.get(`/scan/next?attestation=${last}`);
+      expect(json).toMatchObject({ area: "boundary", round: 3, points: "12000", nextRound: 4, areasLeft: [], suggested: null });
+    });
+
+    it("says the next round is unpaid once the paid places are gone", async () => {
+      const s = await areas();
+      await fillPaidPlaces(s.db, "1.0.0", 100);
+      const { json: scanned } = await scan(s, alice, "keys");
+      const { json } = await s.get(`/scan/next?attestation=${scanned.attestationId}`);
+      expect(json).toMatchObject({ points: "0", nextRound: 2, nextRewardAtomic: "0", nextPaid: false, suggested: "signing" });
+    });
+
+    it("offers no area on a release that is no longer the latest", async () => {
+      const s = await areas();
+      const { json: scanned } = await scan(s, alice, "keys");
+      s.github.releases["1.1.0"] = { commit: "1".repeat(40), files: areaFilesFor() };
+      s.github.latest = "v1.1.0";
+      s.advance(10 * 60_000);
+      const { json } = await s.get(`/scan/next?attestation=${scanned.attestationId}`);
+      expect(json).toMatchObject({ release: "1.0.0", round: 1, areasLeft: [], suggested: null });
+    });
+
+    it("404 unknown_attestation for an id with no signed attestation or a voided one, 400 for a malformed id", async () => {
+      const s = await areas();
+      const unknown = await s.get(`/scan/next?attestation=${"a".repeat(64)}`);
+      expect(unknown.status).toBe(404);
+      expect(unknown.json).toMatchObject({
+        code: "unknown_attestation",
+        error: "No signed attestation has this id yet; sign it in Gleam from the link `pnpm scan finish` printed, then run `pnpm scan next` again.",
+      });
+
+      const { json: scanned } = await scan(s, alice, "keys");
+      await s.db.query("UPDATE attestations SET voided_at = now()");
+      expect((await s.get(`/scan/next?attestation=${scanned.attestationId}`)).json.code).toBe("unknown_attestation");
+
+      for (const query of ["", "?attestation=xyz", `?attestation=${"A".repeat(64)}`]) {
+        const { status, json } = await s.get(`/scan/next${query}`);
+        expect([status, json.code], query).toEqual([400, "malformed_request"]);
+      }
+    });
+  });
+
+  describe("GET /attestations", () => {
+    it("lists each scan's area and round, and coverage by area", async () => {
+      const s = await areas();
+      const first = await scan(s, alice, "keys");
+      const second = await scan(s, alice, "signing");
+      await fillPaidPlaces(s.db, "1.0.0", 1);
+      const { json } = await s.get("/attestations");
+
+      const byId = new Map(json.attestations.map((x) => [x.id, x]));
+      expect(byId.get(first.json.attestationId)).toMatchObject({ area: "keys", round: 1 });
+      expect(byId.get(second.json.attestationId)).toMatchObject({ area: "signing", round: 2 });
+      expect(json.attestations.find((x) => x.id === "0".repeat(64))).toMatchObject({ area: null, round: null });
+      expect(json.coverage.byArea).toEqual([
+        { id: "keys", label: "Key material", examined: 3, total: 4 },
+        { id: "signing", label: "Signing", examined: 3, total: 4 },
+        { id: "boundary", label: "Trust boundary", examined: 0, total: 3 },
+        { id: "preview", label: "Approval preview", examined: 0, total: 1 },
+        { id: "build", label: "Build and release", examined: 0, total: 0 },
+      ]);
+    });
   });
 });

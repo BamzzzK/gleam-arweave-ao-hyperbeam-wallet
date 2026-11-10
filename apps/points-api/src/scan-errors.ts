@@ -24,6 +24,7 @@ export type ScanErrorCode =
   | "wallet_not_registered"
   | "wallet_not_live"
   | "already_attested"
+  | "unknown_attestation"
   | "rate_limited";
 
 export interface ServerIssue {
