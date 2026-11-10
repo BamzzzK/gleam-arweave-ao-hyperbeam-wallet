@@ -4,7 +4,7 @@ import { capabilityRefusal, explorerUrlFor, isHardwareWalletMethod, type Activit
 import { Button } from "@gleam/ui/src/primitives/button.tsx";
 import { ContactsView } from "../../contacts/index.tsx";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
-import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
+import { AccountAvatar, EmptyState, RecipientCard, RecipientWarning, TokenGlyph, TokenRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { formatCurrencyValue } from "@gleam/ui/src/format/currency.ts";
 import { useAddressIdentity } from "../../../address-identity";
 import { t, useT } from "../../../i18n";
@@ -782,8 +782,14 @@ function ComposeStep({
                 type="button"
                 onClick={onOpenTokenPicker}
                 aria-haspopup="dialog"
-                className="flex flex-shrink-0 items-center gap-1 rounded-[7px] border border-line bg-mist px-2.5 py-1.5 text-label font-bold text-foreground hover:bg-line phone:hit-target"
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-[7px] border border-line bg-mist py-1.5 pl-1.5 pr-2.5 text-label font-bold text-foreground hover:bg-line phone:hit-target"
               >
+                <TokenGlyph
+                  label={ticker.slice(0, 2).toUpperCase()}
+                  tone={token === null ? 1 : 2}
+                  logoUrl={sendTokenLogo(token, readRowVisibility(wallet.address), tokenLogos)}
+                  className="h-5 w-5 rounded-md text-[8px]"
+                />
                 {ticker}
                 <ChevronDownIcon />
               </button>

@@ -93,13 +93,13 @@ export function SecurityPhraseSection({ runtime }: { runtime: RuntimePort }) {
           </div>
         </form>
       ) : state.phrase && icon ? (
-        <div className="flex items-center gap-3 pb-1.5 pt-3.5">
+        <div className="flex items-center gap-3 pt-3.5">
           <SecurityPhraseMark phrase={state.phrase} iconSvg={icon} />
           <span className="flex-1" />
           <button
             type="button"
             onClick={() => setState({ kind: "editing", phrase: state.phrase, draft: state.phrase!, saving: false })}
-            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground phone:flex phone:min-h-11 phone:items-center phone:px-3"
+            className="rounded-md px-2 py-1 text-label font-medium text-muted hover:bg-mist hover:text-foreground phone:-my-2.5 phone:flex phone:min-h-11 phone:items-center phone:px-3"
           >
             {t("lockSettings.change")}
           </button>

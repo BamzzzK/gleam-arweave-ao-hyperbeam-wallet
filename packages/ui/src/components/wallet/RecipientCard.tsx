@@ -39,7 +39,7 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
   const labels = labelsProp ?? contextLabels.recipientCard;
   const body = (
     <>
-      <AccountAvatar svgMarkup={avatarSvg} label={name ? labels.avatar(name) : labels.addressAvatar} size={40} />
+      <AccountAvatar svgMarkup={avatarSvg} label={name ? labels.avatar(name) : labels.addressAvatar} size={40} className="phone:h-8! phone:w-8!" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         {name !== undefined ? (
           <span className={cn("truncate text-label font-semibold", name ? "text-foreground" : "text-muted")}>
@@ -47,11 +47,11 @@ export function RecipientCard({ address, name, avatarSvg, emphasisPick, tone = "
           </span>
         ) : null}
         {/* Pulls the padded chunks back so the address lines up with the name. */}
-        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} className="-ml-[0.35ch]" />
+        <MemorableAddress address={address} emphasisPick={emphasisPick} tone={tone} className="-ml-[0.35ch] phone:-ml-[0.25ch]" />
       </span>
     </>
   );
-  const frame = "flex w-full items-center gap-3.5 rounded-md border border-line bg-background py-3 pl-3.5 pr-3 text-left";
+  const frame = "flex w-full items-center gap-3.5 phone:gap-3 rounded-md border border-line bg-background py-3 pl-3.5 pr-3 text-left phone:pl-3";
 
   if (onEdit) {
     return (

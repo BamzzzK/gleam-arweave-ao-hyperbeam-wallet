@@ -162,7 +162,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   return (
     // The row bleeds 8px past the list edge so the hover fill has room
     // around its content while text stays aligned with the header. Only
-    // the checkmark marks the active row: a fill would read as hover. Copy
+    // the "Active" label marks the active row: a fill would read as hover. Copy
     // floats beside the chevron instead of taking a column, so the address
     // keeps the full width for its 7-chunk first row.
     <div
@@ -183,8 +183,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
             {active ? (
-              <span className="flex flex-shrink-0 items-center gap-1 text-caption font-medium text-positive">
-                <CheckIcon size={12} />
+              <span className="flex-shrink-0 text-caption font-medium text-positive">
                 {t("walletSwitcher.active")}
               </span>
             ) : (
@@ -195,7 +194,20 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
               </span>
             )}
           </span>
-          <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
+          {/* A pointer shortcut to the manage button beside the row, which keyboard and screen-reader users reach directly. */}
+          <span
+            onClick={(event) => {
+              event.stopPropagation();
+              onManage();
+            }}
+            className="cursor-pointer"
+          >
+            {/* The phone's copy and manage tap targets leave too little width for the chunked address, so it runs as plain wrapped text there. */}
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:hidden" />
+            <span translate="no" className="hidden break-all font-mono text-caption leading-relaxed text-muted phone:block">
+              {wallet.address}
+            </span>
+          </span>
         </span>
       </button>
       <button

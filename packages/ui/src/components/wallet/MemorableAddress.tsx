@@ -16,10 +16,11 @@ export interface MemorableAddressProps {
 
 /**
  * A full address as a block of 4-character chunks laid out on a grid:
- * two rows (7 · 4) by default, three (4 · 4 · 3) in the phone layout. The
- * columns are fixed and the chunks never wrap on their own, so the block
- * keeps one shape for every address, the emphasised chunks always sit in
- * the same places and the user learns where to look. They are set on a quiet fill in full contrast; the rest
+ * two rows (7 · 4) where the space fits seven chunks, three (4 · 4 · 3)
+ * where it doesn't. The columns are fixed and the chunks never wrap on
+ * their own, so on a given screen the block keeps one shape for every
+ * address, the emphasised chunks always sit in the same places and the
+ * user learns where to look. They are set on a quiet fill in full contrast; the rest
  * are muted. The avatar carries the colour, so the address stays
  * monochrome. A copied selection is the raw address text: the gaps are
  * padding, never characters.
@@ -44,33 +45,33 @@ export function MemorableAddress({
   };
 
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-3", className)} onCopy={copyRawText}>
+    <span className={cn("flex w-full min-w-0 items-center gap-3", className)} onCopy={copyRawText}>
       {avatarSvg ? (
         <span aria-hidden="true" className="shrink-0">
           <AccountAvatar svgMarkup={avatarSvg} label="" size={confirm ? 36 : 28} />
         </span>
       ) : null}
-      <span
-        translate="no"
-        className={cn(
-          "grid min-w-0 grid-cols-[repeat(7,max-content)] text-left font-mono leading-[1.75] phone:grid-cols-[repeat(4,max-content)]",
-          confirm ? "text-[12.5px]" : "text-label",
-        )}
-      >
-        {chunks.map((chunk) => (
-          <span
-            key={chunk.index}
-            data-emphasized={chunk.emphasized || undefined}
-            className={cn(
-              "whitespace-nowrap rounded-[4px] px-[0.35ch]",
-              chunk.emphasized
-                ? cn("bg-foreground/[0.07] text-foreground", confirm ? "font-semibold" : "font-medium")
-                : "text-muted",
-            )}
-          >
-            {chunk.text}
-          </span>
-        ))}
+      {/* Seven chunks with their padding are 32.9ch, or 31.5ch with the phone's tighter padding; `ch` here is the address's own font, so the switch follows the type size. */}
+      <span className={cn("@container flex min-w-0 flex-1 font-mono [justify-content:inherit]", confirm ? "text-[12.5px]" : "text-label")}>
+        <span
+          translate="no"
+          className="grid min-w-0 grid-cols-[repeat(4,max-content)] text-left leading-[1.75] @[33ch]:grid-cols-[repeat(7,max-content)] phone:@[31.6ch]:grid-cols-[repeat(7,max-content)]"
+        >
+          {chunks.map((chunk) => (
+            <span
+              key={chunk.index}
+              data-emphasized={chunk.emphasized || undefined}
+              className={cn(
+                "whitespace-nowrap rounded-[4px] px-[0.35ch] phone:px-[0.25ch]",
+                chunk.emphasized
+                  ? cn("bg-foreground/[0.07] text-foreground", confirm ? "font-semibold" : "font-medium")
+                  : "text-muted",
+              )}
+            >
+              {chunk.text}
+            </span>
+          ))}
+        </span>
       </span>
     </span>
   );

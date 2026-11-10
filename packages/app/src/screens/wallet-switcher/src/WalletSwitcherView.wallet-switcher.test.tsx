@@ -168,4 +168,23 @@ describe("WalletSwitcherView (7.1 wallet-switcher)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Manage Trading" }));
     expect(onManage).toHaveBeenCalledWith("wallet-2");
   });
+
+  it("opens a wallet's details, not a switch, when its address is tapped", async () => {
+    const onManage = vi.fn();
+    const send = vi.fn().mockResolvedValue(STATE);
+    render(
+      <WalletSwitcherView
+        runtime={fakeRuntime({ send })}
+        onSwitched={vi.fn()}
+        onBack={vi.fn()}
+        onAddWallet={vi.fn()}
+        onManage={onManage}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("Trading")).toBeTruthy());
+    fireEvent.click(screen.getByText(STATE.wallets[1]!.address));
+    expect(onManage).toHaveBeenCalledWith("wallet-2");
+    expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ type: "switchWallet" }));
+  });
 });
