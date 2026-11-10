@@ -22,14 +22,13 @@ export function AppearanceView({ runtime, onBack, onOpenDisplayCurrency, onOpenL
     <div className="flex min-h-full flex-col">
       <ScreenHeader title={t("settingsHome.appearance")} onBack={onBack} />
       <div className="flex flex-col px-6 pb-6 pt-6 phone:px-5 phone:pt-4">
-        <OptionRow divided={false} title={t("settingsHome.currencyTitle")} value={display?.currency} onClick={onOpenDisplayCurrency} />
+        <OptionRow title={t("settingsHome.currencyTitle")} value={display?.currency} onClick={onOpenDisplayCurrency} />
         <OptionRow
-          divided={false}
           title={t("language.title")}
           value={LANGUAGES.find((entry) => entry.code === language)?.name}
           onClick={onOpenLanguage}
         />
-        <OptionRow divided={false} title={t("homeScreen.title")} onClick={onOpenHomeScreen} />
+        <OptionRow title={t("homeScreen.title")} onClick={onOpenHomeScreen} />
       </div>
     </div>
   );

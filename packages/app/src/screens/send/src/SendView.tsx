@@ -1513,7 +1513,7 @@ export function SavedAddressesStep({
 function PickerSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section aria-label={label}>
-      <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-faint phone:px-0">{label}</div>
+      <div className="px-3.5 pb-1.5 pt-3 text-caption font-semibold uppercase tracking-wide text-muted phone:px-0">{label}</div>
       {children}
     </section>
   );

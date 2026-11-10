@@ -104,20 +104,17 @@ export function SettingsHomeView({
           />
           {onOpenLockSettings ? (
             <OptionRow
-              divided={false}
               title={t("settingsHome.security")}
               value={state.loading ? undefined : state.lockSettings ? t(TIMEOUT_KEYS[state.lockSettings.autoLockTimeout]) : "—"}
               onClick={onOpenLockSettings}
             />
           ) : null}
           <OptionRow
-            divided={false}
             title={t("settingsHome.appearance")}
             value={display ? [display.currency, languageName].filter(Boolean).join(" · ") : undefined}
             onClick={onOpenAppearance}
           />
           <OptionRow
-            divided={false}
             title={t("settingsHome.networkTitle")}
             value={state.loading ? undefined : state.networkSettings ? gatewayHostname(state.networkSettings.gatewayUrl) : "—"}
             onClick={onOpenNetworkPeers}
@@ -126,12 +123,11 @@ export function SettingsHomeView({
 
         <div className="flex flex-col">
           <OptionRow
-            divided={false}
             title={t("settingsHome.connectedApps")}
             count={state.connectedApps ?? undefined}
             onClick={onOpenConnectedApps}
           />
-          <OptionRow divided={false} external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />
+          <OptionRow external title={t("settingsHome.sendFeedback")} onClick={onOpenFeedback} />
         </div>
 
         <AboutBuild runtime={runtime} version={version} />
