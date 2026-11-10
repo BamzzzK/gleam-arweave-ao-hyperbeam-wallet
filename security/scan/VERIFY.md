@@ -6,7 +6,8 @@ description: Try to disprove one candidate security finding in a Gleam release c
 # Verify a Gleam scan finding
 
 You get one candidate finding from a scan of a Gleam release: a note at
-`.gleam-scan/candidates/<n>.md` in a checkout of the release tag. Your job
+`.gleam-scan/rounds/<area>/candidates/<n>.md` in a checkout of the release
+tag. Your job
 is to **disprove it**. Assume it is wrong until the code, read by you,
 says otherwise. A finding that survives an honest attempt to break it is
 worth reporting. One that doesn't would have cost a maintainer an hour to

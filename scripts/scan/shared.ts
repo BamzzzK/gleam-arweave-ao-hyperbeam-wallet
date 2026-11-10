@@ -1,14 +1,42 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { isScanAreaId, type ChallengeFunction, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
 
 export const SCAN_DIR = ".gleam-scan";
-export const CHALLENGE_FILE = `${SCAN_DIR}/challenge.json`;
-export const ATTESTATION_FILE = `${SCAN_DIR}/attestation.json`;
-/** The round's area files, one per line, so the skill's shell commands can take them as pathspecs. */
-export const AREA_FILES_FILE = `${SCAN_DIR}/area-files.txt`;
-/** Epoch milliseconds of the last `pnpm scan start`, so `finish` can report the elapsed time. */
-export const STARTED_FILE = `${SCAN_DIR}/started-at`;
+export const ROUNDS_DIR = `${SCAN_DIR}/rounds`;
+/** The area id of the round being worked on; commands without `--area` act on it. */
+export const CURRENT_FILE = `${SCAN_DIR}/current`;
+
+/**
+ * How many sign requests in a row the user has left unanswered. The agent
+ * adds 1 per unanswered request (security/scan/SKILL.md § If the user doesn't
+ * sign); `next` deletes it once the server has a signature. On disk, so a new
+ * session keeps the count.
+ */
+export const DECLINES_FILE = `${SCAN_DIR}/declines`;
+
+/** Heads every closing message, which the agent shows the user as the last thing in its turn. */
+export const CLOSING_HEADER = "Show the user exactly this, as the last thing you write:";
+
+/** The files of one round, all under `.gleam-scan/rounds/<area>/`. */
+export function roundPaths(area: ScanAreaId) {
+  const dir = `${ROUNDS_DIR}/${area}`;
+  return {
+    dir,
+    challenge: `${dir}/challenge.json`,
+    attestation: `${dir}/attestation.json`,
+    /** The area's files, one per line, so the skill's shell commands can take them as pathspecs. */
+    areaFiles: `${dir}/area-files.txt`,
+    /** Epoch milliseconds of the round's `pnpm scan start`, so `finish` can report the elapsed time. */
+    startedAt: `${dir}/started-at`,
+    /** Written by `finish` when the round passes, and removed when a later check of it fails. */
+    finished: `${dir}/finished.json`,
+    /** Written by `next` once the server has the round's signature. */
+    signed: `${dir}/signed.json`,
+    /** One line per report the agent filed: the draft's file name, then its link. */
+    filed: `${dir}/filed.txt`,
+  };
+}
 
 /** Runs `git <args>` in the checkout and returns stdout; rejects when git exits non-zero. */
 export type GitRunner = (args: string[]) => Promise<string>;
@@ -27,6 +55,8 @@ export interface Deps {
 export interface Problem {
   path: string;
   message: string;
+  /** The server's code, when the problem came from the points API. */
+  code?: string;
 }
 
 export interface ChallengeResponse {
@@ -41,7 +71,7 @@ export interface ChallengeResponse {
 
 export interface Outcome {
   ok: boolean;
-  command: "start" | "finish" | "next";
+  command: "start" | "finish" | "file" | "next";
   /** Human lines printed after the issues (or alone on success). */
   lines: string[];
   issues: Problem[];
@@ -52,6 +82,15 @@ export function fail(command: Outcome["command"], issues: Problem[]): Outcome {
   return { ok: false, command, lines: [], issues, json: {} };
 }
 
+/** The lines that end a command's output: the header, then the message the agent's turn ends with. */
+export function closingLines(message: string[]): string[] {
+  return ["", CLOSING_HEADER, "", ...message];
+}
+
+export function closingJson(message: string[]): { closingHeader: string; userMessage: string } {
+  return { closingHeader: CLOSING_HEADER, userMessage: message.join("\n") };
+}
+
 export async function readText(deps: Deps, file: string): Promise<string | undefined> {
   try {
     return await readFile(join(deps.root, file), "utf8");
@@ -60,9 +99,36 @@ export async function readText(deps: Deps, file: string): Promise<string | undef
   }
 }
 
+export async function writeText(deps: Deps, file: string, text: string): Promise<void> {
+  await mkdir(join(deps.root, dirname(file)), { recursive: true });
+  await writeFile(join(deps.root, file), text);
+}
+
 export async function writeJson(deps: Deps, file: string, value: unknown): Promise<void> {
-  await mkdir(join(deps.root, SCAN_DIR), { recursive: true });
-  await writeFile(join(deps.root, file), `${JSON.stringify(value, null, 2)}\n`);
+  await writeText(deps, file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export async function readJson(deps: Deps, file: string): Promise<unknown> {
+  const text = await readText(deps, file);
+  if (text === undefined) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function readDeclines(deps: Deps): Promise<number> {
+  const n = Number((await readText(deps, DECLINES_FILE))?.trim());
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/** The line `file` and `next` print above a sign request, so the agent knows which ask this is. */
+export const declinesLine = (n: number) => `Unanswered sign requests so far: ${n} (${DECLINES_FILE}).`;
+
+export async function readCurrent(deps: Deps): Promise<ScanAreaId | undefined> {
+  const text = (await readText(deps, CURRENT_FILE))?.trim();
+  return isScanAreaId(text) ? text : undefined;
 }
 
 export async function gitOrUndefined(deps: Deps, args: string[]): Promise<string | undefined> {
@@ -122,3 +188,5 @@ export function formatElapsed(ms: number): string {
   if (m > 0) return `${m}m ${pad(sec)}s`;
   return `${sec}s`;
 }
+
+export const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;

@@ -1,13 +1,14 @@
 import { execFile } from "node:child_process";
 import { POINTS_API_URL } from "../../packages/core/src/models/network.ts";
 import { SITE_URL } from "../../packages/core/src/models/site-origin.ts";
+import { runFile } from "./file.ts";
 import { runFinish } from "./finish.ts";
 import { runNext } from "./next.ts";
 import { runStart } from "./start.ts";
 import type { Deps, Outcome } from "./shared.ts";
 
-const USAGE = "Usage: pnpm scan start [--area <id>] | pnpm scan finish | pnpm scan next [--json]";
-const COMMANDS = ["start", "finish", "next"] as const;
+const USAGE = "Usage: pnpm scan start [--area <id>] | pnpm scan finish [--area <id>] | pnpm scan file | pnpm scan next [--json]";
+const COMMANDS = ["start", "finish", "file", "next"] as const;
 
 export function render(outcome: Outcome, color: boolean): string {
   const paint = (code: number, text: string) => (color ? `\u001b[${code}m${text}\u001b[0m` : text);
@@ -42,9 +43,23 @@ export async function main(argv: string[], deps: Deps, io: { out: (text: string)
       issues: [{ path: "usage", message: USAGE }],
       json: {},
     };
+  } else if (area !== undefined && (command === "file" || command === "next")) {
+    outcome = {
+      ok: false,
+      command,
+      lines: [],
+      issues: [{ path: "area", message: `\`pnpm scan ${command}\` acts on every waiting round; run it without --area.` }],
+      json: {},
+    };
   } else {
     try {
-      outcome = await (command === "start" ? runStart(deps, { area }) : command === "finish" ? runFinish(deps) : runNext(deps));
+      outcome = await (command === "start"
+        ? runStart(deps, { area })
+        : command === "finish"
+          ? runFinish(deps, { area })
+          : command === "file"
+            ? runFile(deps)
+            : runNext(deps));
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       outcome = { ok: false, command, lines: [], issues: [{ path: "scan", message: `Unexpected error (${reason}); run the command again, and if it repeats tell the user.` }], json: {} };

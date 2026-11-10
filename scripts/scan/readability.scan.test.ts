@@ -51,16 +51,17 @@ describe("draft warnings", () => {
     expect(draftWarning("c.md", `${T}${wordy}\n<details>${LONG_WORDS.repeat(50)}</details>`)).not.toContain("grade");
   });
 
-  it("checks only .gleam-scan/advisory-*.md, and prints nothing without drafts", async () => {
+  it("checks only the round folder's advisory-*.md, and prints nothing without drafts", async () => {
     const deps = makeDeps();
-    expect(await draftWarnings(deps)).toEqual([]);
-    mkdirSync(join(deps.root, ".gleam-scan"));
-    writeFileSync(join(deps.root, ".gleam-scan/advisory-1.md"), `${T}Short and plain. It reads well.`);
-    writeFileSync(join(deps.root, ".gleam-scan/advisory-2.md"), T + LONG_WORDS);
-    writeFileSync(join(deps.root, ".gleam-scan/pr-1.md"), LONG_WORDS);
-    const out = await draftWarnings(deps);
+    const dir = ".gleam-scan/rounds/keys";
+    expect(await draftWarnings(deps, dir)).toEqual([]);
+    mkdirSync(join(deps.root, dir), { recursive: true });
+    writeFileSync(join(deps.root, dir, "advisory-1.md"), `${T}Short and plain. It reads well.`);
+    writeFileSync(join(deps.root, dir, "advisory-2.md"), T + LONG_WORDS);
+    writeFileSync(join(deps.root, dir, "pr-1.md"), LONG_WORDS);
+    const out = await draftWarnings(deps, dir);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatch(/^! \.gleam-scan\/advisory-2\.md: reading grade/);
+    expect(out[0]).toMatch(/^! \.gleam-scan\/rounds\/keys\/advisory-2\.md: reading grade/);
   });
 
   it("reads the title from the first line only", () => {

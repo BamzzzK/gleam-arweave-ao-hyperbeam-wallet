@@ -1,10 +1,32 @@
-import { mkdir, readdir, rename } from "node:fs/promises";
-import { join } from "node:path";
 import { formatPoints } from "../../packages/app/src/screens/points/src/formatPoints.ts";
-import { attestationId, isScanAreaId, parseAttestation, scanArea, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { attestationId, isScanAreaId, type ScanAreaId } from "../../packages/core/src/scan/index.ts";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 import { callApi } from "./api.ts";
-import { CLOSING_HEADER } from "./finish.ts";
-import { ATTESTATION_FILE, SCAN_DIR, fail, jsonParseProblem, readText, type Deps, type Outcome } from "./shared.ts";
+import { isTransient, validateRound } from "./finish.ts";
+import {
+  attestLink,
+  listRounds,
+  nextOffer,
+  roundAttestation,
+  roundReports,
+  signRequest,
+  type Round,
+  type SignedRecord,
+} from "./rounds.ts";
+import {
+  DECLINES_FILE,
+  closingJson,
+  closingLines,
+  declinesLine,
+  fail,
+  plural,
+  readDeclines,
+  writeJson,
+  type Deps,
+  type Outcome,
+  type Problem,
+} from "./shared.ts";
 
 export interface AreaLeft {
   id: ScanAreaId;
@@ -30,7 +52,7 @@ export interface NextResponse {
 
 const ATOMIC = /^\d{1,40}$/;
 
-function isNextResponse(value: unknown): value is NextResponse {
+export function isNextResponse(value: unknown): value is NextResponse {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   const count = (n: unknown) => Number.isInteger(n) && (n as number) >= 0;
@@ -53,89 +75,150 @@ function isNextResponse(value: unknown): value is NextResponse {
   );
 }
 
-/** The message that ends the agent's turn after the drafts are filed: what this round earned and why to run another. */
-export function nextMessage(next: NextResponse): string {
-  const area = next.area === null ? "" : ` (${scanArea(next.area).label})`;
-  const earned = `${next.round === null ? "This scan" : `Round ${next.round}`}${area} earned ${next.points === "0" ? "no points" : `${formatPoints(next.points)} points`}`;
-  const suggested = next.areasLeft.find((a) => a.id === next.suggested);
-  if (suggested === undefined) {
-    return `${earned}. This wallet has no areas of v${next.release} left to scan; the next release opens new rounds.`;
-  }
-  const reward = next.nextPaid
-    ? `${earned}, and round ${next.nextRound} earns ${formatPoints(next.nextRewardAtomic)} points even with no findings.`
-    : `${earned}; the paid places are gone, so round ${next.nextRound} is recorded but earns no points.`;
-  const unexamined = suggested.functions - suggested.examined;
-  const coverage =
-    unexamined <= 0
-      ? `${suggested.label} is the least-covered area left.`
-      : suggested.examined === 0
-        ? `Nobody has examined any of the ${suggested.functions} functions in ${suggested.label} yet.`
-        : `Nobody has examined ${unexamined} of the ${suggested.functions} functions in ${suggested.label} yet.`;
-  return `${reward} ${coverage} Reply "next" to scan it.`;
+export function signedRecord(attestationId: string, next: NextResponse): SignedRecord {
+  return { attestationId, round: next.round, points: next.points };
 }
 
-/** Drafts and notes the agent filed this round; left in place they would be counted and filed again next round. */
-const ROUND_FILES = /^(pr-.*\.md|advisory-.*\.md|leads\.md|candidates)$/;
+const SHAPE: Problem = {
+  path: "next",
+  message: "The points API sent the next round in an unexpected shape; update this checkout (`git fetch --tags`) and run `pnpm scan next` again.",
+};
 
-async function archiveRound(deps: Deps, folder: string): Promise<boolean> {
-  let names: string[];
-  try {
-    names = (await readdir(join(deps.root, SCAN_DIR))).filter((name) => ROUND_FILES.test(name));
-  } catch {
-    return false;
-  }
-  if (names.length === 0) return false;
-  await mkdir(join(deps.root, folder), { recursive: true });
-  for (const name of names) await rename(join(deps.root, SCAN_DIR, name), join(deps.root, folder, name));
-  return true;
-}
+type Asked = { kind: "signed"; next: NextResponse } | { kind: "unsigned" } | { kind: "failed"; issues: Problem[] };
 
-export async function runNext(deps: Deps): Promise<Outcome> {
-  const text = await readText(deps, ATTESTATION_FILE);
-  if (text === undefined) {
-    return fail("next", [{ path: ATTESTATION_FILE, message: "There is no attestation file; run `pnpm scan start` first." }]);
-  }
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch (error) {
-    return fail("next", [jsonParseProblem(ATTESTATION_FILE, text, error)]);
-  }
-  const parsed = parseAttestation(raw);
-  if (!parsed.ok) {
-    return fail("next", [
-      { path: ATTESTATION_FILE, message: `${ATTESTATION_FILE} isn't a finished attestation; run \`pnpm scan finish\` until it passes, have the user sign it, then run \`pnpm scan next\`.` },
-    ]);
-  }
-  const id = await attestationId(parsed.attestation);
-
+async function ask(deps: Deps, id: string): Promise<Asked> {
   const fetched = await callApi(deps, `/scan/next?attestation=${id}`, undefined, "pnpm scan next");
-  if (!fetched.ok) return fail("next", fetched.issues);
-  if (!isNextResponse(fetched.body)) {
-    return fail("next", [
-      { path: "next", message: "The points API sent the next round in an unexpected shape; update this checkout (`git fetch --tags`) and run `pnpm scan next` again." },
-    ]);
+  if (!fetched.ok) {
+    return fetched.issues.some((issue) => issue.code === "unknown_attestation") ? { kind: "unsigned" } : { kind: "failed", issues: fetched.issues };
   }
-  const next = fetched.body;
+  return isNextResponse(fetched.body) ? { kind: "signed", next: fetched.body } : { kind: "failed", issues: [SHAPE] };
+}
 
-  const folder = `${SCAN_DIR}/round-${next.round ?? 1}-${id.slice(0, 12)}`;
-  const archived = await archiveRound(deps, folder);
-  const message = nextMessage(next);
-  const command = next.suggested === null ? undefined : `pnpm scan start --area ${next.suggested}`;
-  const lines = [
-    `${next.round === null ? "The scan" : `Round ${next.round}`} of Gleam v${next.release} is signed (attestation ${id}).`,
-    ...(archived ? [`Moved this round's drafts and notes to ${folder}/.`] : []),
-    ...(command === undefined ? [] : [`If the user replies "next", run \`${command}\` in this checkout and scan that area (security/scan/SKILL.md § Next round).`]),
-    "",
-    CLOSING_HEADER,
-    "",
-    message,
-  ];
+const roundName = (round: number | null, label: string) => (round === null ? label : `Round ${round} (${label})`);
+
+/**
+ * Records which waiting rounds the user signed. A round still unsigned is
+ * checked again as `file` checks it, so a dead challenge gets its fix line
+ * instead of a link that can't be signed. Ends with the sign request for the
+ * live unsigned rounds, or, once every round here is signed, with the offer
+ * of the next round from the server's answer for the last one. Safe to run
+ * again at any time: it prints the same closing message.
+ */
+export async function runNext(deps: Deps): Promise<Outcome> {
+  const rounds = await listRounds(deps);
+  const waiting = rounds.filter((round) => round.status === "waiting");
+  if (waiting.length === 0 && !rounds.some((round) => round.status === "signed")) {
+    return fail("next", [{ path: "rounds", message: "No round is waiting to be signed; run `pnpm scan file` and have the user sign first." }]);
+  }
+
+  const lines: string[] = [];
+  const unsigned: { round: Round; payload: string }[] = [];
+  let latest: { round: number; next: NextResponse } | undefined;
+  for (const round of waiting) {
+    const current = await roundAttestation(deps, round);
+    if (current === undefined) {
+      return fail("next", [
+        { path: round.paths.attestation, message: `${round.paths.attestation} isn't a finished attestation; run \`pnpm scan finish --area ${round.area}\` until it passes, then \`pnpm scan file\`.` },
+      ]);
+    }
+    const id = await attestationId(current.attestation);
+    const asked = await ask(deps, id);
+    if (asked.kind === "failed") return fail("next", asked.issues);
+    if (asked.kind === "unsigned") {
+      unsigned.push({ round, payload: current.payload });
+      lines.push(`${round.label}: not signed yet (attestation ${id}).`);
+      continue;
+    }
+    await writeJson(deps, round.paths.signed, signedRecord(id, asked.next));
+    round.signed = signedRecord(id, asked.next);
+    round.status = "signed";
+    if (latest === undefined || (asked.next.round ?? 0) >= latest.round) latest = { round: asked.next.round ?? 0, next: asked.next };
+    lines.push(`${roundName(asked.next.round, round.label)} is signed: ${asked.next.points === "0" ? "no points" : `${formatPoints(asked.next.points)} points`}. Attestation id ${id}; drafts in ${round.paths.dir}/.`);
+  }
+
+  if (latest !== undefined) await rm(join(deps.root, DECLINES_FILE), { force: true });
+
+  // Re-check what is still unsigned, so the link carries only rounds that can be signed.
+  const live: { round: Round; payload: string }[] = [];
+  const dead: Problem[] = [];
+  for (const entry of unsigned) {
+    const { round } = entry;
+    const checked = await validateRound(deps, round.area, "pnpm scan next", `\`pnpm scan finish --area ${round.area}\` and \`pnpm scan next\` again`);
+    if (checked.ok) live.push(entry);
+    else if (checked.issues.every(isTransient)) return fail("next", checked.issues);
+    else dead.push(...checked.issues.map((issue) => ({ ...issue, path: `${round.area} ${issue.path}` })));
+  }
+  if (dead.length > 0) {
+    return { ok: false, command: "next", lines, issues: dead, json: { unsigned: unsigned.map(({ round }) => round.area) } };
+  }
+
+  if (live.length > 0) {
+    const declines = await readDeclines(deps);
+    let unfiled = 0;
+    let filed = 0;
+    for (const { round } of live) {
+      const reports = await roundReports(deps, round);
+      unfiled += reports.unfiled;
+      filed += reports.filed;
+    }
+    const names = live.map(({ round }) => round.label);
+    const closing = signRequest({ rounds: live.length, link: attestLink(deps, live.map((u) => u.payload)), unfiled, filed });
+    return {
+      ok: false,
+      command: "next",
+      lines: [...lines, ...(declines > 0 ? [declinesLine(declines)] : []), ...closingLines(closing)],
+      issues: [
+        {
+          path: "unsigned",
+          message: `${joinNames(names)} ${names.length === 1 ? "isn't" : "aren't"} signed yet; file only the drafts of the signed rounds, and end the turn with the sign request below.`,
+        },
+      ],
+      json: { unsigned: live.map(({ round }) => round.area), declines, ...closingJson(closing) },
+    };
+  }
+
+  // Every round here is signed: the offer comes from the last one's answer, asked again when this run signed none.
+  const signed = rounds.filter((round) => round.signed !== undefined);
+  if (latest === undefined) {
+    const last = signed.reduce((a, b) => ((b.signed!.round ?? 0) >= (a.signed!.round ?? 0) ? b : a));
+    const asked = await ask(deps, last.signed!.attestationId);
+    if (asked.kind === "failed") return fail("next", asked.issues);
+    if (asked.kind === "unsigned") {
+      return fail("next", [{ path: last.paths.signed, message: `The server no longer has the ${last.label} round; tell the user, since it may have been voided.` }]);
+    }
+    latest = { round: asked.next.round ?? 0, next: asked.next };
+  }
+  const next = latest.next;
+  const taken = new Set(rounds.map((round) => round.area));
+  // The server leaves out areas signed anywhere; an open round here takes its area too.
+  const suggestion = next.areasLeft.find((area) => !taken.has(area.id));
+  const points = signed.reduce((sum, round) => sum + BigInt(round.signed!.points), 0n).toString();
+  const closing = nextOffer({
+    signedRounds: signed.length,
+    pointsAtomic: points,
+    release: next.release,
+    nextRound: next.nextRound,
+    nextAmountAtomic: next.nextPaid ? next.nextRewardAtomic : "0",
+    suggestion,
+  });
   return {
     ok: true,
     command: "next",
-    lines,
+    lines: [...(lines.length > 0 ? lines : [`${plural(signed.length, "round")} of Gleam v${next.release} signed in this checkout.`]), ...closingLines(closing)],
     issues: [],
-    json: { attestationId: id, ...next, ...(command === undefined ? {} : { nextCommand: command }), closingHeader: CLOSING_HEADER, userMessage: message },
+    json: {
+      rounds: signed.map((round) => ({ area: round.area, ...round.signed })),
+      release: next.release,
+      pointsAtomic: points,
+      nextRound: next.nextRound,
+      nextRewardAtomic: next.nextRewardAtomic,
+      nextPaid: next.nextPaid,
+      suggested: suggestion?.id ?? null,
+      ...closingJson(closing),
+    },
   };
+}
+
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }

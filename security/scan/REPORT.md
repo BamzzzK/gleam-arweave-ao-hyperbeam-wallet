@@ -70,10 +70,10 @@ Use these parts, in this order:
 - Cut hedges and filler. Don't argue that it isn't by design.
 - Say once whether it is demonstrated, traced or needs a browser check.
 
-`pnpm scan finish` warns when a `.gleam-scan/advisory-*.md` draft has
-no `Title:` line, a title over 100 characters or with a check id, code
-name or parenthetical, more than 200 words above `<details>`, or a
-reading grade above 10. The warning never fails the scan. Fix the draft
+`pnpm scan finish` and `pnpm scan file` warn when an `advisory-*.md`
+draft in a round folder has no `Title:` line, a title over 100
+characters or with a check id, code name or parenthetical, more than 200
+words above `<details>`, or a reading grade above 10. The warning never fails the scan. Fix the draft
 and move on.
 
 ## Example advisory
