@@ -1178,7 +1178,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
       await waitFor(() => expect(screen.getAllByText(/Received|Sent/).length).toBeGreaterThan(0));
       fireEvent.click(screen.getAllByText(/Received|Sent/)[0]!.closest("button")!);
       expect(openSpy).not.toHaveBeenCalled();
-      fireEvent.click(await screen.findByRole("button", { name: "View in explorer" }));
+      fireEvent.click(await screen.findByTitle("View in explorer"));
 
       expect(openSpy).toHaveBeenCalledWith(
         "https://lunar.arweave.net/#/explorer/tx-0",
@@ -1235,7 +1235,7 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
     fireEvent.click((await screen.findByText(/Sent/)).closest("button")!);
     fireEvent.click(await screen.findByRole("button", { name: "Save address" }));
-    expect(screen.getByText("Transaction · just now")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /· just now/ })).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Bob" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
