@@ -163,7 +163,10 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
   const methodLabel = wallet.method === "watch" ? t("common.watchOnly") : WALLET_METHOD_LABEL[wallet.method];
   const { copied, copy } = useCopy(wallet.address);
   const activeBadge = active ? (
-    <span className="whitespace-nowrap font-sans text-caption font-medium text-positive">{t("walletSwitcher.active")}</span>
+    <span className="shrink-0 whitespace-pre">
+      <span className="text-faint"> · </span>
+      <span className="font-medium text-positive">{t("walletSwitcher.active")}</span>
+    </span>
   ) : null;
 
   return (
@@ -184,18 +187,19 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
       >
         <AccountAvatar svgMarkup={avatarSvg} label={t("walletSwitcher.avatarOf", { name: wallet.name })} size={36} />
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-label font-semibold text-foreground">
+          <span className="flex min-w-0 items-baseline text-label">
+            <span className="truncate font-semibold text-foreground">
               {wallet.name}
               {methodLabel ? <span className="font-normal text-faint"> · {methodLabel}</span> : null}
             </span>
+            {/* Outside the truncating span so a long name can't clip it. */}
+            {activeBadge}
           </span>
           <span>
             {/* The phone's copy and manage tap targets leave too little width for the chunked address, so it runs as plain wrapped text there. */}
-            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} trailing={activeBadge} className="-ml-[0.35ch] phone:hidden" />
+            <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch] phone:hidden" />
             <span translate="no" className="hidden break-all font-mono text-caption leading-relaxed text-muted phone:block">
               {wallet.address}
-              {activeBadge ? <span className="ml-1.5">{activeBadge}</span> : null}
             </span>
           </span>
         </span>
