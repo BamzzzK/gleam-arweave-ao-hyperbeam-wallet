@@ -24,16 +24,26 @@ if [[ "${1:-}" == "pair" ]]; then
   exit 0
 fi
 
+find_phone() { adb mdns services | awk '/_adb-tls-connect/ { print $NF; exit }'; }
+
 address="${1:-}"
 if [[ -z "$address" ]]; then
-  address=$(adb mdns services | awk '/_adb-tls-connect/ { print $NF; exit }')
+  address=$(find_phone)
+  # A long-running adb server can stop seeing the network, on macOS when it
+  # was started by an app without Local Network access. A fresh one sees the phone.
+  if [[ -z "$address" ]]; then
+    adb kill-server >/dev/null 2>&1 || true
+    adb start-server >/dev/null 2>&1
+    sleep 2
+    address=$(find_phone)
+  fi
   [[ -n "$address" ]] || {
     echo "No phone found. Turn on Wireless debugging on the same Wi-Fi, pair once with 'pair <ip:port>', or pass the connect address." >&2
     exit 1
   }
 fi
 
-adb connect "$address" | grep -q "connected to" || { echo "Could not connect to $address" >&2; exit 1; }
+adb connect "$address" | grep -q "connected to" || { echo "Could not connect to $address. If the phone stopped trusting this Mac, pair again with 'pair <ip:port>'." >&2; exit 1; }
 
 pnpm exec vite build
 pnpm exec cap sync android
