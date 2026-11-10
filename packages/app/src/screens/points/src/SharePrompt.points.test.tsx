@@ -125,7 +125,7 @@ describe("share prompts on the Points screen", () => {
     const runtime = setup({ score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 } });
 
     expect(await screen.findByText("Your last invite")).toBeTruthy();
-    fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
+    fireEvent.click(invite().getByRole("button", { name: "Invite a friend" }));
 
     expect(writeText).toHaveBeenCalledWith(LINK);
     await waitFor(() =>
@@ -137,8 +137,10 @@ describe("share prompts on the Points screen", () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
     const runtime = setup({ revealSeen: [] });
 
-    expect(await screen.findByText("You're in and earning Gleam Points.")).toBeTruthy();
-    fireEvent.click(invite().getByRole("button", { name: "Copy invite link" }));
+    const standing = within(await screen.findByRole("region", { name: "Standing" }));
+    expect(await standing.findByText("You're in and earning Gleam Points.")).toBeTruthy();
+    expect(invite().queryByText("You're in and earning Gleam Points.")).toBeNull();
+    fireEvent.click(invite().getByRole("button", { name: "Invite a friend" }));
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "markPointsShareSeen", payload: { walletId: WALLET.id, prompt: "joined" } }),
@@ -151,18 +153,21 @@ describe("share prompts on the Points screen", () => {
     expect(await screen.findByText("A friend joined. You got more invites.")).toBeTruthy();
   });
 
-  it("falls back to the invite count once every prompt has been seen", async () => {
+  it("shows the invite count only after a copy once every prompt has been seen", async () => {
     const runtime = setup({ shareSeen: { [WALLET.id]: ["lastSeat", "joined"] }, score: { seatsLeft: 1 }, seatsSeen: { [WALLET.id]: 1 }, revealSeen: [] });
 
-    await screen.findByText("Top 12%");
+    await screen.findByText("Rank #5");
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith(expect.objectContaining({ type: "getPointsRevealSeen" })));
+    expect(invite().queryByText("1 invite remaining")).toBeNull();
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => {}) } });
+    fireEvent.click(invite().getByRole("button", { name: "Invite a friend" }));
     expect(invite().getByText("1 invite remaining")).toBeTruthy();
   });
 
   it("shows no prompt when seats are not limited", async () => {
     setup({ score: { seatsLeft: null }, revealSeen: [] });
 
-    await screen.findByText("Top 12%");
+    await screen.findByText("Rank #5");
     expect(invite().queryByText(/invites? remaining/)).toBeNull();
   });
 });

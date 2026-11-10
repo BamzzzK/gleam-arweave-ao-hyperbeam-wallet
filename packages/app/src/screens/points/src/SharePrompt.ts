@@ -60,6 +60,7 @@ export interface SharePromptArgs {
 }
 
 export interface ActiveSharePrompt extends PromptContent {
+  kind: SharePromptKind;
   /** Records the prompt as acted on; call when the member copies the link. */
   finish: () => void;
 }
@@ -109,6 +110,7 @@ export function useSharePrompt({ runtime, wallet, score }: SharePromptArgs): Act
   const kind = shown ?? pick;
   if (kind === null || score === null) return null;
   return {
+    kind,
     ...promptContent(kind, t),
     // A new invite was marked seen when it showed; the named prompts only once acted on.
     finish: () => {

@@ -35,6 +35,7 @@ import {
   type TransferLine,
   type TransferRequest,
 } from "./model";
+import { CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 export interface TransferReviewProps {
   /** `RequestHeader` in an approval, the screen's own back header on Send. */
@@ -554,15 +555,6 @@ function ChevronIcon({ open }: { open: boolean }) {
       className={`flex-shrink-0 text-muted transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
     >
       <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h10" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }

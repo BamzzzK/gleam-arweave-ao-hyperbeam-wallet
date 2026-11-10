@@ -6,6 +6,7 @@ import { useAddressIdentity } from "../../../address-identity";
 import { useCopy } from "../../points/src/useCopy";
 import { useT } from "../../../i18n";
 import { errorText } from "../../../i18n/errors";
+import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 // The label sits inside the name's truncating span, so a narrow row cuts
@@ -204,7 +205,7 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         title={copied ? t("walletSwitcher.copied") : t("walletSwitcher.copyAddress")}
         className={`absolute right-[30px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 phone:static phone:h-11 phone:w-11 phone:shrink-0 phone:translate-y-0 phone:opacity-100 ${copied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
       >
-        {copied ? <CheckIcon /> : <CopyIcon />}
+        {copied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
       </button>
       <button
         type="button"
@@ -215,23 +216,6 @@ function WalletSwitcherRow({ wallet, active, switching, onSwitch, onManage }: Wa
         <ChevronRightIcon />
       </button>
     </div>
-  );
-}
-
-function CheckIcon({ size = 15 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-    </svg>
   );
 }
 

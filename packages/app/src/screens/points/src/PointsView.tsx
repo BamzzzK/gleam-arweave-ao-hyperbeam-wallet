@@ -24,6 +24,7 @@ import { useSharePrompt } from "./SharePrompt";
 import { formatPoints } from "./formatPoints";
 import { useCopy } from "./useCopy";
 import { useCountUp } from "./useCountUp";
+import { useFlash } from "./useFlash";
 import { useScanStats } from "./useScanStats";
 import {
   useJoinPoints,
@@ -34,6 +35,7 @@ import {
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { useBackHandler } from "@gleam/ui/src/primitives/back-stack.tsx";
 import { errorText } from "../../../i18n/errors";
+import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 export interface PointsViewProps {
   runtime: RuntimePort;
@@ -41,19 +43,8 @@ export interface PointsViewProps {
   onBack: () => void;
 }
 
-/** The seats a member code starts with (POINTS.md § Invites). */
-const MEMBER_SEATS = 3;
-
 /** What a referrer earns on each referee's base points (POINTS.md § Rules). */
 const REFERRAL_PERCENT = 10;
-
-const BEAM_COLORS = [
-  "var(--color-beam-red)",
-  "var(--color-beam-purple)",
-  "var(--color-beam-sky)",
-  "var(--color-beam-yellow)",
-  "var(--color-beam-green)",
-];
 
 export function PointsView({ runtime, wallet, onBack }: PointsViewProps) {
   const t = useT();
@@ -160,64 +151,6 @@ function JoinView({
   );
 }
 
-/** The total the way the site draws it: whole points large, decimals and unit beside them. */
-function PointsTotal({ value, highlighted }: { value: string; highlighted: boolean }) {
-  const t = useT();
-  const [whole, decimals] = value.split(".");
-  return (
-    <p className="flex items-end gap-1 leading-none">
-      <span className="sr-only">{t("points.pointsAmount", { amount: value })}</span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "text-[44px] font-bold tracking-[-0.05em] tabular-nums transition-colors duration-700 motion-reduce:transition-none",
-          highlighted && "text-positive",
-        )}
-      >
-        {whole}
-      </span>
-      <span aria-hidden="true" className="flex flex-col gap-1 pb-1">
-        {decimals ? (
-          <span className="text-h3 font-semibold tabular-nums text-on-ink-muted">
-            .{decimals}
-          </span>
-        ) : null}
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-on-ink-muted">
-          {t("points.unit")}
-        </span>
-      </span>
-    </p>
-  );
-}
-
-/**
- * One square per seat on the member's code, lit in beam order while it's open.
- * Seats have no cap, so the row stops at one full beam and the text beside it
- * carries the exact count.
- */
-function Seats({ left }: { left: number }) {
-  const total = Math.min(Math.max(left, MEMBER_SEATS), BEAM_COLORS.length);
-  return (
-    <span aria-hidden="true" className="flex items-center gap-1">
-      {Array.from({ length: total }, (_, index) => (
-        <span
-          key={index}
-          className={
-            index < left
-              ? "h-2.5 w-2.5 rounded-[2px]"
-              : "h-2.5 w-2.5 rounded-[2px] border border-line"
-          }
-          style={
-            index < left
-              ? { backgroundColor: BEAM_COLORS[index % BEAM_COLORS.length] }
-              : undefined
-          }
-        />
-      ))}
-    </span>
-  );
-}
-
 function JoinedView({
   runtime,
   wallet,
@@ -233,80 +166,81 @@ function JoinedView({
   const { copied, copy } = useCopy(inviteLinkFor(standing.membership.inviteCode));
   const seatsLeft = score?.seatsLeft ?? null;
   const prompt = useSharePrompt({ runtime, wallet, score });
-  const status = prompt?.text ?? (seatsLeft !== null ? invitesRemainingLine(seatsLeft) : null);
+  // The join welcome belongs to the standing; the other prompts are news about the invites.
+  const welcome = prompt?.kind === "joined" ? prompt.text : null;
+  // The count shows only right after a copy, then fades; at rest the line carries prompt news.
+  const countNote = useFlash();
+  const status =
+    countNote.phase !== "hidden" && seatsLeft !== null ? invitesRemainingLine(seatsLeft) : welcome ? null : (prompt?.text ?? null);
   // A full code sends friends to a "full" invite page, so there's nothing to share.
   const full = seatsLeft !== null && seatsLeft <= 0;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-6 phone:px-5 pb-6 pt-5">
-      <InkCard label={t("points.standing")}>
-        <div className="flex flex-col gap-2">
-          <PointsTotal value={formatPoints(total.shown)} highlighted={total.highlighted} />
-          {score?.originalFounder ? (
-            <span className="text-label text-on-ink-muted">
-              {t("points.earlyMember")}
-            </span>
-          ) : null}
-        </div>
-        {score ? <RankLines score={score} /> : null}
-      </InkCard>
+    <div className="flex flex-1 flex-col gap-9 px-6 phone:px-5 pb-6 pt-6">
+      <Standing
+        score={score}
+        total={formatPoints(total.shown)}
+        highlighted={total.highlighted}
+        welcome={welcome}
+        holdsNothing={standing.holdsNothing}
+      />
 
       {standing.linkedElsewhere ? (
         <ReconnectNotice runtime={runtime} wallet={wallet} />
       ) : (
         <>
-          <RecentEarnings
-            entries={score?.recent ?? []}
-            dailyRateAtomic={standing.dailyRateAtomic}
-            referralPercent={REFERRAL_PERCENT}
-            friends={score?.refereeCount ?? 0}
-          />
           <section aria-labelledby="ways-to-earn" className="flex flex-col gap-3">
-            <h2 id="ways-to-earn" className="text-h3 font-semibold text-foreground">
+            <h2 id="ways-to-earn" className="text-body text-foreground">
               {t("points.waysToEarn")}
             </h2>
-            <div className="flex flex-col gap-6">
-              <EarnItem label={t("points.invite")} title={t("points.inviteFriend")}>
-                <div className="flex flex-col gap-1">
-                  <p className="text-label text-muted">
-                    {t("points.referralBefore")}
-                    <Reward>{REFERRAL_PERCENT}%</Reward>
-                    {t("points.referralAfter")}
-                  </p>
-                  {status ? (
-                    <p className="flex items-center gap-2 text-caption text-muted">
-                      {seatsLeft !== null ? <Seats left={seatsLeft} /> : null}
-                      {status}
-                    </p>
-                  ) : null}
-                  {full ? (
-                    <p className="text-caption text-muted">{t("points.twoMore")}</p>
-                  ) : null}
-                </div>
-                {full ? null : (
-                  <div className="flex gap-2">
-                    <Button
+            <div className="flex flex-col gap-6 rounded-xl bg-mist p-4">
+              <EarnItem label={t("points.invite")}>
+                <p className="text-label text-muted">
+                  {t("points.referralBefore")}
+                  {REFERRAL_PERCENT}%{t("points.referralAfter")}
+                </p>
+                {full ? (
+                  <p className="mt-1.5 text-label text-foreground">{t("points.invitesFull")}</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <button
                       type="button"
-                      variant="secondary"
-                      size="sm"
-                      className={cn(copied && "text-positive")}
+                      className={cn(ACTION_LINK, copied && "text-positive")}
                       onClick={() => {
                         copy();
                         prompt?.finish();
+                        countNote.flash();
                       }}
                     >
-                      {copied ? t("points.copied") : t("points.copyInvite")}
-                    </Button>
+                      {copied ? t("points.copied") : t("points.inviteFriend")}
+                      {copied ? <CheckIcon className={ACTION_ICON} /> : <CopyIcon className={ACTION_ICON} />}
+                    </button>
+                    {status ? (
+                      <span
+                        role="status"
+                        className={cn(
+                          "text-label text-muted transition-opacity duration-700 motion-reduce:transition-none",
+                          countNote.phase === "fading" && "opacity-0",
+                        )}
+                      >
+                        {status}
+                      </span>
+                    ) : null}
                   </div>
                 )}
               </EarnItem>
               <ReviewItem runtime={runtime} />
             </div>
           </section>
+          <RecentEarnings
+            entries={score?.recent ?? []}
+            referralPercent={REFERRAL_PERCENT}
+            friends={score?.refereeCount ?? 0}
+          />
         </>
       )}
 
-      <AboutPoints className="mt-auto">
+      <AboutPoints className="mt-auto" notes={[t("points.twoMore"), t("points.snapshotTime")]}>
         <LeaveControl
           runtime={runtime}
           wallet={wallet}
@@ -317,28 +251,98 @@ function JoinedView({
   );
 }
 
-/** "Top N%" with the private rank under it, so the place never shows without saying what it is. */
-function RankLines({ score }: { score: PointsWalletScore }) {
+/**
+ * The place leads because it's what a member acts on, with the gap to the
+ * next place under it. The total reads as a balance in the top corner and
+ * turns into the percentile on a tap, so only one of them is on screen. Before the first snapshot ranks the
+ * wallet, the total leads instead, with the join welcome in the line the
+ * gap to the next rank uses later.
+ */
+function Standing({
+  score,
+  total,
+  highlighted,
+  welcome,
+  holdsNothing,
+}: {
+  score: PointsWalletScore | null | undefined;
+  total: string;
+  highlighted: boolean;
+  welcome: string | null;
+  holdsNothing: boolean;
+}) {
   const t = useT();
-  // The leader is "#1" because an only ranked wallet is also "Top 100%".
-  const headline =
-    score.rank === 1 ? "#1" : score.topPercent !== null ? t("points.top", { percent: score.topPercent }) : t("points.unranked");
-  const detail =
-    score.rank !== null && score.pointsToNextRankAtomic !== null
-      ? t("points.toNextRank", {
-          rank: score.rank,
-          amount: formatPoints(score.pointsToNextRankAtomic),
-          next: score.rank - 1,
-        })
-      : score.rank !== 1 && score.topPercent === null
-        ? t("points.unrankedHint")
-        : null;
+  const rank = score?.rank ?? null;
+  const toNext =
+    rank !== null && score?.pointsToNextRankAtomic != null
+      ? t("points.toNextRank", { amount: formatPoints(score.pointsToNextRankAtomic), next: rank - 1 })
+      : null;
+  const totalText = (
+    <span className={cn("tabular-nums transition-colors duration-700 motion-reduce:transition-none", highlighted && "text-positive")}>
+      {total}
+    </span>
+  );
+  // The leader skips "Top N%" because an only ranked wallet is also "Top 100%".
+  const percent = rank !== 1 && score?.topPercent != null ? t("points.top", { percent: score.topPercent }) : null;
+  const [showPercent, setShowPercent] = useState(false);
+  const line = welcome ?? toNext;
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <p className="text-body font-semibold tabular-nums">{headline}</p>
-      {detail ? <p className="text-label text-on-ink-muted">{detail}</p> : null}
-    </div>
+    <section aria-label={t("points.standing")} className="relative flex flex-col gap-2">
+      <Beam className="mb-2 w-10" />
+      {rank !== null ? (
+        <>
+          <p className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">
+            {t("points.rank", { rank })}
+          </p>
+          {/* After the rank in reading order, drawn on the beam's row. */}
+          <div className="absolute right-0 top-[1.5px] -translate-y-1/2 text-body text-muted">
+            {percent ? (
+              // The dashed underline says the figure has another reading: the percentile.
+              <button
+                type="button"
+                aria-pressed={showPercent}
+                onClick={() => setShowPercent((value) => !value)}
+                className="underline decoration-line decoration-dashed underline-offset-4 hover:text-foreground hover:decoration-faint phone:min-h-11"
+              >
+                {showPercent ? (
+                  percent
+                ) : (
+                  <>
+                    <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
+                    <span aria-hidden="true">
+                      {totalText} {t("points.unit")}
+                    </span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <p>
+                <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
+                <span aria-hidden="true">
+                  {totalText} {t("points.unit")}
+                </span>
+              </p>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="flex items-baseline gap-2 text-foreground">
+          <span className="sr-only">{t("points.pointsAmount", { amount: total })}</span>
+          <span aria-hidden="true" className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em]">
+            {totalText}
+          </span>
+          <span aria-hidden="true" className="text-body text-muted">
+            {t("points.unit")}
+          </span>
+        </p>
+      )}
+      {line ? <p className="text-h3 text-foreground">{line}</p> : null}
+      {rank === null && score ? (
+        <p className="text-body text-muted">{t(holdsNothing ? "points.holdToEarn" : "points.unrankedHint")}</p>
+      ) : null}
+      {score?.originalFounder ? <p className="text-label text-faint">{t("points.earlyMember")}</p> : null}
+    </section>
   );
 }
 
@@ -368,32 +372,18 @@ function ReconnectNotice({ runtime, wallet }: { runtime: RuntimePort; wallet: Wa
   );
 }
 
-/**
- * One way to earn: a hairline, its title, then what it pays and its
- * actions. Every way shares this shape and a small outlined
- * action, so none reads as more important than the others.
- */
-function EarnItem({
-  label,
-  title,
-  children,
-}: {
-  label: string;
-  title: string;
-  children: ReactNode;
-}) {
+/** One way to earn: what it pays, then its action, which names it. */
+function EarnItem({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section aria-label={label} className="flex flex-col gap-3 border-t border-line pt-4 phone:border-t-0 phone:pt-0">
-      <h3 className="text-body font-semibold text-foreground">{title}</h3>
+    <section aria-label={label} className="flex flex-col gap-1">
       {children}
     </section>
   );
 }
 
-/** What a way to earn pays, picked out of its muted sentence the way the ink card sets its figures. */
-function Reward({ children }: { children: ReactNode }) {
-  return <span className="font-semibold tabular-nums text-foreground">{children}</span>;
-}
+/** Earn actions are text, not buttons, so nothing competes with the place above. */
+const ACTION_LINK =
+  "self-start text-body font-medium text-foreground hover:underline phone:min-h-11";
 
 /**
  * Reviews need a registered wallet, so only members see this. The button
@@ -410,35 +400,23 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
   const paying = placesLeft !== null && placesLeft > 0;
 
   return (
-    <EarnItem label={t("points.review")} title={t("points.reviewRelease")}>
-      <div className="flex flex-col gap-1">
-        <p className="text-label text-muted">
-          {paying && rewardAtomic ? (
-            <>
-              {t("points.reviewEarnBefore")}
-              <Reward>{formatPoints(rewardAtomic)} GLEAM</Reward>
-              {t("points.reviewEarnAfter")}
-            </>
-          ) : (
-            t("points.reviewPlain")
-          )}
-        </p>
+    <EarnItem label={t("points.review")}>
+      <p className="text-label text-muted">
+        <span>
+          {paying && rewardAtomic
+            ? `${t("points.reviewEarnBefore")}${formatPoints(rewardAtomic)} GLEAM${t("points.reviewEarnAfter")}`
+            : t("points.reviewPlain")}
+        </span>{" "}
         {placesLeft === 0 ? (
-          <p className="text-caption text-muted">
-            {pool
-              ? t("points.placesTakenPool", { pool })
-              : t("points.placesTaken")}
-          </p>
+          <span>{pool ? t("points.placesTakenPool", { pool }) : t("points.placesTaken")}</span>
         ) : pool ? (
-          <p className="text-caption text-muted">{t("points.poolPlus", { pool })}</p>
+          <span>{t("points.poolPlus", { pool })}</span>
         ) : null}
-      </div>
-      <Button asChild variant="secondary" size="sm" className="self-start">
-        <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer">
-          {t("points.startReview")}
-          <span aria-hidden="true">↗</span>
-        </a>
-      </Button>
+      </p>
+      <a href={`${scanUrl(version)}#review`} target="_blank" rel="noreferrer" className={cn(ACTION_LINK, "mt-1.5")}>
+        {t("points.startReview")}
+        <span aria-hidden="true"> ↗</span>
+      </a>
     </EarnItem>
   );
 }
@@ -450,9 +428,11 @@ function ReviewItem({ runtime }: { runtime: RuntimePort }) {
  */
 function AboutPoints({
   className,
+  notes,
   children,
 }: {
   className?: string;
+  notes?: string[];
   children?: ReactNode;
 }) {
   const t = useT();
@@ -485,6 +465,11 @@ function AboutPoints({
               detail={t("points.futureDetail")}
             />
           </ul>
+          {notes?.map((note) => (
+            <p key={note} className="px-4 text-caption text-muted phone:px-0">
+              {note}
+            </p>
+          ))}
           {children ? (
             <div className="flex justify-center">{children}</div>
           ) : null}
@@ -598,3 +583,7 @@ function DeviceApprovalNote() {
     </p>
   );
 }
+
+/** Sized and aligned to sit after an earn action's text, like the scan link's ↗. */
+const ACTION_ICON = "ml-1.5 inline-block align-[-0.125em]";
+

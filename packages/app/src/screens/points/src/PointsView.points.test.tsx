@@ -171,12 +171,11 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const review = within(await screen.findByRole("region", { name: "Scan" }));
-    expect(review.getByRole("heading", { name: "Scan Gleam with your agent" })).toBeTruthy();
     const link = review.getByRole("link", { name: /Start a scan/ });
     expect(link.getAttribute("href")).toBe(`${SCAN_URL}#review`);
     expect(link.getAttribute("target")).toBe("_blank");
-    expect(await review.findByText(sentence("Earn 12.50 GLEAM to scan Gleam with your coding agent."))).toBeTruthy();
-    expect(review.getByText("Plus a 5,000 GLEAM bounty pool for confirmed vulnerabilities.")).toBeTruthy();
+    expect(await review.findByText("Scan our code with your agent for 12.50 GLEAM.")).toBeTruthy();
+    expect(review.getByText("Plus a 5,000 GLEAM bug bounty.")).toBeTruthy();
   });
 
   it("keeps the review link once the paid places are taken", async () => {
@@ -195,9 +194,9 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const review = within(await screen.findByRole("region", { name: "Scan" }));
-    expect(await review.findByText(/taken\. Confirmed vulnerabilities still share the 5,000 GLEAM bounty pool/)).toBeTruthy();
+    expect(await review.findByText(/taken\. Confirmed bugs still share the 5,000 GLEAM bounty/)).toBeTruthy();
     expect(review.getByRole("link", { name: /Start a scan/ })).toBeTruthy();
-    expect(review.getByText("Scan Gleam with your coding agent.")).toBeTruthy();
+    expect(review.getByText("Scan our code with your agent.")).toBeTruthy();
   });
 
   it("drops the places line when the stats can't be read", async () => {
@@ -211,7 +210,7 @@ describe("PointsView", () => {
 
     const review = within(await screen.findByRole("region", { name: "Scan" }));
     await waitFor(() => expect(runtime.send).toHaveBeenCalledWith({ type: "getScanStats", payload: undefined }));
-    expect(review.queryByText(/paid places|bounty pool/i)).toBeNull();
+    expect(review.queryByText(/paid places|bounty/i)).toBeNull();
     expect(review.queryByText(/GLEAM/)).toBeNull();
   });
 
@@ -244,8 +243,8 @@ describe("PointsView", () => {
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id, inviteCode: "friend42" } }),
     );
-    expect(await screen.findByText("Top 12%")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
+    expect(await screen.findByText("Rank #5")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Invite a friend" })).toBeTruthy();
   });
 
   it("lets a hardware wallet join and points to the approval window while its device signs", async () => {
@@ -332,7 +331,7 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    expect(await screen.findByText("Top 12%")).toBeTruthy();
+    expect(await screen.findByText("Rank #5")).toBeTruthy();
     expect(screen.queryByText(/OG/)).toBeNull();
     expect(screen.queryByText(/Early member/)).toBeNull();
 
@@ -341,16 +340,17 @@ describe("PointsView", () => {
     expect(standing.queryByText("Per day")).toBeNull();
     expect(standing.queryByText("Friends joined")).toBeNull();
 
-    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
-    expect(screen.getByText("3 invites remaining")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Invite" })).toBeTruthy();
+    expect(screen.queryByText("3 invites remaining")).toBeNull();
+    expect(screen.getByRole("region", { name: "Ways to earn" })).toBeTruthy();
     expect(within(screen.getByRole("region", { name: "Invite" })).getByText(sentence("Earn an extra 10% daily for every friend who joins."))).toBeTruthy();
     const writeText = vi.fn(async () => {});
     Object.assign(navigator, { clipboard: { writeText } });
-    fireEvent.click(screen.getByRole("button", { name: "Copy invite link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Invite a friend" }));
     expect(writeText).toHaveBeenCalledWith(LINK);
+    expect(screen.getByText("3 invites remaining")).toBeTruthy();
 
-    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Start a scan↗"]);
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Start a scan ↗"]);
     expect(screen.queryByRole("button", { name: "Leave Gleam Points" })).toBeNull();
     const about = screen.getByRole("button", { name: "About Gleam Points" });
     expect(about.getAttribute("aria-expanded")).toBe("false");
@@ -406,14 +406,19 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    const recent = within(await screen.findByRole("region", { name: "Recent earnings" }));
+    const toggle = await screen.findByRole("button", { name: /Recent earnings/ });
+    expect(toggle.textContent).toContain("+1,325");
+    expect(screen.queryAllByRole("listitem")).toEqual([]);
+    fireEvent.click(toggle);
+    const recent = within(screen.getByRole("region", { name: "Recent earnings" }));
     expect(recent.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "Finding↗PR #142 · v1.42.0+1,000",
       "Security scanv1.42.0+250.00",
       "Invites3 friends · 10% of their points+75.00",
     ]);
     expect(recent.getByRole("link", { name: /Finding/ }).getAttribute("href")).toBe("https://github.com/o/r/pull/142");
-    expect(screen.getByRole("heading", { name: "Ways to earn" })).toBeTruthy();
+    const ways = screen.getByRole("region", { name: "Ways to earn" });
+    expect(ways.compareDocumentPosition(screen.getByRole("region", { name: "Recent earnings" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides Recent earnings when nothing was credited in the last two days", async () => {
@@ -428,8 +433,9 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Top 12%")).toBeTruthy();
-    expect(screen.queryByText("Recent earnings")).toBeNull();
+    expect(await screen.findByText("Rank #5")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Recent earnings" })).toBeNull();
+    expect(screen.queryByText("Today")).toBeNull();
   });
 
   it("leaves the invite slots empty until the server reports them", async () => {
@@ -443,11 +449,11 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    expect(await screen.findByText("Top 12%")).toBeTruthy();
+    expect(await screen.findByText("Rank #5")).toBeTruthy();
 
     expect(screen.queryByText(/invites? remaining/)).toBeNull();
-    expect(screen.getByRole("heading", { name: "Invite a friend" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy invite link" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Invite" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Invite a friend" })).toBeTruthy();
   });
 
   it("says the invites are used and offers nothing to share at zero seats", async () => {
@@ -459,9 +465,10 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("All your invites are used")).toBeTruthy();
+    expect(await screen.findByText("All your invites are used. You get two more when a friend you invited joins Points.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Invite a friend" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
     expect(screen.getByText("You get two more when a friend you invited joins Points.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Copy invite link" })).toBeNull();
   });
 
   it("shows why a join failed", async () => {
@@ -496,13 +503,13 @@ describe("PointsView", () => {
     const notice = within(await screen.findByRole("region", { name: "Left on another browser" }));
     expect(notice.getByRole("heading", { name: "Left on another browser" })).toBeTruthy();
     expect(screen.queryByText(/Top \d+%/)).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Ways to earn" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Ways to earn" })).toBeNull();
     fireEvent.click(notice.getByRole("button", { name: "Join again" }));
 
     await waitFor(() =>
       expect(runtime.send).toHaveBeenCalledWith({ type: "joinPoints", payload: { walletId: WALLET.id } }),
     );
-    expect(await screen.findByRole("heading", { name: "Ways to earn" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "Ways to earn" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Left on another browser" })).toBeNull();
   });
 
@@ -532,24 +539,45 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
-    expect(standing.queryByText(/Top \d+%|Unranked/)).toBeNull();
+    expect(standing.queryByText(/Top \d+%|daily snapshot/)).toBeNull();
     expect(screen.queryByRole("region", { name: "Left on another browser" })).toBeNull();
   });
 
-  it("shows Top 100% for the last ranked wallet", async () => {
+  it("swaps the total for the percentile on a tap", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
-      getPointsScores: () => ({ ...SCORES, wallets: [{ ...SCORES.wallets[0]!, topPercent: 100 }] }),
+      getPointsScores: () => SCORES,
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
-    expect(await standing.findByText("Top 100%")).toBeTruthy();
+    expect(await standing.findByText("Rank #5")).toBeTruthy();
+    expect(standing.queryByText("Top 12%")).toBeNull();
+    const corner = standing.getByRole("button", { pressed: false });
+    fireEvent.click(corner);
+    expect(standing.getByText("Top 12%")).toBeTruthy();
+    expect(corner.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(corner);
+    expect(standing.queryByText("Top 12%")).toBeNull();
   });
 
-  it("says Unranked, with why, until a snapshot credits the wallet", async () => {
+  it("shows the leader's total without a toggle", async () => {
+    const runtime = fakeRuntime({
+      ...BALANCES,
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({ ...SCORES, wallets: [{ ...SCORES.wallets[0]!, rank: 1, topPercent: 100, pointsToNextRankAtomic: null }] }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    const standing = within(await screen.findByRole("region", { name: "Standing" }));
+    expect(await standing.findByText("Rank #1")).toBeTruthy();
+    expect(standing.queryByRole("button")).toBeNull();
+  });
+
+  it("leads with the total and says when a rank comes until a snapshot credits the wallet", async () => {
     const runtime = fakeRuntime({
       ...BALANCES,
       getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
@@ -561,9 +589,27 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("Unranked")).toBeTruthy();
-    expect(screen.getByText(/daily snapshot/)).toBeTruthy();
-    expect(screen.queryByText(/points to pass/)).toBeNull();
+    expect(await screen.findByText("You're ranked once a daily snapshot credits your points.")).toBeTruthy();
+    expect(screen.queryByText(/Rank #|Unranked|points to pass/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About Gleam Points" }));
+    expect(screen.getByText("Snapshots run just after midnight UTC.")).toBeTruthy();
+  });
+
+  it("asks an unranked wallet with no AR or AO to hold some", async () => {
+    const runtime = fakeRuntime({
+      getBalance: () => "0",
+      getTokenBalances: () => [],
+      getPointsMemberships: () => ({ [WALLET.id]: MEMBERSHIP }),
+      getPointsScores: () => ({
+        ...SCORES,
+        wallets: [{ ...SCORES.wallets[0]!, totalAtomic: "0", rank: null, topPercent: null, pointsToNextRankAtomic: null }],
+      }),
+    });
+
+    renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
+
+    expect(await screen.findByText("Hold AR or AO in this wallet to start earning.")).toBeTruthy();
+    expect(screen.queryByText(/daily snapshot credits/)).toBeNull();
   });
 
   it("shows the private rank and the points needed to pass the next one", async () => {
@@ -575,7 +621,8 @@ describe("PointsView", () => {
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
-    expect(await screen.findByText("You're #5. 1.80 points to pass #4.")).toBeTruthy();
+    expect(await screen.findByText("Rank #5")).toBeTruthy();
+    expect(screen.getByText("1.80 points to pass #4.")).toBeTruthy();
   });
 
   it("shows #1 for the leader, even as the only ranked wallet", async () => {
@@ -591,7 +638,7 @@ describe("PointsView", () => {
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
 
     const standing = within(await screen.findByRole("region", { name: "Standing" }));
-    expect(await standing.findByText("#1")).toBeTruthy();
+    expect(await standing.findByText("Rank #1")).toBeTruthy();
     expect(screen.queryByText(/points to pass/)).toBeNull();
   });
 
@@ -605,7 +652,7 @@ describe("PointsView", () => {
     });
 
     renderWithQuery(<PointsView runtime={runtime} wallet={WALLET} onBack={vi.fn()} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Copy invite link" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Invite a friend" }));
 
     expect(writeText).toHaveBeenCalledWith("https://gleamwallet.app/invite.html?c=MYCODE22");
     expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();

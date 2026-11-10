@@ -14,22 +14,20 @@ describe("recentDays", () => {
       { kind: "holding", amountAtomic: "70", at: at(7, 23) },
     ];
 
-    const days = recentDays(entries, NOW, "90");
+    const days = recentDays(entries, NOW);
 
     expect(days.map((day) => [day.day, day.totalAtomic, day.rows.map((row) => row.kind)])).toEqual([
-      ["today", "250", ["scan", "pending"]],
+      ["today", "250", ["scan"]],
       ["yesterday", "88", ["invites", "holding"]],
     ]);
   });
 
-  it("shows no day that has only a friend joining or pending points", () => {
-    expect(recentDays([{ kind: "friendJoined", at: at(9, 9) }], NOW, "90")).toEqual([]);
+  it("shows no day that has only a friend joining", () => {
+    expect(recentDays([{ kind: "friendJoined", at: at(9, 9) }], NOW)).toEqual([]);
   });
 
-  it("drops the pending row once today's daily credit has landed", () => {
-    const days = recentDays([{ kind: "holding", amountAtomic: "90", at: at(9, 2) }], NOW, "90");
-
-    expect(days[0]!.rows.map((row) => row.kind)).toEqual(["holding"]);
+  it("shows nothing without activity", () => {
+    expect(recentDays([], NOW)).toEqual([]);
   });
 
   it("keeps a friend joining after the credits", () => {
@@ -39,7 +37,6 @@ describe("recentDays", () => {
         { kind: "holding", amountAtomic: "80", at: at(8, 2) },
       ],
       NOW,
-      "0",
     );
 
     expect(days[0]!.rows.map((row) => row.kind)).toEqual(["holding", "friendJoined"]);

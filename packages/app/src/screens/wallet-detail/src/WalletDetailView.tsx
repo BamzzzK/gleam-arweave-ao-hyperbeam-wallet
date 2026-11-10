@@ -17,6 +17,7 @@ import { useCopy } from "../../points/src/useCopy";
 import { useT, type TFunction } from "../../../i18n";
 import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
+import { CheckIcon, CopyIcon } from "@gleam/ui/src/primitives/copy-icons.tsx";
 
 // JWK is what nearly every wallet is, so only the other methods get a label.
 const walletMethodLabel = (t: TFunction, method: WalletSummary["method"]): string | null => {
@@ -193,7 +194,7 @@ export function WalletDetailView({
                 title={addressCopied ? t("walletDetail.copied") : t("walletDetail.copyAddress")}
                 className={`-my-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-opacity hover:bg-mist focus-visible:opacity-100 group-hover:opacity-100 phone:opacity-100 phone:hit-target ${addressCopied ? "text-positive opacity-100" : "text-faint opacity-0 hover:text-foreground"}`}
               >
-                {addressCopied ? <CheckIcon /> : <CopyIcon />}
+                {addressCopied ? <CheckIcon size={15} /> : <CopyIcon size={15} />}
               </button>
             </div>
             <MemorableAddress address={wallet.address} emphasisPick={identity.emphasisPick} className="-ml-[0.35ch]" />
@@ -393,19 +394,3 @@ function ExportPasswordStep({
   );
 }
 
-function CopyIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="9" y="9" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
