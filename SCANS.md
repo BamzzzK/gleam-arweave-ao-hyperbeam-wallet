@@ -375,8 +375,8 @@ style of an advisory or PR body. In summary:
   attack.
 - Say once whether a finding was demonstrated, traced or needs a
   browser check, then write plainly.
-- Keep the part above `<details>` to about 200 words, written for a
-  maintainer skimming.
+- Above `<details>`, put only the title and a plain summary of about
+  100 words at reading grade 6 to 7. Everything else goes inside it.
 - A clean `pass` earns the same as `scanned`. Padding a report with
   weak findings earns nothing.
 
