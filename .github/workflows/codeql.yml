@@ -10,8 +10,12 @@ on:
 permissions:
   contents: read
 
+# A pull request's newer push replaces its older run. Master commits each get
+# their own group: a cancelled run records its analysis as failed, so merges
+# landing within the Swift job's ~17 minutes would otherwise leave master's
+# Swift result failed, and `reuse-swift` with an older one to copy.
 concurrency:
-  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  group: codeql-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
