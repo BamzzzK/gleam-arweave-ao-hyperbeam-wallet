@@ -23,10 +23,18 @@ jobs:
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      # Only patch/minor updates to non-major semver, and never a security
-      # advisory for a package with no patched version — those still need a
-      # human to pick the fix (see elliptic/GHSA-848j-6mx2-7j84).
-      - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+      # Only patch/minor updates to direct npm dev dependencies outside the
+      # build-toolchain group. An Action bump runs in the release job with
+      # write and OIDC tokens, and a production dependency or the bundler
+      # writes what ships, so those get a human review; so does a security
+      # advisory for a package with no patched version (see
+      # elliptic/GHSA-848j-6mx2-7j84). scripts/workflows.ci.test.ts checks
+      # every gh step keeps all four conditions.
+      - if: >-
+          steps.metadata.outputs.update-type != 'version-update:semver-major' &&
+          steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' &&
+          steps.metadata.outputs.dependency-type == 'direct:development' &&
+          steps.metadata.outputs.dependency-group != 'build-toolchain'
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -34,7 +42,11 @@ jobs:
       # Merge commit: the master ruleset requires signed commits and allows
       # only merge commits. GitHub signs the merge commit, and Dependabot's
       # own commit keeps its signature. GitHub can't sign rebase merges.
-      - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+      - if: >-
+          steps.metadata.outputs.update-type != 'version-update:semver-major' &&
+          steps.metadata.outputs.package-ecosystem == 'npm_and_yarn' &&
+          steps.metadata.outputs.dependency-type == 'direct:development' &&
+          steps.metadata.outputs.dependency-group != 'build-toolchain'
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
