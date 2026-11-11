@@ -33,12 +33,12 @@ export function RequestHeader({ origin, requestType, icon }: { origin: string; r
           <img src={icon} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={() => setIconFailed(true)} />
         </div>
       ) : (
-        <div aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-mist text-[15px] font-semibold text-muted">
+        <div aria-hidden="true" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-mist text-body font-semibold text-muted">
           {(host.replace(/^www\./, "").charAt(0) || "?").toUpperCase()}
         </div>
       )}
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="break-all text-[15px] font-semibold leading-snug text-foreground">
+        <span className="break-all text-body font-semibold leading-snug text-foreground">
           {own ? (
             "Gleam"
           ) : (

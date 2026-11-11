@@ -758,7 +758,7 @@ function ComposeStep({
                   onChange({ amountDisplay: sanitized });
                 }}
                 onBlur={onBlurAmount}
-                className="min-w-0 flex-1 border-none bg-transparent text-[26px] font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
+                className="min-w-0 flex-1 border-none bg-transparent text-display-sm font-semibold tracking-[-0.01em] tabular-nums text-foreground placeholder:text-faint focus:outline-none"
               />
               <button
                 type="button"
@@ -770,7 +770,7 @@ function ComposeStep({
                   label={ticker.slice(0, 2).toUpperCase()}
                   tone={token === null ? 1 : 2}
                   logoUrl={sendTokenLogo(token, readRowVisibility(wallet.address), tokenLogos)}
-                  className="h-5 w-5 rounded-md text-[8px]"
+                  className="h-5 w-5 rounded-md text-micro"
                 />
                 {ticker}
                 <ChevronDownIcon />
@@ -1221,7 +1221,7 @@ export function ReviewRow({ label, value, mono, strong }: { label: string; value
     <div className="flex items-center justify-between gap-4 border-b border-line py-2.5 text-label last:border-b-0 phone:border-b-0 phone:py-3">
       <span className="text-muted">{label}</span>
       <span
-        className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-[11px] font-medium" : ""}`}
+        className={`text-right tabular-nums text-foreground ${strong ? "font-bold" : "font-semibold"} ${mono ? "max-w-[220px] break-all font-mono text-caption font-medium" : ""}`}
       >
         {value}
       </span>

@@ -53,7 +53,7 @@ export function TokenGlyph({ label, tone = 1, logoUrl, className }: TokenGlyphPr
     <div
       aria-hidden="true"
       className={cn(
-        "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-bold tracking-[-0.02em]",
+        "flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg text-micro font-bold tracking-[-0.02em]",
         TONE_CLASSES[tone],
         className,
       )}

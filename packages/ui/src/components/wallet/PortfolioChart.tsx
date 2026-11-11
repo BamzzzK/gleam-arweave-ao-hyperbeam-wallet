@@ -404,7 +404,7 @@ export function PortfolioChart({
   );
 }
 
-const HEADLINE_CLASS = "text-[36px] font-semibold tracking-[-0.02em] tabular-nums text-foreground";
+const HEADLINE_CLASS = "text-display font-semibold tracking-[-0.02em] tabular-nums text-foreground";
 
 /** The large figure; a button that hides or shows balances when `onToggle` is set. */
 function Headline({ parts, trend, masked, onToggle }: { parts: CurrencyValueParts; trend: AnimatedNumberTrend | null; masked: boolean; onToggle?: () => void }) {
