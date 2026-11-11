@@ -94,3 +94,10 @@ export function explorerUrlFor(idOrAddress: string): string {
  * permission warning that would disable Gleam on update.
  */
 export const POINTS_API_URL = "https://api.gleamwallet.app";
+
+/** `url` without trailing slashes. A loop, since `/\/+$/` is quadratic on a long run of slashes. */
+export function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end--;
+  return url.slice(0, end);
+}

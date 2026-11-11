@@ -1,5 +1,6 @@
 import { AO_LEGACY_CU_URL } from "./result";
 import { userErrorMessage } from "../models/user-errors";
+import { trimTrailingSlashes } from "../models/network";
 
 /**
  * Read-only queries to a legacynet token process through the Compute
@@ -38,7 +39,7 @@ function replyMessages(body: unknown): Array<{ data: unknown; tags: Tag[] }> {
 }
 
 async function dryRun(processId: string, tags: Tag[], cuUrl: string, fetchImpl: typeof fetch): Promise<unknown> {
-  const response = await fetchImpl(`${cuUrl.replace(/\/+$/, "")}/dry-run?process-id=${encodeURIComponent(processId)}`, {
+  const response = await fetchImpl(`${trimTrailingSlashes(cuUrl)}/dry-run?process-id=${encodeURIComponent(processId)}`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     // Id and Owner are placeholders: a dry-run is never signed or scheduled.

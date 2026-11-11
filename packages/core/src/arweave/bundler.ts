@@ -1,4 +1,5 @@
 import { userErrorMessage } from "../models/user-errors";
+import { trimTrailingSlashes } from "../models/network";
 
 /**
  * POSTs an already-signed ANS-104 data item's raw bytes to
@@ -8,10 +9,7 @@ import { userErrorMessage } from "../models/user-errors";
  * data the bundler didn't accept.
  */
 export async function postDataItemToBundler(bundlerUrl: string, rawBytes: Uint8Array<ArrayBuffer>): Promise<void> {
-  // A loop, not /\/+$/: that regex is quadratic on a run of slashes.
-  let base = bundlerUrl;
-  while (base.endsWith("/")) base = base.slice(0, -1);
-  const endpoint = `${base}/tx`;
+  const endpoint = `${trimTrailingSlashes(bundlerUrl)}/tx`;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
