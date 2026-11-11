@@ -262,7 +262,10 @@ balance:
 | Low, or a merged hardening PR |    2% |
 
 The pool grows while nothing is found, so bounties rise over time.
-Only the first report of a root cause earns. Points carry no promised
+Only the first report of a root cause earns. A finding in the release
+that master has already fixed earns at its rating like any other, since
+users run the release until the next one ships. The scan reports it as
+an advisory that says so, since there is no fix left to make. Points carry no promised
 value or conversion ratio.
 
 These are the current values. They are tuned per release.
@@ -338,7 +341,9 @@ style of an advisory or PR body. In summary:
 6. Try to disprove each finding with `VERIFY.md`, in a fresh subagent
    where the agent can start one. A round's review, and each draft, can
    run in a fresh subagent too (the skill's Round brief and Draft brief). Only findings that survive get
-   drafted, at the severity the verdict gives.
+   drafted, at the severity the verdict gives. Each survivor is then
+   checked against `origin/master`. One that master already fixes is
+   drafted as an advisory that says so, never as a fix PR.
 7. Draft the reports, as `REPORT.md` says. PRs are the default: low or
    informational issues, hardening, and anything that would have made
    the scan better (a missing surface file, a check the skill should

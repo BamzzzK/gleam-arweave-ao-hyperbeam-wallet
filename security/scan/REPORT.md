@@ -47,7 +47,8 @@ Use these parts, in this order:
 
 - `Title: <title>` as the first line. Filing sends it as the advisory's
   title and the rest as its description.
-- **Summary**: two or three sentences on what is wrong.
+- **Summary**: two or three sentences on what is wrong. If master
+  already fixes it, end with `Already fixed on master in <ref>.`
 - **Impact**: who is affected and what they lose. Give the severity and
   one line on why.
 - **Steps**: numbered, six at most, from the attacker's access to the harm.
