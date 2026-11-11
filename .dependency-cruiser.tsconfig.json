@@ -1,0 +1,9 @@
+{
+  "//": "Resolution only, for .dependency-cruiser.cjs: WXT's @/ and ~/ aliases with a baseUrl its resolver needs.",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["apps/extension/*"], "~/*": ["apps/extension/*"] },
+    "allowJs": true
+  },
+  "include": ["apps/extension/entrypoints"]
+}

@@ -12,6 +12,10 @@ import reactHooks from "eslint-plugin-react-hooks";
  * `packages/core` never imports an adapter, and popup-side UI code never
  * imports background-adapter code directly — every cross-context call
  * crosses `packages/messaging`.
+ *
+ * The fences below match specifier strings and give editor feedback.
+ * `.dependency-cruiser.cjs` (`pnpm deps:check`) checks the same fences on
+ * resolved files, which also catches relative climbs and re-exports.
  */
 // Any path into `packages/core/src/signer`: the `@gleam/core/signer`
 // subpath, any path through `src/signer`, or `../signer` anywhere in a
@@ -92,7 +96,37 @@ const noStorageReadModifyWrite = {
     };
   },
 };
-const gleam = { rules: { "no-dynamic-import": noDynamicImport, "no-storage-read-modify-write": noStorageReadModifyWrite } };
+// `.dependency-cruiser.cjs` checks the fences on resolved files, and a
+// computed `import()` path can't be resolved, so it would pass unseen.
+const noComputedImport = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    return {
+      ImportExpression(node) {
+        const src = node.source;
+        const literal = src.type === "Literal" || (src.type === "TemplateLiteral" && src.expressions.length === 0);
+        if (!literal) {
+          context.report({ node, message: "import() takes a literal path, so the import fences can check it." });
+        }
+      },
+    };
+  },
+};
+const gleam = {
+  rules: {
+    "no-dynamic-import": noDynamicImport,
+    "no-computed-import": noComputedImport,
+    "no-storage-read-modify-write": noStorageReadModifyWrite,
+  },
+};
+// `no-restricted-globals` sees a bare `chrome`, not `globalThis.chrome`.
+const NO_GLOBAL_OBJECT_EXTENSION_API = ["globalThis", "self", "window"].flatMap((object) =>
+  ["chrome", "browser"].map((property) => ({
+    object,
+    property,
+    message: "Shell-free packages never touch extension globals. Reach the platform through a port.",
+  })),
+);
 const signerFence = (regex) => ({
   "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
   "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
@@ -322,6 +356,29 @@ export default tseslint.config(
         "error",
         { regex: SIGNER_IMPORT, message: SIGNER_IMPORT_MESSAGE },
         { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE },
+      ],
+    },
+  },
+  {
+    files: ["packages/**/*.{ts,tsx}", "apps/extension/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: { "gleam/no-computed-import": "error" },
+  },
+  {
+    // The same fence as `no-restricted-globals` below, through a global object.
+    files: ["packages/**/*.{ts,tsx}"],
+    rules: { "no-restricted-properties": ["error", ...NO_GLOBAL_OBJECT_EXTENSION_API] },
+  },
+  {
+    // core, messaging and ui run in every shell and context, like runtime.
+    files: ["packages/{core,messaging,ui}/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...["chrome", "browser"].map((name) => ({
+          name,
+          message: "Shell-free packages never touch extension globals. Reach the platform through a port.",
+        })),
       ],
     },
   },

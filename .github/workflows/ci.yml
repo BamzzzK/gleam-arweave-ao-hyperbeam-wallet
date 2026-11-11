@@ -63,6 +63,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm eslint --max-warnings=0 .
+      - run: pnpm deps:check
       - run: pnpm tsc -p packages/core --noEmit
       - run: pnpm tsc -p packages/messaging --noEmit
       - run: pnpm tsc -p packages/ui --noEmit
