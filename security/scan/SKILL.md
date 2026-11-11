@@ -472,7 +472,9 @@ gives:
 Draft everything, and file nothing yet. Every PR and advisory, skill and
 surface PRs included, quotes the round's attestation id, which you get
 when the user signs. Write `{{ATTESTATION_ID}}` in its place. The id goes
-in PR and advisory bodies, never in a commit message.
+in PR and advisory bodies, never in a commit message. The id credits the
+wallet, not the round, so any id this wallet has signed works when the
+round's own can't be signed.
 
 Save every draft in the round folder, numbered from 1 within the round:
 `.gleam-scan/rounds/<area>/pr-<n>.md` and
@@ -732,9 +734,11 @@ request as `Unanswered sign requests so far: <n> (.gleam-scan/declines).`
   the attestation id earn no award. Run `pnpm scan file` (`pnpm scan
   next` after a "signed") and end with its sign request.
 - **3 or more, or the user says to file anyway:** file every draft of the
-  unsigned rounds that their `filed.txt` doesn't list yet, with
-  `{{ATTESTATION_ID}}` replaced by `none (not signed)`, so the line reads
-  `Attestation id: none (not signed)` (File the reports). Then run `pnpm
+  unsigned rounds that their `filed.txt` doesn't list yet (File the
+  reports). Replace `{{ATTESTATION_ID}}` with the id of any round this
+  wallet has signed, from a `signed.json` in `.gleam-scan/`, since any
+  signed id credits the wallet. With none, write `none (not signed)`,
+  so the line reads `Attestation id: none (not signed)`. Then run `pnpm
   scan file` and end with its sign request, with one line per filed link
   above it. Its line 2 now offers to add the ids.
 

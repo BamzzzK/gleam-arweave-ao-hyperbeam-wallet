@@ -23,9 +23,11 @@ Include, where relevant:
 - Impact — what an attacker could do (e.g. key exfiltration, signing without
   approval, draining funds).
 
-If the report comes from a [community scan](SCANS.md), include its
+If you have signed a [community scan](SCANS.md), include its
 attestation id as a line of its own, `Attestation id: <64 hex characters>`,
-so the finding is credited to the wallet that signed the scan.
+so the finding is credited to the wallet that signed the scan. Any
+attestation your wallet signed works, not only the one from the round
+that found the issue.
 
 ## Severity
 

@@ -21,9 +21,12 @@ Also list `state=draft` for accepted reports that are not yet published.
 ## 1. Triage each report
 
 1. **Attestation id.** Look for `Attestation id: <64 hex>` in the
-   description, then in the comments. If neither has one, still triage
-   the report. It can be fixed and published, but it gets no award.
-   Don't hold anything for the id.
+   description, then in the comments. The id only links the finding to
+   a wallet: any non-voided attestation the reporter's wallet signed is
+   valid, from any round or release. If there is none, ask once for one
+   and triage anyway. Don't hold anything for the id. A valid report
+   without one is fixed and published. Whether it is paid is Will's call,
+   on its value.
 2. **Reproduce.** Read the cited code on `origin/master` and on the
    latest release tag. Trace the attacker's path from the access they
    have to the harm. Write a failing test where you can.
@@ -88,7 +91,8 @@ Then `gh api -X PATCH "$API/<GHSA>" -f state=published`.
 
 ## 4. Pay
 
-Pay only advisories that carry an attestation id. Give Will the list
+Pay advisories that carry an attestation id. List any valid one without
+an id for Will with your view of its value. Give Will the list
 (GHSA, attestation id, severity) and wait for his approval. Then, from
 `apps/points-api`, preview each award with `n`:
 
