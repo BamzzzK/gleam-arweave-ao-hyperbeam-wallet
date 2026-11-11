@@ -50,8 +50,9 @@ jobs:
   # minutes, so dependencies build untraced and only our own Swift is rebuilt
   # under CodeQL.
   # The Swift job takes ~17 minutes, so a pull request runs it only when it
-  # changes what that job builds or how. Master pushes and the weekly run
-  # always analyze, and a failure here leaves the output empty, which runs it.
+  # changes what that job builds or how; otherwise `reuse-swift` reports
+  # master's result. Master pushes and the weekly run always analyze, and a
+  # failure here leaves the output empty, which runs it.
   swift-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -134,4 +135,42 @@ jobs:
           build
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
+          category: /language:swift
+
+  # The code scanning rule waits for a result in every category master has,
+  # so a pull request that skips the Swift build still needs a Swift result.
+  # Its Swift is master's, so master's latest Swift analysis is its result:
+  # this uploads that SARIF for the pull request. With no master analysis to
+  # reuse, the job fails rather than pass the gate empty.
+  reuse-swift:
+    name: Analyze (swift, from master)
+    runs-on: ubuntu-latest
+    needs: swift-changes
+    if: ${{ !cancelled() && needs.swift-changes.outputs.swift == 'false' }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/$REPO/code-scanning/analyses?ref=refs/heads/master&tool_name=CodeQL&per_page=100" \
+            --jq '[.[] | select(.category == "/language:swift")][0].id // empty')
+          if [ -z "$id" ]; then
+            echo "::error::master has no Swift analysis to reuse"
+            exit 1
+          fi
+          echo "Reusing master's Swift analysis $id"
+          gh api -H "Accept: application/sarif+json" "repos/$REPO/code-scanning/analyses/$id" > "$RUNNER_TEMP/swift.sarif"
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ runner.temp }}/swift.sarif
           category: /language:swift
