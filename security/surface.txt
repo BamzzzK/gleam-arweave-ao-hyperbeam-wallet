@@ -195,3 +195,4 @@
 5 packages/core/src/points/device-key-store.ts
 5 security/surface-exempt.txt
 5 .dependency-cruiser.cjs
+5 scripts/surface-check.mjs

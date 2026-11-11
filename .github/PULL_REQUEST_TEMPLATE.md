@@ -16,3 +16,4 @@
 - [ ] If this touches signing, network, or extension wiring: checked manually
       in Chrome against `.output/chrome-mv3`
 - [ ] Corresponding item removed from `todo.md`, if applicable
+- [ ] Touches `security/surface.txt` paths (the next release needs a fresh audit)
