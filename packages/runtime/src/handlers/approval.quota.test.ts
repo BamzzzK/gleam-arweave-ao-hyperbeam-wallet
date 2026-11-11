@@ -121,6 +121,38 @@ describe("ApprovalHandler: pending requests stay within session storage", () => 
     await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
   });
 
+  it("holds 1 MB of text for review, showing only its start", async () => {
+    const { handler, presenter } = setup();
+    const pending = handler.requestApproval({
+      kind: "dispatch",
+      origin: SITE_A,
+      walletId: WALLET_ID,
+      payload: encoder.encode("x".repeat(1_000_000)),
+      gatewayUrl: "https://arweave.net",
+    });
+    pending.catch(() => {});
+
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
+    const { preview } = await handler.getApproval({ requestId: presenter.presented[0]! });
+    expect(preview).toMatchObject({ decodedData: `${"x".repeat(4096)}…` });
+  });
+
+  it("never cuts a preview inside a character", async () => {
+    const { handler, presenter } = setup();
+    const pending = handler.requestApproval({
+      kind: "dispatch",
+      origin: SITE_A,
+      walletId: WALLET_ID,
+      payload: encoder.encode(`${"x".repeat(4095)}😀${"x".repeat(10)}`),
+      gatewayUrl: "https://arweave.net",
+    });
+    pending.catch(() => {});
+
+    await vi.waitFor(() => expect(presenter.presented).toHaveLength(1));
+    const { preview } = await handler.getApproval({ requestId: presenter.presented[0]! });
+    expect(preview).toMatchObject({ decodedData: `${"x".repeat(4095)}…` });
+  });
+
   it("refuses a site more waiting data than its share, and still opens another site's request", async () => {
     const { handler, presenter } = setup();
 

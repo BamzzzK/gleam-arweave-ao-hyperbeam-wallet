@@ -91,13 +91,18 @@ export function SettingsHomeView({
       <ScreenHeader
         title={t("settingsHome.title")}
         onBack={onBack}
-        end={
+        center={
           platform.sidePanel ? (
-            <SidePanelToggle
-              docked={platform.sidePanel.docked}
-              label={t(platform.sidePanel.docked ? "settingsHome.openAsPopup" : "settingsHome.openInSidePanel")}
-              onToggle={platform.sidePanel.toggle}
-            />
+            // The toggle hangs off the title's right so the title stays centred
+            // and the toggle sits clear of where the main screen's gear was clicked.
+            <span className="relative text-body font-semibold text-foreground">
+              {t("settingsHome.title")}
+              <SidePanelToggle
+                docked={platform.sidePanel.docked}
+                label={t(platform.sidePanel.docked ? "settingsHome.openAsPopup" : "settingsHome.openInSidePanel")}
+                onToggle={platform.sidePanel.toggle}
+              />
+            </span>
           ) : undefined
         }
       />
@@ -155,9 +160,9 @@ function SidePanelToggle({ docked, label, onToggle }: { docked: boolean; label: 
       aria-label={label}
       title={label}
       onClick={() => void onToggle().catch(() => {})}
-      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted hover:bg-mist hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
+      className="absolute left-full top-1/2 ml-0.5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-faint hover:bg-mist hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
         <path d="M15 4v16" stroke="currentColor" strokeWidth="2" />
         {docked ? <path d="M15 5h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3z" fill="currentColor" /> : null}

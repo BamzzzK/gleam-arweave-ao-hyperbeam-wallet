@@ -1,3 +1,4 @@
+import { trimTrailingSlashes } from "../models/network";
 /**
  * Resolves what happened to an AO `Transfer` message after the Messenger
  * Unit accepted it, by reading the process's evaluated result from the
@@ -26,7 +27,7 @@ export async function getTransferOutcome(
   cuUrl: string = AO_LEGACY_CU_URL,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AoTransferOutcome> {
-  const url = `${cuUrl.replace(/\/+$/, "")}/result/${messageId}?process-id=${encodeURIComponent(processId)}`;
+  const url = `${trimTrailingSlashes(cuUrl)}/result/${messageId}?process-id=${encodeURIComponent(processId)}`;
 
   let response: Response;
   try {

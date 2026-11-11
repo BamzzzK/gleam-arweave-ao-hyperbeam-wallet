@@ -252,12 +252,14 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     await expect(handler.getApproval({ requestId })).rejects.toThrow(/No pending approval/);
   });
 
-  it("dispatch: posts the device-signed transaction on L1", async () => {
+  it("dispatch: posts a device-signed AR send on L1", async () => {
     const calls = mockNetwork();
     const { pending, requestId, device } = await approveOnDevice({
       kind: "dispatch",
       payload: new TextEncoder().encode("hello"),
       gatewayUrl: GATEWAY,
+      target: RECIPIENT,
+      quantity: "10",
       reward: "5000",
       last_tx: "b".repeat(64),
     });
@@ -528,6 +530,8 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
       kind: "dispatch",
       payload: new TextEncoder().encode("hello"),
       gatewayUrl: GATEWAY,
+      target: RECIPIENT,
+      quantity: "10",
       reward: "5000",
       last_tx: "b".repeat(64),
     });
@@ -822,6 +826,8 @@ describe("ApprovalHandler: device races", () => {
       kind: "dispatch",
       payload: new TextEncoder().encode("hello"),
       gatewayUrl: GATEWAY,
+      target: RECIPIENT,
+      quantity: "10",
       reward: "5000",
       last_tx: "b".repeat(64),
     });

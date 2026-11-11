@@ -361,7 +361,11 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
           void refresh(runtime);
         }}
         onRemoved={() => {
-          setSubView({ kind: "home" });
+          const remaining = wallets.filter((candidate) => candidate.id !== detailWallet.id);
+          // Drop it now so the list doesn't flash the removed wallet. With none
+          // left, refresh switches to onboarding, which should finish on home.
+          setWallets(remaining);
+          setSubView(remaining.length > 0 ? { kind: "wallet-switcher" } : { kind: "home" });
           void refresh(runtime);
         }}
       />

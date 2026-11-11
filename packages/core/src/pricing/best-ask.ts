@@ -1,3 +1,4 @@
+import { trimTrailingSlashes } from "../models/network";
 /**
  * Spot price of an AO token from its own swap orderbook, the way Bazar
  * shows "Current unit price": the lowest open ask in the token process's
@@ -118,7 +119,7 @@ function winstonPerToken({ asking, quantity }: Order, denomination: number): big
  */
 export async function readBestAsk(processId: string, nodeUrl: string, fetchImpl: typeof fetch = fetch): Promise<BestAsk | null> {
   if (!ADDRESS.test(processId)) return null;
-  const base = nodeUrl.replace(/\/+$/, "");
+  const base = trimTrailingSlashes(nodeUrl);
   const signal = AbortSignal.timeout(READ_TIMEOUT_MS);
 
   try {

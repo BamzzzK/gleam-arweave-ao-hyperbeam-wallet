@@ -820,7 +820,7 @@ export function MainScreenView({
       */}
       <div className="transition-opacity duration-300 ease-out" style={{ opacity: headerCollapsed ? 0 : 1 }}>
         <div inert={headerCollapsed}>
-          <div className="px-6 pt-0.5 phone:px-5 phone:pb-1 phone:pt-1">
+          <div className="-mt-1 px-6 phone:mt-0 phone:px-5 phone:pb-1 phone:pt-1">
             <PortfolioChart
               points={chartSeries}
               currentValue={history ? history.currentValue + extraValue : 0}

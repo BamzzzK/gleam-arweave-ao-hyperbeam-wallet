@@ -238,6 +238,8 @@ export interface SigningRequestInput {
    * no network-settings storage access of its own.
    */
   gatewayUrl?: string;
+  /** Bundler a bundled `dispatch` posts to, from the same settings read; the handler's own default otherwise. */
+  bundlerUrl?: string;
   /** `sign`/`dispatch`'s transaction-shaped fields beyond `payload`/`tags` — `target`/`quantity`/`reward`/`last_tx`. */
   target?: string;
   quantity?: string;
@@ -862,13 +864,23 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+/*
+ * The window shows the start of the text; the payload and `payloadHash`
+ * still cover every byte. A full copy would be stored a second time
+ * beside the payload and count against `PENDING_BYTES_PER_ORIGIN`.
+ */
+const DATA_PREVIEW_CHARS = 4096;
+
 function decodeDataPreview(payload: Uint8Array): string | null {
+  let text: string;
   try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(payload);
-    return text;
+    text = new TextDecoder("utf-8", { fatal: true }).decode(payload);
   } catch {
     return null;
   }
+  if (text.length <= DATA_PREVIEW_CHARS) return text;
+  const cut = /[\uD800-\uDBFF]/.test(text[DATA_PREVIEW_CHARS - 1]!) ? DATA_PREVIEW_CHARS - 1 : DATA_PREVIEW_CHARS;
+  return `${text.slice(0, cut)}…`;
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
@@ -1602,7 +1614,7 @@ export class ApprovalHandler {
       case "sign":
         return finishSignTransaction(transactionOf(payload).transaction, signature!, owner);
       case "dispatch":
-        return finishDispatch(this.requireGatewayUrl(input), this.bundlerUrl, payload!, signature!, owner);
+        return finishDispatch(this.requireGatewayUrl(input), input.bundlerUrl ?? this.bundlerUrl, payload!, signature!, owner);
       case "signDataItem":
         // Wander resolves to the raw signed item as an ArrayBuffer, which
         // aoconnect's createDataItemSigner parses directly.
