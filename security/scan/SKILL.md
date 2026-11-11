@@ -425,7 +425,22 @@ more fresh verifier and give the candidate to it. If the two still
 disagree, take the lower severity, or `refuted` if one of them refuted
 it.
 
-Done when every candidate has a verdict.
+Then check each candidate that survived against `origin/master`. You
+scan the release tag, and master may already have fixed it:
+
+```bash
+git fetch origin master
+git log --oneline HEAD..origin/master -- <file>   # HEAD is the release tag
+git show origin/master:<file>                     # read the cited lines there
+```
+
+If master already fixes it, keep its severity: users run the release
+until the next one ships. Note it in the candidate note as
+`Already fixed on master in <PR number or short sha>`. Step 7 files it as
+a private advisory, at any severity, because a PR has nothing left to
+change.
+
+Done when every candidate has a verdict and a master check.
 
 ## Step 7: Draft your reports (don't file them yet)
 
@@ -450,6 +465,9 @@ gives:
 - **Low or informational, or a hardening change:** draft a PR.
 - **Medium, high or critical:** draft a private advisory. If you're unsure
   whether it's low or medium, treat it as medium.
+- **Already fixed on master** (Step 6): draft a private advisory at its
+  severity, with the line `Already fixed on master in <ref>.` at the end
+  of the Summary. Don't draft a fix PR for it.
 
 Draft everything, and file nothing yet. Every PR and advisory, skill and
 surface PRs included, quotes the round's attestation id, which you get
@@ -815,10 +833,11 @@ For each round, after Step 1:
 
    Wait for its summary block.
 2. **Verify.** For each candidate in the summary, start a fresh verifier
-   as Step 6 says. Act on the verdicts as Step 6's table says.
+   as Step 6 says. Act on the verdicts as Step 6's table says, then do
+   Step 6's master check yourself.
 3. **Draft.** For each candidate that survived, pick its file name: a
    verdict severity of low or informational gets `pr-<n>.md`, medium and
-   above `advisory-<n>.md`. Number from 1 above the highest number of that
+   above, or a finding master already fixes, `advisory-<n>.md`. Number from 1 above the highest number of that
    kind already in the round folder or given to another draft subagent,
    so no two drafts share a name. Then start a fresh subagent with only
    this prompt, filled in:
