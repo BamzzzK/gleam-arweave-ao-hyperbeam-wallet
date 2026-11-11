@@ -6,6 +6,7 @@ const WORKFLOWS = join(import.meta.dirname, "../.github/workflows");
 
 interface Job {
   name: string;
+  runsOn: string;
   /** Each step's source lines, joined. */
   steps: string[];
 }
@@ -37,12 +38,14 @@ function jobsOf(source: string): Job[] {
     const jobMatch = /^ {2}([\w-]+):\s*$/.exec(line);
     if (jobMatch) {
       flush();
-      job = { name: jobMatch[1]!, steps: [] };
+      job = { name: jobMatch[1]!, runsOn: "", steps: [] };
       jobs.push(job);
       stepIndent = -1;
       continue;
     }
     if (!job) continue;
+    const runsOn = /^ {4}runs-on:\s*(\S+)/.exec(line);
+    if (runsOn) job.runsOn = runsOn[1]!;
     const stepsMatch = /^(\s+)steps:\s*$/.exec(line);
     if (stepsMatch) {
       flush();
@@ -94,6 +97,19 @@ describe("dependabot-automerge.yml", () => {
       const expression = conditionOf(step);
       expect(expression).not.toMatch(/\|\||\$\{\{/);
       expect(expression.split("&&").map((part) => part.trim())).toContain(condition);
+    }
+  });
+});
+
+describe("every workflow job", () => {
+  const files = readdirSync(WORKFLOWS).filter((name) => name.endsWith(".yml"));
+
+  // An install- or build-time exfiltration attempt then leaves an egress
+  // record. harden-runner runs on Linux runners only.
+  it.each(files)("in %s starts with harden-runner", (file) => {
+    for (const job of jobsOf(workflow(file))) {
+      if (job.steps.length === 0 || job.runsOn.startsWith("macos")) continue;
+      expect(job.steps[0], `${file} ${job.name}`).toMatch(/^\s*- uses: step-security\/harden-runner@[0-9a-f]{40} /);
     }
   });
 });
