@@ -140,6 +140,7 @@
 /packages/ui/src/components/wallet/AccountAvatar.tsx                       @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
+/packages/app/src/screens/network-peers/                                    @skyf0xx
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
 /packages/runtime/src/points-attest.ts                                     @skyf0xx
 /packages/runtime/src/handlers/attest-errors.ts                            @skyf0xx
