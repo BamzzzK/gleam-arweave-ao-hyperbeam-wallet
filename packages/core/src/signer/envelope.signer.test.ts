@@ -280,3 +280,23 @@ describe("envelopeNeedsUpgrade", () => {
     expect(envelopeNeedsUpgrade(envelope, { ...PARAMS, iterations: 2 })).toBe(true);
   });
 });
+
+describe("VaultKeys: key properties", () => {
+  it.each([
+    { kdf: "Argon2id" as const, salt: bytesToBase64(new Uint8Array(16).fill(1)), ...PARAMS },
+    { kdf: "PBKDF2-HMAC-SHA256" as const, salt: bytesToBase64(new Uint8Array(16).fill(2)) },
+  ])("derives a non-extractable AES-256-GCM vault key with $kdf", async (spec) => {
+    const key = await new VaultKeys(PASSWORD).derive(spec);
+    expect(key.extractable).toBe(false);
+    expect(key.algorithm).toMatchObject({ name: "AES-GCM", length: 256 });
+    expect(key.usages.sort()).toEqual(["decrypt", "encrypt"]);
+    await expect(crypto.subtle.exportKey("raw", key)).rejects.toThrow();
+  });
+
+  it("refuses an envelope whose algorithm isn't AES-GCM", async () => {
+    const envelope = await encryptToEnvelope(encode("secret"), PASSWORD, WALLET_ID, ADDRESS, { params: PARAMS });
+    await expect(
+      decryptFromEnvelope({ ...envelope, algorithm: "AES-CBC" } as unknown as VaultEnvelope, PASSWORD, WALLET_ID, ADDRESS),
+    ).rejects.toThrow(VaultKdfError);
+  });
+});

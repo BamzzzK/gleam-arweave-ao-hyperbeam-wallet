@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, vi } from "vitest";
 import { signerFromJwk, generateJWK } from "../signer/keys";
 import Arweave from "arweave";
 import { signMessage, verifyMessage, type MessageHashAlgorithm } from "./message-signing";
@@ -126,4 +126,22 @@ describe("vault/message-signing", () => {
       await expect(verifyMessage(jwk.n, data, await signMessage(signerFromJwk(hinted, ""), data))).resolves.toBe(true);
     });
   });
+});
+
+describe("verifyMessage: imported key", () => {
+  it("imports the public key non-extractable", async () => {
+    const jwk = await generateJWK();
+    const signer = signerFromJwk(jwk, "address");
+    const data = new TextEncoder().encode("hello").buffer;
+    const signature = await signMessage(signer, data);
+    const importKey = vi.spyOn(crypto.subtle, "importKey");
+    try {
+      await expect(verifyMessage(jwk.n, data, signature)).resolves.toBe(true);
+      const key = (await importKey.mock.results[0]!.value) as CryptoKey;
+      expect(key.extractable).toBe(false);
+      expect(key.type).toBe("public");
+    } finally {
+      importKey.mockRestore();
+    }
+  }, 20_000);
 });

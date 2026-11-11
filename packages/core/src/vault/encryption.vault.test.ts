@@ -134,3 +134,18 @@ describe("vault/encryption", () => {
     });
   });
 });
+
+describe("encrypt: imported key", () => {
+  it("imports the owner's public key non-extractable", async () => {
+    const jwk = await generateJWK();
+    const importKey = vi.spyOn(crypto.subtle, "importKey");
+    try {
+      await encrypt(jwk.n, new Uint8Array([1, 2, 3]), { name: "RSA-OAEP" });
+      const key = (await importKey.mock.results[0]!.value) as CryptoKey;
+      expect(key.extractable).toBe(false);
+      expect(key.algorithm).toMatchObject({ name: "RSA-OAEP", modulusLength: 4096 });
+    } finally {
+      importKey.mockRestore();
+    }
+  }, 20_000);
+});
