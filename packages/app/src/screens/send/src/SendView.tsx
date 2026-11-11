@@ -14,7 +14,14 @@ import { addressFromQr, QrScanError } from "../../../app-platform/qr-scanner";
 import { useDisplaySettings } from "../../../display-settings";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
-import { displayTicker, formatAtomicAsDisplay, formatAtomicCompact, formatWinstonAsAr } from "../../main-screen/src/formatWinston";
+import {
+  AR_DENOMINATION,
+  displayTicker,
+  formatAtomicAsDisplay,
+  formatAtomicCompact,
+  formatWinstonAsAr,
+  parseDisplayToAtomic,
+} from "../../main-screen/src/formatWinston";
 import { useOrderbookPrices, useTokenPrices } from "../../main-screen/src/useTokenPrices";
 import { AddressRow } from "../../activity/src/AddressRow";
 import { useActivity } from "../../activity/src/useActivity";
@@ -33,8 +40,6 @@ import { ScreenFooter } from "@gleam/ui/src/primitives/screen-footer.tsx";
 import { errorText } from "../../../i18n/errors";
 import { ReviewButtons, TransferReview } from "../../../transfer-review/TransferReview";
 import { feeText, type RecipientRisk, type TransferContext, type TransferRequest } from "../../../transfer-review/model";
-
-const WINSTON_PER_AR = 1_000_000_000_000n;
 
 /**
  * Compose → review → success, internal step state only (same "no router"
@@ -108,30 +113,6 @@ type Step =
       error?: string;
     }
   | { kind: "success"; txId: string; recipient: string; amountAtomic: string };
-
-function parseArToWinston(amountAr: string): string | null {
-  if (!/^\d+(\.\d+)?$/.test(amountAr.trim())) return null;
-  const [wholePart, fractionPart = ""] = amountAr.trim().split(".");
-  const fraction = fractionPart.padEnd(12, "0").slice(0, 12);
-  const winston = BigInt(wholePart || "0") * WINSTON_PER_AR + BigInt(fraction || "0");
-  return winston.toString();
-}
-
-/**
- * Parses a human-entered display amount into an atomic-integer string in
- * `denomination`'s smallest unit (matching `TokenBalance.quantity`'s own
- * shape) — the AO-token equivalent of `parseArToWinston` above, generalized
- * over an arbitrary decimal-places `denomination` instead of AR's fixed 12.
- * `BigInt` throughout; no amount ever passes through a floating-point
- * `Number` conversion.
- */
-function parseDisplayToAtomic(amountDisplay: string, denomination: number): string | null {
-  if (!/^\d+(\.\d+)?$/.test(amountDisplay.trim())) return null;
-  const [wholePart, fractionPart = ""] = amountDisplay.trim().split(".");
-  const fraction = fractionPart.padEnd(denomination, "0").slice(0, denomination);
-  const atomic = BigInt(wholePart || "0") * 10n ** BigInt(denomination) + BigInt(fraction || "0");
-  return atomic.toString();
-}
 
 /**
  * Strips the amount input to digits and at most one decimal point as the
@@ -285,7 +266,7 @@ export function SendView({ runtime, wallet, token, recipient, onBack, onDone }: 
       }
       const amountAtomic =
         selectedToken === null
-          ? parseArToWinston(amountResult.data)
+          ? parseDisplayToAtomic(amountResult.data, AR_DENOMINATION)
           : parseDisplayToAtomic(amountResult.data, selectedToken.denomination);
       if (amountAtomic === null) {
         setStep({ ...step, recipientError: undefined, amountError: t("send.invalidAmount") });
