@@ -4,11 +4,9 @@ import {
   base64UrlToBytes,
   bytesToBase64,
   bytesToBase64Url,
-  batchSignDataItem,
   capabilitiesFor,
   decrypt,
   DEFAULT_BUNDLER_URL,
-  dispatchTransaction,
   encrypt,
   finishDataItem,
   finishDataItems,
@@ -22,9 +20,8 @@ import {
   prepareSignTransaction,
   readDataItemFields,
   HARDWARE_MESSAGE_HASH,
-  signDataItem,
   signMessage as vaultSignMessage,
-  signTransaction,
+  signPayloadWithSigner,
   verifyDeviceSignature,
   PERMISSION_TYPES,
   WALLET_APPROVAL_ORIGIN,
@@ -43,6 +40,7 @@ import {
   type Grant,
   type HardwareDevice,
   type HardwareWalletMethod,
+  type WalletMethod,
   type PermissionType,
   type ScanAttestationApprovalPreview,
   type SignTransactionInput,
@@ -1555,12 +1553,15 @@ export class ApprovalHandler {
     return { method: wallet.method, device: wallet.device ?? null, address: wallet.address, publicKey: wallet.publicKey };
   }
 
-  private async prepareDevicePayloads(
-    walletId: string,
-    wallet: HardwareWalletInfo,
+  /**
+   * What a dApp's sign, dispatch or data-item request will sign, for any
+   * wallet kind. `method` decides whether a large dispatch can bundle.
+   */
+  private async prepareDappPayloads(
+    owner: string,
+    method: WalletMethod,
     input: SigningRequestInput,
   ): Promise<UnsignedPayload[]> {
-    const owner = wallet.publicKey;
     switch (input.kind) {
       case "sign":
         return [
@@ -1570,7 +1571,7 @@ export class ApprovalHandler {
           },
         ];
       case "dispatch": {
-        const { dispatchViaBundler: viaBundler } = capabilitiesFor(wallet.method);
+        const { dispatchViaBundler: viaBundler } = capabilitiesFor(method);
         return [await prepareDispatch(this.requireGatewayUrl(input), owner, transactionInputOf(input), { viaBundler })];
       }
       case "signDataItem": {
@@ -1583,6 +1584,48 @@ export class ApprovalHandler {
         if (items.length === 0) throw new Error("batchSignDataItem requires at least one data item.");
         return prepareDataItems(owner, items).map((raw) => ({ kind: "dataItem", raw }));
       }
+      default:
+        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+    }
+  }
+
+  /** Applies the signatures to `prepareDappPayloads`' result and returns what the dApp gets. */
+  private async finishDappPayloads(
+    owner: string,
+    input: SigningRequestInput,
+    payloads: UnsignedPayload[],
+    signatures: Uint8Array[],
+  ): Promise<unknown> {
+    const [payload] = payloads;
+    const [signature] = signatures;
+    switch (input.kind) {
+      case "sign":
+        return finishSignTransaction(transactionOf(payload).transaction, signature!, owner);
+      case "dispatch":
+        return finishDispatch(this.requireGatewayUrl(input), this.bundlerUrl, payload!, signature!, owner);
+      case "signDataItem":
+        // Wander resolves to the raw signed item as an ArrayBuffer, which
+        // aoconnect's createDataItemSigner parses directly.
+        return toArrayBuffer(await finishDataItem(dataItemOf(payload), signature!, owner));
+      case "batchSignDataItem":
+        return (await finishDataItems(payloads.map(dataItemOf), signatures, owner)).map(toArrayBuffer);
+      default:
+        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+    }
+  }
+
+  private async prepareDevicePayloads(
+    walletId: string,
+    wallet: HardwareWalletInfo,
+    input: SigningRequestInput,
+  ): Promise<UnsignedPayload[]> {
+    const owner = wallet.publicKey;
+    switch (input.kind) {
+      case "sign":
+      case "dispatch":
+      case "signDataItem":
+      case "batchSignDataItem":
+        return this.prepareDappPayloads(owner, wallet.method, input);
       case "transferAoTokens":
       case "transfer":
         return [await this.deviceTransfers().prepareDeviceTransfer(this.transferRequestOf(walletId, input), owner)];
@@ -1613,13 +1656,10 @@ export class ApprovalHandler {
     const [signature] = signatures;
     switch (input.kind) {
       case "sign":
-        return finishSignTransaction(transactionOf(payload).transaction, signature!, owner);
       case "dispatch":
-        return finishDispatch(this.requireGatewayUrl(input), this.bundlerUrl, payload!, signature!, owner);
       case "signDataItem":
-        return toArrayBuffer(await finishDataItem(dataItemOf(payload), signature!, owner));
       case "batchSignDataItem":
-        return (await finishDataItems(payloads.map(dataItemOf), signatures, owner)).map(toArrayBuffer);
+        return this.finishDappPayloads(owner, input, payloads, signatures);
       case "transferAoTokens":
       case "transfer": {
         const { txId } = await this.deviceTransfers().finishDeviceTransfer(
@@ -1887,30 +1927,18 @@ export class ApprovalHandler {
       return this.performTransfer(walletId, input);
     }
 
-    const transaction = transactionInputOf(input);
-
     switch (input.kind) {
-      case "sign": {
-        return signTransaction(this.requireGatewayUrl(input), signer, transaction);
-      }
-
-      case "dispatch": {
-        // A cached key means a keyfile wallet even if its record can't be read.
-        const { dispatchViaBundler: viaBundler } = capabilitiesFor((await this.keySession.getWalletMethod(walletId)) ?? "jwk");
-        return dispatchTransaction(this.requireGatewayUrl(input), this.bundlerUrl, signer, transaction, { viaBundler });
-      }
-
-      case "signDataItem": {
-        const [dataItem] = input.dataItems ?? [];
-        if (!dataItem) throw new Error("signDataItem requires a data item.");
-        // Wander resolves to the raw signed item as an ArrayBuffer, which
-        // aoconnect's createDataItemSigner parses directly.
-        return toArrayBuffer(await signDataItem(signer, dataItem));
-      }
-
+      case "sign":
+      case "dispatch":
+      case "signDataItem":
       case "batchSignDataItem": {
-        const signed = await batchSignDataItem(signer, input.dataItems ?? []);
-        return signed.map(toArrayBuffer);
+        // A cached key means a keyfile wallet even if its record can't be read.
+        const method = (await this.keySession.getWalletMethod(walletId)) ?? "jwk";
+        const payloads = await this.prepareDappPayloads(signer.owner, method, input);
+        assertPreparedMatches(input, payloads, signer.address);
+        const signatures: Uint8Array[] = [];
+        for (const payload of payloads) signatures.push(await signPayloadWithSigner(payload, signer));
+        return this.finishDappPayloads(signer.owner, input, payloads, signatures);
       }
 
       case "decrypt": {
