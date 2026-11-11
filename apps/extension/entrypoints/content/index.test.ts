@@ -137,12 +137,10 @@ describe("content.ts: page <-> background relay", () => {
   });
 
   /**
-   * PROVIDER-EVENTS-ACCOUNT-SWITCH-PROVIDER-BRIDGE: the background ->
-   * content half of `ProtocolMap.providerEvent`. Access control (only a
-   * connected origin's tab is ever targeted) is enforced by the background
-   * sender choosing which tabId to push to, not by this content script —
-   * receiving the message at all already means this tab was targeted, so
-   * relaying straight into `postProviderEvent` is correct here.
+   * The background -> content half of `ProtocolMap.providerEvent`. The
+   * background picks the tabs of a connected origin; this script relays
+   * only an event for its own origin, since the tab may have navigated
+   * since the background looked.
    */
   it("registers a providerEvent handler that relays event/data into postProviderEvent", async () => {
     const contentScript = (await import("./index")).default;
@@ -156,12 +154,30 @@ describe("content.ts: page <-> background relay", () => {
     });
 
     const handler = registeredHandlers.get("providerEvent")!;
-    handler({ data: { event: "walletSwitch", data: { address: "addr-1" } } });
+    handler({ data: { origin: location.origin, event: "walletSwitch", data: { address: "addr-1" } } });
 
     await vi.waitFor(() => expect(eventSpy).toHaveBeenCalled());
     expect(eventSpy).toHaveBeenCalledWith(
       expect.objectContaining({ type: EVENT, event: "walletSwitch", data: { address: "addr-1" } }),
     );
+  });
+
+  it("drops a providerEvent meant for another origin, as after a navigation", async () => {
+    const contentScript = (await import("./index")).default;
+    await contentScript.main!({} as never);
+
+    const eventSpy = vi.fn();
+    window.addEventListener("message", (event) => {
+      if ((event.data as { type?: string })?.type === EVENT) eventSpy(event.data);
+    });
+
+    const handler = registeredHandlers.get("providerEvent")!;
+    handler({ data: { origin: "https://connected.example", event: "walletSwitch", data: { address: "addr-2" } } });
+    handler({ data: { origin: location.origin, event: "disconnect", data: {} } });
+
+    await vi.waitFor(() => expect(eventSpy).toHaveBeenCalled());
+    expect(eventSpy).toHaveBeenCalledTimes(1);
+    expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ event: "disconnect" }));
   });
   function siteModeSpy() {
     const spy = vi.fn();

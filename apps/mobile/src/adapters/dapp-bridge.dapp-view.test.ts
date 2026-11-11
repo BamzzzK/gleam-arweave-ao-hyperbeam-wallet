@@ -275,7 +275,7 @@ describe("the dApp view as the runtime's tab", () => {
   it("pushes events and the site mode to the tab's origin", async () => {
     const { view, dapps } = bridge();
     view.navigate(`${DAPP}/`);
-    await dapps.tabs.send(1, "providerEvent", { event: "walletSwitch", data: { address: "a" } });
+    await dapps.tabs.send(1, "providerEvent", { origin: DAPP, event: "walletSwitch", data: { address: "a" } });
     await dapps.tabs.send(1, "siteWalletMode", { useGleam: false });
     expect(view.posted).toEqual([
       { envelope: { type: EVENT, event: "walletSwitch", data: { address: "a" } }, targetOrigin: DAPP, delivered: true },
@@ -287,12 +287,28 @@ describe("the dApp view as the runtime's tab", () => {
     const { view, dapps } = bridge();
     view.navigate(`${DAPP}/`);
     view.navigate("https://other.example/");
-    await expect(dapps.tabs.send(1, "providerEvent", { event: "disconnect", data: {} })).rejects.toThrow(/no longer open/);
+    await expect(dapps.tabs.send(1, "providerEvent", { origin: DAPP, event: "disconnect", data: {} })).rejects.toThrow(
+      /no longer open/,
+    );
     expect(view.posted).toEqual([]);
 
     view.page.origin = "https://elsewhere.example";
-    await expect(dapps.tabs.send(2, "providerEvent", { event: "disconnect", data: {} })).rejects.toThrow(/no longer open/);
+    await expect(
+      dapps.tabs.send(2, "providerEvent", { origin: "https://other.example", event: "disconnect", data: {} }),
+    ).rejects.toThrow(/no longer open/);
     expect(view.posted[0]?.targetOrigin).toBe("https://other.example");
+  });
+
+  it("posts an event to the origin it is for, so a page that navigated away never gets it", async () => {
+    const { view, dapps } = bridge();
+    view.navigate(`${DAPP}/`);
+    view.page.origin = "https://elsewhere.example";
+    await expect(
+      dapps.tabs.send(1, "providerEvent", { origin: DAPP, event: "walletSwitch", data: { address: "b" } }),
+    ).rejects.toThrow(/no longer open/);
+    expect(view.posted).toEqual([
+      { envelope: { type: EVENT, event: "walletSwitch", data: { address: "b" } }, targetOrigin: DAPP, delivered: false },
+    ]);
   });
 
   it("reloads only the current tab", async () => {

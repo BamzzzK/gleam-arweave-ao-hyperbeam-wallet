@@ -207,10 +207,18 @@ export function createDappBridge({
     async send<K extends TabPush>(tabId: number, type: K, data: Parameters<ProtocolMap[K]>[0]) {
       const current = webTab();
       if (!current || current.id !== tabId) throw new Error("That page is no longer open.");
-      const envelope: PageEventEnvelope | PageSiteModeEnvelope =
-        type === "providerEvent"
-          ? { type: EVENT, ...(data as Parameters<ProtocolMap["providerEvent"]>[0]) }
-          : { type: SITE_MODE, useGleam: (data as Parameters<ProtocolMap["siteWalletMode"]>[0]).useGleam };
+      if (type === "providerEvent") {
+        // Posted to the origin the event is for, so a page that has
+        // navigated elsewhere since the runtime chose this tab never gets it.
+        const { origin, event, data: payload } = data as Parameters<ProtocolMap["providerEvent"]>[0];
+        const envelope: PageEventEnvelope = { type: EVENT, event, data: payload };
+        if (!(await post(envelope, origin))) throw new Error("That page is no longer open.");
+        return;
+      }
+      const envelope: PageSiteModeEnvelope = {
+        type: SITE_MODE,
+        useGleam: (data as Parameters<ProtocolMap["siteWalletMode"]>[0]).useGleam,
+      };
       if (!(await post(envelope, current.origin))) throw new Error("That page is no longer open.");
     },
   };

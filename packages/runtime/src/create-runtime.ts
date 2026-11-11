@@ -311,7 +311,9 @@ export function createRuntime(platform: Platform): Runtime {
 
   /**
    * Sends a `providerEvent` push to every tab currently showing `origin` —
-   * never a broadcast to every open tab. Each send targets one `tabId`; a
+   * never a broadcast to every open tab. The push names `origin`, and the
+   * receiving page drops it if it has navigated elsewhere since the tab
+   * query. Each send targets one `tabId`; a
    * tab with no content script listening (e.g. mid-navigation) simply
    * rejects that one send, which is swallowed here rather than failing the
    * caller — a missed push is not itself an error the connect/disconnect/
@@ -329,7 +331,7 @@ export function createRuntime(platform: Platform): Runtime {
     const tabIds = await findTabsForOrigin(origin);
     await Promise.all(
       tabIds.map((tabId) =>
-        tabs.send(tabId, "providerEvent", { event, data }).catch(() => undefined),
+        tabs.send(tabId, "providerEvent", { origin, event, data }).catch(() => undefined),
       ),
     );
   }
