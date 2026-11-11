@@ -264,6 +264,8 @@ export default tseslint.config(
       "**/.wxt/**",
       "**/node_modules/**",
       "**/.claude/worktrees/**",
+      ".stryker-tmp/**",
+      "reports/**",
       // Generated native projects; `cap sync` copies the built bundle into them.
       "apps/mobile/ios/**",
       "apps/mobile/android/**",
