@@ -143,6 +143,7 @@
 4 packages/app/src/account-avatar.ts
 4 packages/ui/src/components/wallet/AccountAvatar.tsx
 
+5 packages/app/src/screens/network-peers/
 5 packages/runtime/src/points-invite.ts
 5 packages/runtime/src/points-attest.ts
 5 packages/runtime/src/handlers/attest-errors.ts
