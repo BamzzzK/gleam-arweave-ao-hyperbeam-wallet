@@ -27,4 +27,5 @@ pre-commit:
         pnpm tsc -p apps/extension --noEmit &&
         pnpm tsc -p apps/mobile --noEmit &&
         pnpm tsc -p apps/points-api --noEmit &&
-        pnpm tsc -p scripts/scan --noEmit
+        pnpm tsc -p scripts/scan --noEmit &&
+        pnpm tsc -p tsconfig.scripts.json --noEmit

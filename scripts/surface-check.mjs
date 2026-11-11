@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Lists the security-surface paths a PR touches, writes them to the job
 // summary, and fails unless the PR body ticks the surface box. Run by
 // .github/workflows/surface.yml. Plain .mjs on bare Node: no install.
@@ -12,6 +13,7 @@ import process from "node:process";
 import { URL, fileURLToPath } from "node:url";
 import { parseSurface } from "../security/surface.mjs";
 
+/** @type {Record<number, string>} */
 const TIER_NAMES = {
   1: "key material",
   2: "signing",
@@ -34,7 +36,8 @@ export function touchedSurface(files, entries) {
     const matches = entries.filter(({ path }) => (path.endsWith("/") ? file.startsWith(path) : file === path));
     if (matches.length === 0) return [];
     const tier = Math.min(...matches.map((entry) => Number(entry.tier)));
-    return [{ file, tier, path: matches.find((entry) => Number(entry.tier) === tier).path }];
+    const entry = /** @type {{ path: string }} */ (matches.find((match) => Number(match.tier) === tier));
+    return [{ file, tier, path: entry.path }];
   });
 }
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Walks a full release end to end, pausing at each step a human has to do
 // (merge a PR, watch CI, upload to the Chrome Web Store) rather than trying
 // to script past them.
@@ -35,7 +36,10 @@ const BRANCH = "master";
 // A release must not ship apps whose invite and attest links cannot verify.
 const WELL_KNOWN_REQUIRED = true;
 
-/** @param {string} reason */
+/**
+ * @param {string} reason
+ * @returns {never}
+ */
 function refuse(reason) {
   process.stderr.write(`release:all refused: ${reason}\n`);
   process.exit(1);

@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": false,
+    "jsx": "react-jsx",
+    "types": ["node"]
+  },
+  "include": [
+    "*.ts",
+    "scripts/*.ts",
+    "scripts/*.mjs",
+    "security/*.ts",
+    "security/*.mjs",
+    "e2e/**/*.ts",
+    "apps/mobile/*.test.ts",
+    "apps/mobile/scripts/*.ts",
+    "apps/mobile/scripts/*.mjs",
+    "apps/site-open/*.test.ts"
+  ]
+}

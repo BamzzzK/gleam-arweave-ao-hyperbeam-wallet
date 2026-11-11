@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Tags a release: checks the branch, tree and remote, runs the release gate,
 // then creates a signed annotated tag v<version> and pushes only that tag.
 // Dry run unless --yes is passed.

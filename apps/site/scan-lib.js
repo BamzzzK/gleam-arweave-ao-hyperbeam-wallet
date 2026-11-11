@@ -373,6 +373,8 @@ async function getJson(fetchImpl, path, signal, isValid) {
 /**
  * Reads one page of `GET /attestations`. Settles with `{ ok: true, listing }`
  * or `{ ok: false, status, error }`; it never rejects.
+ * @param {(url: string, init?: RequestInit) => Promise<Response>} fetchImpl
+ * @param {{ release?: string | null, cursor?: string | null, limit?: number, signal?: AbortSignal }} [options]
  */
 export async function fetchListing(fetchImpl, { release = null, cursor = null, limit = 100, signal } = {}) {
   const params = new URLSearchParams();

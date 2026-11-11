@@ -1,3 +1,4 @@
+// @ts-check
 // Checks that the invite-link host serves the files iOS and Android fetch
 // to verify the app may open its links. Run from release-all only: the
 // release workflow blocks egress to this host.

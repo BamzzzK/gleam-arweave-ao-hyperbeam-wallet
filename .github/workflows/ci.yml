@@ -75,6 +75,7 @@ jobs:
       - run: pnpm tsc -p apps/mobile --noEmit
       - run: pnpm tsc -p apps/points-api --noEmit
       - run: pnpm tsc -p scripts/scan --noEmit
+      - run: pnpm tsc -p tsconfig.scripts.json --noEmit
 
   test:
     runs-on: ubuntu-latest

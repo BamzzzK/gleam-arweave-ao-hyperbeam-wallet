@@ -44,6 +44,9 @@ import {
   unusedModels,
 } from "../apps/site/scan-lib.js";
 
+/** A decoded round, as `decodeAttestationLink` documents it (the site lib is plain JS). */
+type Round = { ok: true; payload: string; attestation: { report: string } } | { ok: false; payload: string; error: string };
+
 const attestation = {
   release: "1.4.0",
   commit: "a".repeat(40),
@@ -93,8 +96,8 @@ describe("site scan lib: a link with several rounds", () => {
     const decoded = decodeAttestationLink(`#${parts.join(".")}`);
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
-    expect(decoded.rounds.map((round) => round.ok && round.attestation.report)).toEqual(reports);
-    expect(decoded.rounds.map((round) => round.payload)).toEqual(parts);
+    expect(decoded.rounds.map((round: Round) => (round.ok ? round.attestation.report : false))).toEqual(reports);
+    expect(decoded.rounds.map((round: Round) => round.payload)).toEqual(parts);
     expect(decodeAttestationLink(`#${parts[0]}`)).toEqual({ ok: true, rounds: [{ ok: true, payload: parts[0], attestation: { ...attestation, report: reports[0] } }] });
   });
 
@@ -102,7 +105,7 @@ describe("site scan lib: a link with several rounds", () => {
     const decoded = decodeAttestationLink(`#${payload(reports[0]!)}.e30.${payload(reports[1]!)}`);
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
-    expect(decoded.rounds.map((round) => round.ok)).toEqual([true, false, true]);
+    expect(decoded.rounds.map((round: Round) => round.ok)).toEqual([true, false, true]);
     expect(decoded.rounds[1]).toMatchObject({ ok: false, payload: "e30", error: expect.stringMatching(/damaged/) });
   });
 
@@ -312,7 +315,8 @@ describe("site scan lib: the points API", () => {
     attestations: [],
     nextCursor: null,
   };
-  const reply = (status: number, body: unknown) => vi.fn(async () => ({ ok: status < 400, status, json: async () => body }) as Response);
+  const reply = (status: number, body: unknown) =>
+    vi.fn<(url: string) => Promise<Response>>(async () => ({ ok: status < 400, status, json: async () => body }) as Response);
 
   it("requests the release and cursor", async () => {
     const fetchImpl = reply(200, listing);
@@ -388,7 +392,8 @@ describe("site scan lib: the points API", () => {
 });
 
 describe("site scan lib: areas and rounds", () => {
-  const reply = (status: number, body: unknown) => vi.fn(async () => ({ ok: status < 400, status, json: async () => body }) as Response);
+  const reply = (status: number, body: unknown) =>
+    vi.fn<(url: string) => Promise<Response>>(async () => ({ ok: status < 400, status, json: async () => body }) as Response);
   const areas = {
     release: "1.44.0",
     areas: [

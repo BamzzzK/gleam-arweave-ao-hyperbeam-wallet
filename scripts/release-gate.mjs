@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Release gate: a version may be tagged only when security/audits/v<version>.md
 // exists and no security-surface file changed after the commit it audited.
 // Plain .mjs with JSDoc so it runs on bare Node with no build step.

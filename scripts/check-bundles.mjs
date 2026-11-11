@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Checks the built extension (after `pnpm wxt:build`):
 // - the keyring page, which holds unlocked keys, loads only key code;
 // - provider.js (run in every page's world) and the content script
@@ -27,7 +28,10 @@ export const KEYRING_ALLOWED = [
   /^\0rolldown\/runtime/,
 ];
 
-/** Each page-injected file's size budget and the npm packages it may contain. */
+/**
+ * Each page-injected file's size budget and the npm packages it may contain.
+ * @type {Record<string, { maxBytes: number, packages: string[] }>}
+ */
 export const PAGE_SCRIPTS = {
   "provider.js": { maxBytes: 16 * 1024, packages: ["wxt"] },
   "content-scripts/content.js": {
@@ -36,7 +40,11 @@ export const PAGE_SCRIPTS = {
   },
 };
 
-/** The npm package a module path belongs to, or null for workspace code. */
+/**
+ * The npm package a module path belongs to, or null for workspace code.
+ * @param {string} modulePath
+ * @returns {string | null}
+ */
 export function packageOf(modulePath) {
   const match = /.*node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(modulePath);
   return match ? match[1] : null;
@@ -49,11 +57,13 @@ export function packageOf(modulePath) {
  * @param {Map<string, { imports: string[], dynamicImports: string[], modules: string[] }>} chunks
  */
 export function closureOf(entry, chunks) {
+  /** @type {Set<string>} */
   const seen = new Set();
   const queue = [entry];
+  /** @type {string[]} */
   const modules = [];
   while (queue.length > 0) {
-    const fileName = queue.pop();
+    const fileName = /** @type {string} */ (queue.pop());
     if (seen.has(fileName)) continue;
     seen.add(fileName);
     const chunk = chunks.get(fileName);
@@ -64,16 +74,25 @@ export function closureOf(entry, chunks) {
   return { chunks: [...seen], modules };
 }
 
-/** Problems with the keyring page's modules. */
+/**
+ * Problems with the keyring page's modules.
+ * @param {string[]} modules
+ */
 export function keyringProblems(modules) {
   return modules
     .filter((module) => !KEYRING_ALLOWED.some((pattern) => pattern.test(module)))
     .map((module) => `keyring page loads ${JSON.stringify(module)}, which isn't key code`);
 }
 
-/** Problems with one page-injected file. */
+/**
+ * Problems with one page-injected file.
+ * @param {string} fileName
+ * @param {number} bytes
+ * @param {string[]} modules
+ */
 export function pageScriptProblems(fileName, bytes, modules) {
   const { maxBytes, packages } = PAGE_SCRIPTS[fileName];
+  /** @type {string[]} */
   const problems = [];
   if (bytes > maxBytes) problems.push(`${fileName} is ${bytes} bytes, over its ${maxBytes}-byte budget`);
   for (const name of new Set(modules.map(packageOf).filter((name) => name !== null))) {
@@ -96,7 +115,7 @@ function main() {
   );
 
   const html = readFileSync(join(out, "keyring.html"), "utf8");
-  const scripts = [...html.matchAll(/<script[^>]*src="\/?([^"]+)"/g)].map((match) => match[1]);
+  const scripts = [...html.matchAll(/<script[^>]*src="\/?([^"]+)"/g)].map((match) => /** @type {string} */ (match[1]));
   if (scripts.length === 0) throw new Error("keyring.html loads no script");
   const keyring = scripts.map((script) => closureOf(script, chunks));
   const problems = keyringProblems(keyring.flatMap(({ modules }) => modules));
