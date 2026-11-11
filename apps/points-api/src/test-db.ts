@@ -1,4 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
+import { onTestFinished } from "vitest";
 import { dbFromPglite, type Db } from "./db";
 import { migrate } from "./migrate";
 import type { TestDevice } from "./test-signers";
@@ -18,9 +19,16 @@ function snapshot(): Promise<File | Blob> {
   return migratedSnapshot;
 }
 
-/** A fresh, fully migrated in-memory Postgres for one test. */
+/**
+ * A fresh, fully migrated in-memory Postgres for one test, closed when that
+ * test finishes. A PGlite's WASM memory sits outside the JS heap, so the
+ * garbage collector feels no pressure to free open ones, and a fast file
+ * can hold gigabytes of them.
+ */
 export async function createTestDb(): Promise<Db> {
-  return dbFromPglite(new PGlite({ loadDataDir: await snapshot() }));
+  const pg = new PGlite({ loadDataDir: await snapshot() });
+  onTestFinished(() => pg.close());
+  return dbFromPglite(pg);
 }
 
 /**
