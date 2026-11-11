@@ -599,7 +599,17 @@ function decodeTransactionTag(tag: { name: string; value: string }): { name: str
   return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
 }
 
-function summarize(payload: UnsignedPayload): DeviceSigningSummary {
+function previewCollectibleId(preview: ApprovalRequest["preview"]): string | null {
+  return "collectible" in preview ? (preview.collectible?.id ?? null) : null;
+}
+
+/**
+ * `collectibleId` is the collectible the approved preview named, if any. A
+ * transfer of 1 is shown as a collectible only for that asset: for a
+ * fungible token it is 1 atomic unit, and the device step must read it the
+ * way the first review did.
+ */
+function summarize(payload: UnsignedPayload, collectibleId?: string | null): DeviceSigningSummary {
   if (payload.kind === "message") {
     return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
   }
@@ -607,7 +617,7 @@ function summarize(payload: UnsignedPayload): DeviceSigningSummary {
     const { target, quantity, reward, data_size } = payload.transaction;
     const tags = payload.transaction.tags.map(decodeTransactionTag);
     const collectible = readCollectibleTransfer({ target, quantity, data_size, tags });
-    if (collectible) {
+    if (collectible && collectible.assetId === collectibleId) {
       return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
     }
     const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags });
@@ -1275,7 +1285,7 @@ export class ApprovalHandler {
       device: {
         ...wallet,
         payloads: payloads.map(toWirePayload),
-        summaries: payloads.map(summarize),
+        summaries: payloads.map((payload) => summarize(payload, previewCollectibleId(entry.request.preview))),
         deadline: entry.device.deadline,
       },
     };

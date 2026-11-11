@@ -896,6 +896,17 @@ describe("ApprovalHandler: what the device signs is what was approved", () => {
     ]);
   });
 
+  it("summarizes a token transfer of 1 as the token when the preview named no collectible", async () => {
+    const { view } = await signL1Transfer([
+      { name: "Action", value: "Transfer" },
+      { name: "Recipient", value: RECIPIENT },
+      { name: "Quantity", value: "1" },
+    ]);
+    expect(view.device!.summaries).toEqual([
+      { kind: "l1TokenTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "1", fee: "5000" },
+    ]);
+  });
+
   it("flags a transfer-looking transaction it can't read", async () => {
     const { view } = await signL1Transfer(
       [
