@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CATALOGS } from "./catalog";
 import { LANGUAGES } from "./define";
@@ -15,6 +17,47 @@ describe("message catalogs", () => {
       expect(CATALOGS[code][key], key).not.toBe("");
       expect(placeholders(CATALOGS[code][key]), key).toEqual(placeholders(CATALOGS.en[key]));
     }
+  });
+});
+
+const REPO = join(import.meta.dirname, "../../../..");
+
+/** Every non-test source file that can call `t()`, the catalogs themselves left out. */
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return ["node_modules", "messages", ".output", ".wxt", "dist"].includes(entry.name) ? [] : sourceFiles(path);
+    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+/**
+ * Keys read through a built name rather than a literal. Each entry says
+ * where, so a key whose caller goes away doesn't stay listed.
+ */
+const BUILT_KEYS: Record<string, string> = {
+  "points.today": "RecentEarnings.tsx, t(`points.${day.day}`)",
+  "points.yesterday": "RecentEarnings.tsx, t(`points.${day.day}`)",
+};
+
+describe("message keys", () => {
+  it("are each read somewhere, by literal name or as a listed built name", () => {
+    const source = ["packages/app/src", "packages/keystone/src", "apps/extension/src", "apps/extension/entrypoints", "apps/mobile/src"]
+      .flatMap((dir) => sourceFiles(join(REPO, dir)))
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
+    const unread = Object.keys(CATALOGS.en).filter(
+      (key) =>
+        // `errorText` reads `errors.*` by the English message it matches.
+        !key.startsWith("errors.") &&
+        !Object.hasOwn(BUILT_KEYS, key) &&
+        ![`"${key}"`, `'${key}'`, `\`${key}\``].some((quoted) => source.includes(quoted)),
+    );
+    expect(unread, "delete each from every language, or list it in BUILT_KEYS").toEqual([]);
+  });
+
+  it("lists only built keys that exist", () => {
+    for (const key of Object.keys(BUILT_KEYS)) expect(Object.keys(CATALOGS.en)).toContain(key);
   });
 });
 
