@@ -11,7 +11,7 @@ import {
 } from "@gleam/core";
 import { VaultKdfError, Keyring } from "@gleam/core/signer";
 import { WalletLifecycleHandler } from "./wallet-lifecycle";
-import { createKeySession } from "./key-session";
+import { createKeySession, SESSION_KEY } from "./key-session";
 
 vi.mock("hash-wasm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("hash-wasm")>();
@@ -311,6 +311,22 @@ describe("WalletLifecycleHandler: importWallet", () => {
     const state = await handler.getState();
     expect(state.session?.unlockedWalletIds).toEqual([first.id]);
   });
+
+  it("stores nothing when the keyring refuses the imported key, so the other wallets still unlock", async () => {
+    const healthy = await handler.createWallet({ name: "Healthy", password: GOOD_PASSWORD });
+    vi.spyOn(sessionKeys, "importKey").mockRejectedValueOnce(new Error("unusable key"));
+
+    await expect(
+      handler.importWallet({ jwk: validJWK(), name: "Imported", password: GOOD_PASSWORD }),
+    ).rejects.toThrow(/couldn't keep the wallet unlocked/);
+    vi.restoreAllMocks();
+
+    const state = await handler.getState();
+    expect(state.wallets.map((wallet) => wallet.id)).toEqual([healthy.id]);
+    expect(state.activeWalletId).toBe(healthy.id);
+    await handler.lockWallet();
+    expect(await handler.unlockWallet({ password: GOOD_PASSWORD })).toEqual({ unlockedWalletIds: [healthy.id] });
+  });
 });
 
 describe("WalletLifecycleHandler: adding a wallet to an existing vault", () => {
@@ -453,20 +469,35 @@ describe("WalletLifecycleHandler: unlockWallet", () => {
     expect((await handler.getState()).session).toBeNull();
   });
 
-  it("a failed unlock drops the keys it had already imported", async () => {
+  it("a wallet whose key the keyring refuses stays locked while the others unlock", async () => {
     const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
-    await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+    const second = await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
     await handler.lockWallet();
     const importKey = sessionKeys.importKey.bind(sessionKeys);
-    vi.spyOn(sessionKeys, "importKey")
-      .mockImplementationOnce(importKey)
-      .mockRejectedValueOnce(new Error("keyring gone"));
+    vi.spyOn(sessionKeys, "importKey").mockImplementation((walletId, jwk) =>
+      walletId === second.id ? Promise.reject(new Error("unusable key")) : importKey(walletId, jwk),
+    );
 
-    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(/couldn't keep the wallet unlocked/);
+    expect(await handler.unlockWallet({ password: GOOD_PASSWORD })).toEqual({ unlockedWalletIds: [first.id] });
 
-    expect(await sessionKeys.has([first.id])).toEqual([]);
-    expect((await handler.getState()).session).toBeNull();
+    expect(await sessionKeys.has([second.id])).toEqual([]);
     vi.restoreAllMocks();
+  });
+
+  it("a failed unlock drops the keys it had already imported", async () => {
+    const first = await handler.createWallet({ name: "First", password: GOOD_PASSWORD });
+    const second = await handler.createWallet({ name: "Second", password: GOOD_PASSWORD });
+    await handler.lockWallet();
+    const set = storage.set.bind(storage);
+    vi.spyOn(storage, "set").mockImplementation((key, value) =>
+      key === SESSION_KEY ? Promise.reject(new Error("session storage error")) : set(key, value),
+    );
+
+    await expect(handler.unlockWallet({ password: GOOD_PASSWORD })).rejects.toThrow(/session storage error/);
+
+    expect(await sessionKeys.has([first.id, second.id])).toEqual([]);
+    vi.restoreAllMocks();
+    expect((await handler.getState()).session).toBeNull();
   });
 
   describe("when the keyring fails", () => {
