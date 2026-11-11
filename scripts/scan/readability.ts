@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { readText, type Deps } from "./shared.ts";
 
 /** The limits `security/scan/REPORT.md` sets for the part of an advisory above `<details>`. */
-export const MAX_WORDS = 200;
-export const MAX_GRADE = 10;
+export const MAX_WORDS = 120;
+export const MAX_GRADE = 8;
 /** About one sentence: REPORT.md § Advisory title. */
 export const MAX_TITLE_CHARS = 100;
 
@@ -113,8 +113,8 @@ export function draftWarning(file: string, markdown: string): string | undefined
   const fixes = [
     ...(title === undefined || title === "" ? ["start the draft with a Title: line"] : []),
     ...(titled.length > 0 ? ["name the risk in the user's words"] : []),
-    ...(words > MAX_WORDS ? ["move traces, code and duplicate notes into <details>"] : []),
-    ...(grade > MAX_GRADE ? ["use shorter sentences and plainer words"] : []),
+    ...(words > MAX_WORDS ? ["move impact, steps, traces and code into <details>"] : []),
+    ...(grade > MAX_GRADE ? ["use short sentences and common words"] : []),
   ];
   return `! ${file}: ${problems.join(", ")}; ${fixes.join(", and ")} (security/scan/REPORT.md).`;
 }
