@@ -3,11 +3,24 @@ import { dbFromPglite, type Db } from "./db";
 import { migrate } from "./migrate";
 import type { TestDevice } from "./test-signers";
 
+// A new PGlite runs initdb (~400ms); loading a dumped data directory skips
+// it (~70ms). Every test's database starts from one migrated snapshot.
+let migratedSnapshot: Promise<File | Blob> | undefined;
+
+function snapshot(): Promise<File | Blob> {
+  migratedSnapshot ??= (async () => {
+    const pg = new PGlite();
+    await migrate(dbFromPglite(pg));
+    const dump = await pg.dumpDataDir("none");
+    await pg.close();
+    return dump;
+  })();
+  return migratedSnapshot;
+}
+
 /** A fresh, fully migrated in-memory Postgres for one test. */
 export async function createTestDb(): Promise<Db> {
-  const db = dbFromPglite(new PGlite());
-  await migrate(db);
-  return db;
+  return dbFromPglite(new PGlite({ loadDataDir: await snapshot() }));
 }
 
 /**

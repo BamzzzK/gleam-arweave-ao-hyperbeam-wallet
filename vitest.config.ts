@@ -16,7 +16,6 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/.output/**", "**/.wxt/**", "**/.claude/worktrees/**", "**/.stryker-tmp/**"],
     setupFiles: ["./vitest.setup.ts"],
     // Each points-api test file boots PGlite (~3s, more on a busy machine).
-    // PGlite's clone() boots a fresh WASM instance too, so it saves nothing.
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },
