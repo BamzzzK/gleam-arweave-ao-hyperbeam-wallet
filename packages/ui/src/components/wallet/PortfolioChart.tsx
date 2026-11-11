@@ -373,8 +373,10 @@ export function PortfolioChart({
         </div>
       ) : (
         <>
-          {figures}
-          {chart}
+          <div className="flex flex-col gap-1.5">
+            {figures}
+            {chart}
+          </div>
           {isEmpty && <div className="text-center text-caption text-faint">{labels.chart.valueWillAppear}</div>}
         </>
       )}

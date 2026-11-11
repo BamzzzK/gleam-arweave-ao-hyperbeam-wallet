@@ -176,16 +176,50 @@ describe("vault/signing", () => {
       });
     }
 
-    it("posts small payloads as a BASE transaction", async () => {
+    it("posts small payloads to the bundler as a BUNDLED data item", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+      const data = new TextEncoder().encode("small payload");
+
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
+        data: bytesToBase64(data),
+      }, VIA_BUNDLER);
+
+      expect(result.type).toBe("BUNDLED");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(String(fetchSpy.mock.calls[0]![0])).toBe("https://up.arweave.net/tx");
+      const item = new DataItem(Buffer.from(fetchSpy.mock.calls[0]![1]!.body as Uint8Array));
+      expect(item.id).toBe(result.id);
+      expect(await verifies(item)).toBe(true);
+      expect(Buffer.from(item.rawData).equals(Buffer.from(data))).toBe(true);
+    });
+
+    it.each([
+      ["a token transfer", [{ name: "action", value: "transfer" }, { name: "recipient", value: "r".repeat(43) }, { name: "quantity", value: "5" }]],
+      ["an unreadable token transfer", [{ name: "Action", value: "Transfer" }]],
+    ])("posts %s to the gateway as a BASE transaction", async (_, tags) => {
+      const fetchSpy = mockGatewayFetch(200);
+
+      const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
+        target: "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI",
+        quantity: "0",
+        tags,
+      }, VIA_BUNDLER);
+
+      expect(result.type).toBe("BASE");
+      expect(fetchSpy.mock.calls.some(([url]) => String(url).startsWith(BUNDLER))).toBe(false);
+    });
+
+    it("posts a small payload that sends AR to the gateway as a BASE transaction", async () => {
       const fetchSpy = mockGatewayFetch(200);
 
       const result = await dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
         data: bytesToBase64(new TextEncoder().encode("small payload")),
+        target: "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI",
+        quantity: "1000",
       }, VIA_BUNDLER);
 
       expect(result.type).toBe("BASE");
-      expect(result.id).toBeTruthy();
-      expect(fetchSpy).toHaveBeenCalled();
+      expect(fetchSpy.mock.calls.some(([url]) => String(url).startsWith(BUNDLER))).toBe(false);
     });
 
     it("posts large payloads to the bundler as a signed BUNDLED data item", async () => {
@@ -291,6 +325,8 @@ describe("vault/signing", () => {
       await expect(
         dispatchTransaction("https://arweave.net", BUNDLER, signerFromJwk(jwk, ""), {
           data: bytesToBase64(new TextEncoder().encode("x")),
+          target: "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI",
+          quantity: "1000",
         }, VIA_BUNDLER),
       ).rejects.toThrow(/Failed to dispatch transaction/);
     });
@@ -353,21 +389,26 @@ describe("vault/signing", () => {
    * The device is played by a key the pipeline never sees.
    */
   describe("dispatch boundaries", () => {
-    const plan = (bytes: number) =>
+    const plan = (bytes: number, viaBundler = true, quantity?: string) =>
       prepareDispatch(
         "https://arweave.net",
         jwk.n,
-        { data: bytesToBase64(new Uint8Array(bytes).fill(3)), reward: "1", last_tx: "b".repeat(64) },
-        { viaBundler: true },
+        { data: bytesToBase64(new Uint8Array(bytes).fill(3)), quantity, reward: "1", last_tx: "b".repeat(64) },
+        { viaBundler },
       );
 
-    it("bundles only payloads over 100 KiB", async () => {
-      expect((await plan(100 * 1024)).kind).toBe("transaction");
-      expect((await plan(100 * 1024 + 1)).kind).toBe("dataItem");
+    it("bundles a payload of any size, empty included", async () => {
+      for (const bytes of [0, 1, 100 * 1024, 100 * 1024 + 1]) {
+        expect((await plan(bytes)).kind).toBe("dataItem");
+      }
     });
 
-    it("plans an empty transaction when the dApp sends no data", async () => {
-      const unsigned = await prepareDispatch("https://arweave.net", jwk.n, { reward: "1", last_tx: "b".repeat(64) }, { viaBundler: true });
+    it("plans a base transaction for a send of 1 Winston", async () => {
+      expect((await plan(10, true, "1")).kind).toBe("transaction");
+    });
+
+    it("plans an empty transaction when the dApp sends no data to the gateway", async () => {
+      const unsigned = await prepareDispatch("https://arweave.net", jwk.n, { reward: "1", last_tx: "b".repeat(64) }, { viaBundler: false });
       expect(unsigned).toMatchObject({ kind: "transaction", transaction: { data: "", data_size: "0", quantity: "0" } });
     });
 
@@ -376,7 +417,7 @@ describe("vault/signing", () => {
       [300, false],
     ])("treats a gateway answer of HTTP %i as accepted: %s", async (status, accepted) => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status }));
-      const unsigned = await plan(10);
+      const unsigned = await plan(10, false);
       const signature = await signPayloadWithSigner(unsigned, signerFromJwk(jwk, ""));
       const result = finishDispatch("https://arweave.net", "https://up.arweave.net", unsigned, signature, jwk.n);
       if (accepted) await expect(result).resolves.toMatchObject({ type: "BASE" });

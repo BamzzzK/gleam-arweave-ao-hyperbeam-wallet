@@ -9,6 +9,8 @@ export interface NetworkSettings {
   peers: HyperBeamPeer[];
   /** URL of the currently active peer, or `null` if none is selected. */
   activePeerUrl: string | null;
+  /** Bundler a dApp's `dispatch` posts data items to. Unset or `null` is automatic: `DEFAULT_BUNDLER_URL`. */
+  bundlerUrl?: string | null;
 }
 
 /**
@@ -68,6 +70,11 @@ export const L1_TOKEN_NODE_URLS: readonly string[] = [
  */
 export const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
 
+/** The bundler `dispatch` uses under these settings. */
+export function bundlerUrlOf(settings: Pick<NetworkSettings, "bundlerUrl">): string {
+  return settings.bundlerUrl || DEFAULT_BUNDLER_URL;
+}
+
 /**
  * lunar.arweave.net's block explorer, used everywhere a tx id or address
  * needs an external link: activity rows and send success.
@@ -87,3 +94,10 @@ export function explorerUrlFor(idOrAddress: string): string {
  * permission warning that would disable Gleam on update.
  */
 export const POINTS_API_URL = "https://api.gleamwallet.app";
+
+/** `url` without trailing slashes. A loop, since `/\/+$/` is quadratic on a long run of slashes. */
+export function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === "/") end--;
+  return url.slice(0, end);
+}

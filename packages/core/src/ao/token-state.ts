@@ -1,4 +1,5 @@
 import { userErrorMessage } from "../models/user-errors";
+import { trimTrailingSlashes } from "../models/network";
 
 const STATE_TIMEOUT_MS = 8_000;
 
@@ -20,7 +21,7 @@ export async function readTokenStateLogo(
   peerUrl: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
-  const response = await fetchImpl(`${peerUrl.replace(/\/+$/, "")}/${processId}~process@1.0/compute&max-age=60`, {
+  const response = await fetchImpl(`${trimTrailingSlashes(peerUrl)}/${processId}~process@1.0/compute&max-age=60`, {
     method: "HEAD",
     signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
   });
@@ -37,7 +38,7 @@ export async function readTokenStateLogo(
  * block moves the balance only once this catches up.
  */
 export async function readTokenSwapHeight(processId: string, nodeUrl: string, fetchImpl: typeof fetch = fetch): Promise<number> {
-  const response = await fetchImpl(`${nodeUrl.replace(/\/+$/, "")}/${processId}~process@1.0/compute&max-age=60`, {
+  const response = await fetchImpl(`${trimTrailingSlashes(nodeUrl)}/${processId}~process@1.0/compute&max-age=60`, {
     method: "HEAD",
     signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
   });

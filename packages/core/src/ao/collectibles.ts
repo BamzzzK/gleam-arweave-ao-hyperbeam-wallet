@@ -2,6 +2,7 @@ import type { Collectible } from "../models/collectible";
 import { classifyAsset, createAssetScanner, mapLimit, PROCESS_ID, tagMap, withRequestTimeout, type Tag } from "./asset-scan";
 import { readL1Balance } from "./balance";
 import { userErrorMessage } from "../models/user-errors";
+import { trimTrailingSlashes } from "../models/network";
 
 export { classifyAsset } from "./asset-scan";
 export type { AssetClass } from "./asset-scan";
@@ -109,7 +110,7 @@ export async function discoverCollectibles(options: DiscoverCollectiblesOptions)
     }
   }
 
-  const gateway = gatewayUrl.replace(/\/+$/, "");
+  const gateway = trimTrailingSlashes(gatewayUrl);
   return held.map((id): Collectible => {
     const t = tagMap(descriptors.get(id) ?? []);
     const ticker = clean(t.ticker, 32) || "ASSET";

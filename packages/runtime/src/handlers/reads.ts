@@ -231,7 +231,8 @@ function isValidNetworkSettings(value: unknown): value is NetworkSettings {
     typeof candidate.gatewayUrl === "string" &&
     Array.isArray(candidate.peers) &&
     candidate.peers.every(isValidHyperBeamPeer) &&
-    (candidate.activePeerUrl === null || typeof candidate.activePeerUrl === "string")
+    (candidate.activePeerUrl === null || typeof candidate.activePeerUrl === "string") &&
+    (candidate.bundlerUrl === undefined || candidate.bundlerUrl === null || typeof candidate.bundlerUrl === "string")
   );
 }
 

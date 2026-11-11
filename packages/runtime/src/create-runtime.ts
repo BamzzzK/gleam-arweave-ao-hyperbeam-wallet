@@ -3,7 +3,10 @@ import {
   DEFAULT_BUNDLER_URL,
   POINTS_API_URL,
   REFUSED_PROVIDER_METHODS,
+  bundlerUrlOf,
   bytesToBase64,
+  capabilitiesFor,
+  dispatchesViaBundler,
   missingPermissions,
   HARDWARE_MESSAGE_HASH,
   isHardwareWalletMethod,
@@ -658,7 +661,8 @@ export function createRuntime(platform: Platform): Runtime {
     transaction: ProviderTransaction,
     { origin, wallet, activeWalletId, requestApproval }: GrantedCall & ApprovalCall,
   ): Promise<unknown> {
-    const { gatewayUrl } = await reads.getNetworkSettings();
+    const settings = await reads.getNetworkSettings();
+    const { gatewayUrl } = settings;
     // A token transfer to an arweave-scheduler process moves no AR, so it
     // shows as the token it sends, read from the transaction's own tags.
     // One that can't be read cleanly shows as the plain transaction, warned.
@@ -681,9 +685,16 @@ export function createRuntime(platform: Platform): Runtime {
         : null;
     // The dApp's reward is the fee actually charged. Without one, the quote
     // the preview shows becomes the reward, so a gateway can't charge more
-    // than the user approved. A bundled dispatch carries no reward at all.
-    const fee =
-      transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
+    // than the user approved. A bundled dispatch carries no reward at all,
+    // so its preview shows no fee.
+    const bundled =
+      kind === "dispatch" &&
+      dispatchesViaBundler(transaction, transaction.data.byteLength, {
+        viaBundler: capabilitiesFor(wallet?.method ?? "jwk").dispatchViaBundler,
+      });
+    const fee = bundled
+      ? null
+      : (transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee);
     return requestApproval({
       kind,
       origin,
@@ -707,9 +718,10 @@ export function createRuntime(platform: Platform): Runtime {
       payload: transaction.data,
       tags: transaction.tags,
       gatewayUrl,
+      ...(bundled ? { bundlerUrl: bundlerUrlOf(settings) } : {}),
       target: transaction.target,
       quantity: transaction.quantity,
-      reward: fee,
+      reward: fee ?? undefined,
       last_tx: transaction.last_tx,
     });
   }

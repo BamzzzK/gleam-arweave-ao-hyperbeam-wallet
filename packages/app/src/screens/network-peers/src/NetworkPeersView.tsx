@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePlatform } from "../../../app-platform/context";
 import type { EphemeralStatePort } from "../../../app-platform/types";
-import { DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
+import { DEFAULT_BUNDLER_URL, DEFAULT_HYPERBEAM_PEER_URLS, type HyperBeamPeer, type NetworkSettings, type RuntimePort } from "@gleam/core";
 import { isArweaveGateway } from "@gleam/core/src/arweave/gateway.ts";
 import { NetworkErrorBanner, SkeletonRow } from "@gleam/ui/src/components/wallet/index.ts";
 import { ScreenHeader } from "@gleam/ui/src/primitives/screen-header.tsx";
@@ -23,6 +23,11 @@ import { errorText } from "../../../i18n/errors";
  * as an Arweave gateway (`isArweaveGateway`) before it's persisted, so a
  * typo'd, dead, or unrelated host can't strand balance/activity reads with
  * no feedback at edit time.
+ *
+ * The bundler is automatic (`DEFAULT_BUNDLER_URL`) until one is entered.
+ * A custom bundler is used exactly as entered: https-only and granted
+ * like the gateway, but with no reachability check, since bundlers share
+ * no info endpoint to check against.
  *
  * Requesting a host permission (the `hostPermissions` port) closes the
  * popup in Chrome the instant it shows its own prompt, which would
@@ -107,7 +112,7 @@ function peerOriginPattern(normalizedPeerUrl: string): string {
 }
 
 interface PendingNetworkEdit {
-  kind: "gateway" | "peer";
+  kind: "gateway" | "bundler" | "peer";
   url: string;
 }
 
@@ -120,7 +125,7 @@ async function loadPendingEdit(store: EphemeralStatePort): Promise<PendingNetwor
       value !== undefined &&
       value !== null &&
       typeof value === "object" &&
-      (value.kind === "gateway" || value.kind === "peer") &&
+      (value.kind === "gateway" || value.kind === "bundler" || value.kind === "peer") &&
       typeof value.url === "string"
     ) {
       return { kind: value.kind, url: value.url };
@@ -176,6 +181,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
   const [newGatewayUrl, setNewGatewayUrl] = useState("");
   const [gatewayError, setGatewayError] = useState<string | null>(null);
   const [checkingGateway, setCheckingGateway] = useState(false);
+  const [editingBundler, setEditingBundler] = useState(false);
+  const [newBundlerUrl, setNewBundlerUrl] = useState("");
+  const [bundlerError, setBundlerError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -216,6 +224,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
         if (pending.kind === "gateway") {
           setNewGatewayUrl(pending.url);
           setEditingGateway(true);
+        } else if (pending.kind === "bundler") {
+          setNewBundlerUrl(pending.url);
+          setEditingBundler(true);
         } else {
           setNewPeerUrl(pending.url);
           setAddingPeer(true);
@@ -238,6 +249,9 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
           const settings = state.settings;
           if (settings) await persist({ ...settings, gatewayUrl: pending.url });
         }
+      } else if (pending.kind === "bundler") {
+        const settings = state.settings;
+        if (settings) await persist({ ...settings, bundlerUrl: pending.url });
       } else {
         const settings = state.settings;
         if (settings && !settings.peers.some((peer) => peer.url === pending.url)) {
@@ -325,6 +339,43 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
     setEditingGateway(false);
     setGatewayError(null);
     await clearPendingEdit(ephemeralState);
+  };
+
+  const closeBundlerEditor = () => {
+    setEditingBundler(false);
+    setNewBundlerUrl("");
+    setBundlerError(null);
+  };
+
+  const handleEditBundler = async () => {
+    if (!state.settings) return;
+    const normalized = normalizeGatewayUrl(newBundlerUrl);
+    if (normalized === null) {
+      setBundlerError(t("networkPeers.bundlerInvalid"));
+      return;
+    }
+    if (normalized === state.settings.bundlerUrl) {
+      closeBundlerEditor();
+      return;
+    }
+
+    await savePendingEdit(ephemeralState, { kind: "bundler", url: normalized });
+    const granted = await requestHostAccess(normalized);
+    if (!granted) {
+      setBundlerError(t("networkPeers.bundlerPermissionDenied"));
+      await clearPendingEdit(ephemeralState);
+      return;
+    }
+
+    await persist({ ...state.settings, bundlerUrl: normalized });
+    closeBundlerEditor();
+    await clearPendingEdit(ephemeralState);
+  };
+
+  const handleUseAutomaticBundler = async () => {
+    if (!state.settings) return;
+    await persist({ ...state.settings, bundlerUrl: null });
+    closeBundlerEditor();
   };
 
   const handleAddPeer = async () => {
@@ -428,6 +479,78 @@ export function NetworkPeersView({ runtime, onBack }: NetworkPeersViewProps) {
                     {state.settings ? gatewayHostname(state.settings.gatewayUrl) : "—"}
                   </span>
                   <span className="text-caption text-muted">{t("networkPeers.gatewayHint")}</span>
+                </span>
+                <span aria-hidden="true" className="flex-shrink-0 text-label font-medium text-muted">
+                  {t("networkPeers.changeGateway")}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="pb-10">
+          <div className="pb-1 text-label font-semibold uppercase tracking-[0.04em] text-muted">
+            {t("networkPeers.bundler")}
+          </div>
+          <div>
+            {state.loading ? (
+              <SkeletonRow />
+            ) : editingBundler ? (
+              <div className="flex flex-col gap-2 py-3.5">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={DEFAULT_BUNDLER_URL}
+                  value={newBundlerUrl}
+                  onChange={(event) => {
+                    setNewBundlerUrl(event.target.value);
+                    setBundlerError(null);
+                  }}
+                  className="w-full border-0 border-b border-line bg-transparent px-0 py-2.5 font-mono text-label text-foreground focus:outline-none"
+                />
+                {bundlerError ? (
+                  <span role="alert" className="text-caption text-warning">
+                    {bundlerError}
+                  </span>
+                ) : null}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void handleEditBundler()}
+                    className="text-label font-semibold text-foreground disabled:opacity-60"
+                  >
+                    {t("networkPeers.save")}
+                  </button>
+                  <button type="button" onClick={closeBundlerEditor} className="text-label font-semibold text-muted">
+                    {t("networkPeers.cancel")}
+                  </button>
+                  {state.settings?.bundlerUrl ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleUseAutomaticBundler()}
+                      className="ml-auto text-label font-semibold text-muted disabled:opacity-60"
+                    >
+                      {t("networkPeers.useAutomatic")}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewBundlerUrl(state.settings?.bundlerUrl ?? "");
+                  setEditingBundler(true);
+                }}
+                className="flex w-full items-center gap-2.5 py-3.5 text-left"
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-label font-semibold text-foreground">
+                    {state.settings?.bundlerUrl ? gatewayHostname(state.settings.bundlerUrl) : t("networkPeers.automatic")}
+                  </span>
+                  <span className="text-caption text-muted">{t("networkPeers.bundlerHint")}</span>
                 </span>
                 <span aria-hidden="true" className="flex-shrink-0 text-label font-medium text-muted">
                   {t("networkPeers.changeGateway")}
