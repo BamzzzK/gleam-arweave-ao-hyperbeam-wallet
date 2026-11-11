@@ -158,8 +158,10 @@ extension wiring, it also needs a manual check in Chrome (load
 
 Make one Conventional Commit per change (`fix(ao): …`,
 `feat(activity): …`), group related commits on one branch, open one PR
-for the branch, and merge it once CI is green. `master` accepts only
-signed commits through a PR with passing CI, and admins get no bypass.
+for the branch, and merge it with a merge commit once CI is green
+(`gh pr merge <n> --merge`; the ruleset refuses squash and rebase
+merges). `master` accepts only signed commits through a PR with passing
+CI, and admins get no bypass.
 This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`.
 

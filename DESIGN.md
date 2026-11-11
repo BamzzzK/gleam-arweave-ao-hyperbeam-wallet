@@ -105,6 +105,18 @@ No excessive shadows, thick borders, oversized cards or enterprise-dashboard den
 
 ---
 
+## In the app
+
+- **Spacing before lines.** Separate groups with padding and gaps. Add a
+  divider or border only when spacing can't separate them, and never
+  stack borders, such as a row's own separator inside a bordered section.
+- **One short line.** UI copy has no hint lines and no second sentences.
+  Fix a confusing control with structure (a clear label, an action
+  button, the reason a button is disabled), not more words. If a control
+  already says it, say nothing.
+
+---
+
 ## Color System
 
 ### Foundation (Neutral Palette)
