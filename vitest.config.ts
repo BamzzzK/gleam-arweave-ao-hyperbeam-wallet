@@ -2,6 +2,21 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+const EXCLUDE = ["**/node_modules/**", "**/.output/**", "**/.wxt/**", "**/.claude/worktrees/**", "**/.stryker-tmp/**"];
+
+// Code that never touches a DOM. Setting up jsdom costs each test file a
+// noticeable share of the run; a file here that does need it says so with
+// `// @vitest-environment jsdom`.
+const NODE_TESTS = [
+  "packages/core/**/*.test.ts",
+  "packages/runtime/**/*.test.ts",
+  "packages/messaging/**/*.test.ts",
+  "apps/points-api/**/*.test.ts",
+  "scripts/**/*.test.ts",
+  "security/**/*.test.ts",
+  "docs/**/*.test.ts",
+];
+
 /**
  * Root Vitest config, shared by every package/app in the workspace.
  * Test files are colocated with the code they test and suffixed with a
@@ -11,13 +26,17 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
-    environment: "jsdom",
-    include: ["**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["**/node_modules/**", "**/.output/**", "**/.wxt/**", "**/.claude/worktrees/**", "**/.stryker-tmp/**"],
+    exclude: EXCLUDE,
     setupFiles: ["./vitest.setup.ts"],
     // Each points-api test file boots PGlite (~3s, more on a busy machine).
-    // PGlite's clone() boots a fresh WASM instance too, so it saves nothing.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    projects: [
+      { extends: true, test: { name: "node", environment: "node", include: NODE_TESTS } },
+      {
+        extends: true,
+        test: { name: "dom", environment: "jsdom", include: ["**/*.{test,spec}.{ts,tsx}"], exclude: [...EXCLUDE, ...NODE_TESTS] },
+      },
+    ],
   },
 });

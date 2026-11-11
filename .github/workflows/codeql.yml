@@ -33,13 +33,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
           config-file: ./.github/codeql/codeql-config.yml
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
 
@@ -49,9 +49,48 @@ jobs:
   # Tracing the full build (every Capacitor plugin, SQLCipher's C) took ~20
   # minutes, so dependencies build untraced and only our own Swift is rebuilt
   # under CodeQL.
+  # The Swift job takes ~17 minutes, so a pull request runs it only when it
+  # changes what that job builds or how; otherwise `reuse-swift` reports
+  # master's result. Master pushes and the weekly run always analyze, and a
+  # failure here leaves the output empty, which runs it.
+  swift-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      swift: ${{ steps.diff.outputs.swift }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      # A pull request checks out its merge commit, so HEAD^1 is the base.
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          swift=false
+          if [ "$EVENT" != pull_request ]; then
+            swift=true
+          else
+            git diff --name-only HEAD^1 HEAD > changed.txt
+            [ -s changed.txt ] || swift=true
+            while IFS= read -r path; do
+              case "$path" in
+                apps/mobile/ios/*|apps/mobile/plugins/*|apps/mobile/package.json|apps/mobile/capacitor.config.*) swift=true ;;
+                .github/workflows/codeql.yml|.github/codeql/*) swift=true ;;
+              esac
+            done < changed.txt
+          fi
+          echo "swift=$swift" | tee -a "$GITHUB_OUTPUT"
+
   analyze-swift:
     name: Analyze (swift)
     runs-on: macos-15
+    needs: swift-changes
+    if: ${{ !cancelled() && needs.swift-changes.outputs.swift != 'false' }}
     permissions:
       contents: read
       security-events: write
@@ -59,7 +98,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
@@ -75,7 +114,7 @@ jobs:
           ARCHS=arm64
           CODE_SIGNING_ALLOWED=NO
           build
-      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: swift
           build-mode: manual
@@ -94,6 +133,45 @@ jobs:
           ARCHS=arm64
           CODE_SIGNING_ALLOWED=NO
           build
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
+          category: /language:swift
+
+  # The code scanning rule waits for a result in every category master has,
+  # so a pull request that skips the Swift build still needs a Swift result.
+  # Its Swift is master's, so master's latest Swift analysis is its result:
+  # this uploads that SARIF for the pull request. It takes the newest one
+  # that finished without error; with none to reuse, the job fails rather
+  # than pass the gate empty.
+  reuse-swift:
+    name: Analyze (swift, from master)
+    runs-on: ubuntu-latest
+    needs: swift-changes
+    if: ${{ !cancelled() && needs.swift-changes.outputs.swift == 'false' }}
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/$REPO/code-scanning/analyses?ref=refs/heads/master&tool_name=CodeQL&per_page=100" \
+            --jq '[.[] | select(.category == "/language:swift" and .error == "")][0].id // empty')
+          if [ -z "$id" ]; then
+            echo "::error::master has no Swift analysis to reuse"
+            exit 1
+          fi
+          echo "Reusing master's Swift analysis $id"
+          gh api -H "Accept: application/sarif+json" "repos/$REPO/code-scanning/analyses/$id" > "$RUNNER_TEMP/swift.sarif"
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ runner.temp }}/swift.sarif
           category: /language:swift
