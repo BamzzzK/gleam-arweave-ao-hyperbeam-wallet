@@ -77,8 +77,13 @@ jobs:
       - run: pnpm tsc -p scripts/scan --noEmit
       - run: pnpm tsc -p tsconfig.scripts.json --noEmit
 
-  test:
+  test-shard:
+    name: test (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A real server for the points-api tests that PGlite's single connection can't run (scan races).
     services:
       postgres:
@@ -107,7 +112,22 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest run
+      - run: pnpm vitest run --shard=${{ matrix.shard }}/4
+
+  # The required check, which passes only when every shard passed.
+  test:
+    runs-on: ubuntu-latest
+    needs: test-shard
+    if: ${{ !cancelled() }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - env:
+          SHARDS: ${{ needs.test-shard.result }}
+        run: |
+          echo "shards: $SHARDS"
+          [ "$SHARDS" = success ]
 
   build-extension:
     runs-on: ubuntu-latest
