@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import type { ApprovalPresenterPort, StoragePort } from "@gleam/core";
+import { createSerializer, type ApprovalPresenterPort, type StoragePort } from "@gleam/core";
 
 /**
  * Implements `ApprovalPresenterPort` with one `browser.windows` popup per
@@ -31,17 +31,11 @@ function isApprovalWindowMap(value: unknown): value is ApprovalWindowMap {
 }
 
 export class WindowApprovalPresenter implements ApprovalPresenterPort {
-  private queue: Promise<unknown> = Promise.resolve();
+  private readonly serialize = createSerializer();
   private readonly dismissedListeners = new Set<(requestId: string) => void>();
   private listeningForRemovals = false;
 
   constructor(private readonly storage: StoragePort) {}
-
-  private serialize<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(task, task);
-    this.queue = run.catch(() => undefined);
-    return run;
-  }
 
   private async loadMap(): Promise<ApprovalWindowMap> {
     const raw = await this.storage.get<unknown>(APPROVAL_WINDOWS_KEY);

@@ -34,6 +34,7 @@ import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import { attestFailure, serverAttestFailure } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { updateStored } from "../storage-update";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -184,7 +185,10 @@ export class PointsHandler {
       referred: body.referred,
       joinedAt: this.now(),
     };
-    await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, { ...(await this.getMemberships()), [req.walletId]: membership });
+    await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, (current) => ({
+      ...(current !== null && typeof current === "object" ? current : {}),
+      [req.walletId]: membership,
+    }));
     await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
       registered: true,
       lastHeartbeatAt: this.now(),
@@ -313,11 +317,12 @@ export class PointsHandler {
   }
 
   async setClaimPending(req: { walletId: string; pending: boolean }): Promise<void> {
-    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_CLAIM_PENDING_KEY);
-    const next: Record<string, true> = { ...(stored !== null && typeof stored === "object" ? stored : {}) };
-    if (req.pending) next[req.walletId] = true;
-    else delete next[req.walletId];
-    await this.deps.storage.set(POINTS_CLAIM_PENDING_KEY, next);
+    await updateStored(this.deps.storage, POINTS_CLAIM_PENDING_KEY, (stored) => {
+      const next = { ...(stored !== null && typeof stored === "object" ? stored : {}) } as Record<string, true>;
+      if (req.pending) next[req.walletId] = true;
+      else delete next[req.walletId];
+      return next;
+    });
   }
 
   async getInviteUnlock(): Promise<InviteUnlock | null> {
@@ -373,8 +378,10 @@ export class PointsHandler {
   }
 
   async markRevealSeen(req: { walletId: string }): Promise<void> {
-    const stored = await this.deps.storage.get<Record<string, true>>(POINTS_REVEAL_SEEN_KEY);
-    await this.deps.storage.set(POINTS_REVEAL_SEEN_KEY, { ...(stored !== null && typeof stored === "object" ? stored : {}), [req.walletId]: true });
+    await updateStored(this.deps.storage, POINTS_REVEAL_SEEN_KEY, (stored) => ({
+      ...(stored !== null && typeof stored === "object" ? stored : {}),
+      [req.walletId]: true,
+    }));
   }
 
   private async requestRedeem(code: string): Promise<{ result: InviteRedeemResult; kind?: "member" | "drop" }> {

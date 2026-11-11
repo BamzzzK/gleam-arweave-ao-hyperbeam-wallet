@@ -53,6 +53,7 @@ import {
   APPROVAL_TIMEOUT_MS,
   SCAN_ATTESTATION_TIMEOUT_MS,
 } from "@gleam/messaging/src/page-protocol.ts";
+import { updateStored } from "../storage-update";
 import {
   buildAttestMessage,
   buildOwnershipTransaction,
@@ -820,6 +821,22 @@ function dataItemOf(payload: UnsignedPayload | undefined): Uint8Array {
   return payload.raw;
 }
 
+function validGrants(raw: unknown): Grant[] {
+  return Array.isArray(raw) ? raw.filter(isValidGrant) : [];
+}
+
+function validPending(raw: unknown): PendingApprovalRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (entry): entry is PendingApprovalRecord =>
+      entry !== null &&
+      typeof entry === "object" &&
+      isValidApprovalRequest((entry as PendingApprovalRecord).request) &&
+      (typeof (entry as PendingApprovalRecord).walletId === "string" ||
+        (entry as PendingApprovalRecord).walletId === null),
+  );
+}
+
 function transactionInputOf(input: SigningRequestInput): SignTransactionInput {
   return {
     data: bytesToBase64(input.payload),
@@ -967,16 +984,6 @@ export class ApprovalHandler {
    */
   private readonly resolving = new Set<string>();
 
-  /**
-   * Tail of the queue every `session:pendingApprovals` read-modify-write
-   * runs on. Each one awaits a read before its write, so two running at
-   * once would each write back an array missing the other's change.
-   */
-  private pendingQueue: Promise<void> = Promise.resolve();
-
-  /** The same for `local:grants`: a revoke written from a stale read would restore another origin's grant. */
-  private grantsQueue: Promise<void> = Promise.resolve();
-
   /** Set while a scan attestation is being opened or awaited, so two can't race past the pending check. */
   private attesting = false;
 
@@ -996,24 +1003,18 @@ export class ApprovalHandler {
   }
 
   private async loadGrants(): Promise<Grant[]> {
-    const raw = await this.storage.get<unknown>(GRANTS_KEY);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(isValidGrant);
+    return validGrants(await this.storage.get<unknown>(GRANTS_KEY));
   }
 
   /** The only way to write grants. `update` sees the current grants and returns the new ones. */
-  private updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
-    const run = this.grantsQueue.then(async () => {
-      const { next, result } = update(await this.loadGrants());
-      if (next === null) await this.storage.remove(GRANTS_KEY);
-      else await this.storage.set(GRANTS_KEY, next);
-      return result;
+  private async updateGrants<R>(update: (grants: Grant[]) => { next: Grant[] | null; result: R }): Promise<R> {
+    let result!: R;
+    await updateStored(this.storage, GRANTS_KEY, (raw) => {
+      const outcome = update(validGrants(raw));
+      result = outcome.result;
+      return outcome.next;
     });
-    this.grantsQueue = run.then(
-      () => {},
-      () => {},
-    );
-    return run;
+    return result;
   }
 
   /** Past its deadline with nothing settling it. A request being resolved runs to completion. */
@@ -1033,16 +1034,7 @@ export class ApprovalHandler {
   }
 
   private async loadAllPending(): Promise<PendingApprovalRecord[]> {
-    const raw = await this.storage.get<unknown>(PENDING_APPROVALS_KEY);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter(
-      (entry): entry is PendingApprovalRecord =>
-        entry !== null &&
-        typeof entry === "object" &&
-        isValidApprovalRequest((entry as PendingApprovalRecord).request) &&
-        (typeof (entry as PendingApprovalRecord).walletId === "string" ||
-          (entry as PendingApprovalRecord).walletId === null),
-    );
+    return validPending(await this.storage.get<unknown>(PENDING_APPROVALS_KEY));
   }
 
   /**
@@ -1051,15 +1043,13 @@ export class ApprovalHandler {
    * returns the new ones, or `null` to leave storage untouched. Stale
    * records are pruned from what is written.
    */
-  private updatePending(
+  private async updatePending(
     update: (pending: PendingApprovalRecord[]) => PendingApprovalRecord[] | null,
   ): Promise<void> {
-    const run = this.pendingQueue.then(async () => {
-      const next = update(await this.loadAllPending());
-      if (next) await this.storage.set(PENDING_APPROVALS_KEY, next.filter((entry) => !this.isStale(entry)));
+    await updateStored(this.storage, PENDING_APPROVALS_KEY, (raw) => {
+      const next = update(validPending(raw));
+      return next ? next.filter((entry) => !this.isStale(entry)) : undefined;
     });
-    this.pendingQueue = run.catch(() => {});
-    return run;
   }
 
   /**

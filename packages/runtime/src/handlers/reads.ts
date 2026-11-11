@@ -38,6 +38,7 @@ import {
   type HistoricalPricePoint,
 } from "@gleam/core/src/pricing/index.ts";
 import { DEFAULT_HYPERBEAM_PEER_URLS, L1_TOKEN_NODE_URLS, POINTS_API_URL, isFiatCurrency } from "@gleam/core";
+import { updateStored } from "../storage-update";
 import { mergeDiscoveredPeers, readDismissedPeers, readExtraPeerUrls } from "../peers";
 import type {
   ActivityEntry,
@@ -65,6 +66,7 @@ import type {
   Winston,
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { WALLETS_KEY, ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, ACTIVITY_LOG_KEY_PREFIX, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -78,10 +80,10 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
  * - `local:networkSettings` — `NetworkSettings`, defaulting to
  *   `arweave.net` and the default HyperBEAM peer.
  * - `local:activityLog:{address}` — `ActivityEntry[]`, the local
- *   append-only action log `handlers/transfer.ts` writes optimistic
- *   entries into. Read-only from this handler's side; `transfer.ts` owns
- *   writing it. Keyed per-address since the log is scoped to whichever
- *   wallet's activity is being viewed.
+ *   action log `handlers/transfer.ts` adds optimistic entries to and
+ *   the settle below writes outcomes into, both through `updateStored`.
+ *   Keyed per-address since the log is scoped to whichever wallet's
+ *   activity is being viewed.
  * - `local:wallets` / `local:activeWalletId` — owned by
  *   `handlers/wallet-lifecycle.ts` (`WalletLifecycleHandler`'s own doc
  *   comment), read-only here. `getPortfolioHistory` prices the wallet
@@ -106,12 +108,9 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
  *   balance is read and how it is sent (`core/ao/balance.ts`'s
  *   `readTokenBalance`).
  */
-const NETWORK_SETTINGS_KEY = "local:networkSettings";
 const PRICE_SNAPSHOTS_KEY = "local:priceSnapshots";
 /** More than a wallet lists is not a real request, and each id costs the node several reads. */
 const MAX_PRICED_PROCESS_IDS = 50;
-const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
-const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 const TOKEN_METADATA_KEY_PREFIX = "local:tokenMetadata:";
 const HIDDEN_PROCESS_IDS_KEY_PREFIX = "local:hiddenProcessIds:";
 const DISCOVERED_TOKENS_KEY_PREFIX = "local:discoveredTokens:";
@@ -131,8 +130,6 @@ const COLLECTIBLES_KEY_PREFIX = "local:collectibles:";
 // open within this window reuses the last result.
 const COLLECTIBLES_TTL_MS = 10 * 60 * 1000;
 const ACTIVITY_PAGE_LIMIT = 50;
-const WALLETS_KEY = "local:wallets";
-const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const WINSTON_PER_AR = 1_000_000_000_000;
 
 const PORTFOLIO_HISTORY_RANGES: readonly PortfolioHistoryRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
@@ -406,13 +403,11 @@ export class ReadsHandler {
    * rediscovery right after the send would still list it.
    */
   async forgetCollectible(req: { address: string; id: string }): Promise<void> {
-    const key = `${COLLECTIBLES_KEY_PREFIX}${req.address}`;
-    const raw = await this.storage.get<unknown>(key);
-    if (!isCollectiblesCache(raw)) return;
-    await this.storage.set<CollectiblesCache>(key, {
-      ...raw,
-      collectibles: raw.collectibles.filter((collectible) => collectible.id !== req.id),
-    });
+    await updateStored<CollectiblesCache>(this.storage, `${COLLECTIBLES_KEY_PREFIX}${req.address}`, (raw) =>
+      isCollectiblesCache(raw)
+        ? { ...raw, collectibles: raw.collectibles.filter((collectible) => collectible.id !== req.id) }
+        : undefined,
+    );
   }
 
   async getWatchedTokens(req: { address: string }): Promise<string[]> {
@@ -477,6 +472,8 @@ export class ReadsHandler {
         return metadata;
       }
     }
+    // A cache fill: the value comes from the network, not from what was stored.
+    // eslint-disable-next-line gleam/no-storage-read-modify-write
     await this.storage.set(cacheKey, metadata);
     return metadata;
   }
@@ -948,16 +945,27 @@ export class ReadsHandler {
         .then((heights) => ids.filter((id) => !heights.has(id)).forEach((id) => unmined.add(id)))
         .catch(() => undefined);
     }
-    const nextLog = await Promise.all(
-      localLog.map(async (entry) => {
-        if (promotedIds.has(entry.txId)) return promoted.find((candidate) => candidate.txId === entry.txId) ?? entry;
-        return unmined.has(entry.txId) && (await this.neverMined(entry))
-          ? { ...entry, status: "failed" as const, error: NEVER_MINED_ERROR }
-          : entry;
-      }),
-    );
+    const settled = new Map<string, ActivityEntry>();
+    for (const entry of localLog) {
+      const confirmed = promotedIds.has(entry.txId) ? promoted.find((candidate) => candidate.txId === entry.txId) : undefined;
+      if (confirmed) settled.set(entry.txId, confirmed);
+      else if (unmined.has(entry.txId) && (await this.neverMined(entry))) {
+        settled.set(entry.txId, { ...entry, status: "failed", error: NEVER_MINED_ERROR });
+      }
+    }
+    if (settled.size > 0) await this.settleActivity(address, settled);
+  }
 
-    await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, nextLog);
+  /**
+   * Writes each settled entry over the one with its id in the stored log,
+   * read afresh: a send recorded while the settle was waiting on the
+   * network stays in the log.
+   */
+  private async settleActivity(address: string, settled: ReadonlyMap<string, ActivityEntry>): Promise<ActivityEntry[]> {
+    const written = await updateStored(this.storage, `${ACTIVITY_LOG_KEY_PREFIX}${address}`, (raw) =>
+      (Array.isArray(raw) ? raw.filter(isValidActivityEntry) : []).map((entry) => settled.get(entry.txId) ?? entry),
+    );
+    return written ?? [];
   }
 
   /** A pending L1 transaction, AR or token, too old to be mined. A legacy AO send settles from its CU result instead. */
@@ -978,26 +986,24 @@ export class ReadsHandler {
    * updated log.
    */
   private async resolvePendingAoTransfers(address: string, localLog: ActivityEntry[]): Promise<ActivityEntry[]> {
-    let changed = false;
-    const resolved = await Promise.all(
+    const settled = new Map<string, ActivityEntry>();
+    await Promise.all(
       localLog.map(async (entry) => {
-        if (entry.status !== "pending" || !entry.token) return entry;
+        if (entry.status !== "pending" || !entry.token) return;
         // An L1 token send settles through the gateway index, like an AR send.
         const metadata = await this.storage.get<unknown>(`${TOKEN_METADATA_KEY_PREFIX}${entry.token}`);
-        if (isValidTokenMetadata(metadata) && metadata.transport === "l1") return entry;
+        if (isValidTokenMetadata(metadata) && metadata.transport === "l1") return;
         const outcome = await getTransferOutcome(entry.txId, entry.token);
-        if (outcome.status === "pending") return entry;
-        changed = true;
-        return {
+        if (outcome.status === "pending") return;
+        settled.set(entry.txId, {
           ...entry,
           status: outcome.status,
           error: outcome.status === "failed" ? outcome.error : entry.error,
-        };
+        });
       }),
     );
 
-    if (changed) await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, resolved);
-    return resolved;
+    return settled.size > 0 ? this.settleActivity(address, settled) : localLog;
   }
 
   /**
@@ -1258,16 +1264,19 @@ export class ReadsHandler {
 
     const asks = await Promise.all(processIds.map(async (processId) => ({ processId, ask: await readBestAsk(processId, nodeUrl) })));
     const now = Date.now();
-    const snapshots = parsePriceSnapshots(await this.storage.get<unknown>(PRICE_SNAPSHOTS_KEY));
-    const prices = asks.flatMap(({ processId, ask }) => {
-      if (ask === null) return [];
-      const usd = ask.arPerToken * arUsd;
-      if (!Number.isFinite(usd) || usd <= 0) return [];
-      const samples = snapshots[processId] ?? [];
-      snapshots[processId] = recordPriceSample(samples, usd, now);
-      return [{ processId, usd, change: changeSinceYesterday(samples, usd, now) }];
+    let prices: { processId: string; usd: number; change: number | null }[] = [];
+    await updateStored(this.storage, PRICE_SNAPSHOTS_KEY, (raw) => {
+      const snapshots = parsePriceSnapshots(raw);
+      prices = asks.flatMap(({ processId, ask }) => {
+        if (ask === null) return [];
+        const usd = ask.arPerToken * arUsd;
+        if (!Number.isFinite(usd) || usd <= 0) return [];
+        const samples = snapshots[processId] ?? [];
+        snapshots[processId] = recordPriceSample(samples, usd, now);
+        return [{ processId, usd, change: changeSinceYesterday(samples, usd, now) }];
+      });
+      return prices.length > 0 ? snapshots : undefined;
     });
-    if (prices.length > 0) await this.storage.set(PRICE_SNAPSHOTS_KEY, snapshots);
     return prices;
   }
 }

@@ -1,5 +1,5 @@
 import * as Comlink from "comlink";
-import type { StoragePort } from "@gleam/core";
+import { createSerializer, type StoragePort } from "@gleam/core";
 import { STORE_REQUEST, type SqliteStore, type StoredRow } from "./sqlite-channel";
 
 type Area = "local" | "session";
@@ -40,7 +40,7 @@ function parseRow(key: string, json: string): [string, unknown] {
 export class MobileStoragePort implements StoragePort {
   private readonly session = new Map<string, unknown>();
   private loaded: Promise<Map<string, unknown>> | undefined;
-  private writes: Promise<unknown> = Promise.resolve();
+  private readonly serializeWrites = createSerializer();
   private readonly watchers = new Map<string, Set<(value: unknown) => void>>();
 
   constructor(private readonly store: Pick<SqliteStore, "load" | "write">) {
@@ -100,7 +100,7 @@ export class MobileStoragePort implements StoragePort {
     const values = Object.entries(puts).map(([key, value]) => [key, structuredClone(value)] as const);
     if (area === "session") return this.apply(this.session, values, deletes);
 
-    const run = this.writes.then(async () => {
+    return this.serializeWrites(async () => {
       const local = await this.local();
       const rows: StoredRow[] = values.map(([key, value]) => [key, JSON.stringify(value)]);
       const removed = deletes.filter((key) => local.has(key));
@@ -113,8 +113,6 @@ export class MobileStoragePort implements StoragePort {
         removed,
       );
     });
-    this.writes = run.catch(() => {});
-    return run;
   }
 
   private apply(area: Map<string, unknown>, values: ReadonlyArray<readonly [string, unknown]>, deletes: string[]): void {

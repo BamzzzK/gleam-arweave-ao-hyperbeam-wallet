@@ -51,7 +51,48 @@ const noDynamicImport = {
     };
   },
 };
-const gleam = { rules: { "no-dynamic-import": noDynamicImport } };
+// A `storage.set(K, …)` in a function that also reads `storage.get(K)` is
+// a read-modify-write: another write to K between the two is lost. Such a
+// write goes through `updateStored` (`runtime/src/storage-update.ts`),
+// which runs one update per key at a time. Keys match by source text.
+const noStorageReadModifyWrite = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    const source = context.sourceCode;
+    const gets = [];
+    const sets = [];
+    const isStorage = (node) => {
+      const name = node.type === "MemberExpression" ? node.property.name : node.type === "Identifier" ? node.name : null;
+      return typeof name === "string" && /storage$/i.test(name);
+    };
+    return {
+      CallExpression(node) {
+        const callee = node.callee;
+        if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return;
+        if (!isStorage(callee.object) || node.arguments.length === 0) return;
+        const key = source.getText(node.arguments[0]);
+        if (callee.property.name === "get") gets.push({ key, node });
+        else if (callee.property.name === "set") sets.push({ key, node });
+      },
+      "Program:exit"() {
+        for (const set of sets) {
+          const scope = source.getAncestors(set.node).findLast((ancestor) => /Function/.test(ancestor.type));
+          if (!scope) continue;
+          const read = gets.some(
+            (get) => get.key === set.key && get.node.range[0] >= scope.range[0] && get.node.range[1] <= scope.range[1],
+          );
+          if (read) {
+            context.report({
+              node: set.node,
+              message: `${set.key} is written from a read of itself. Use updateStored (runtime/src/storage-update.ts), which runs one update per key at a time.`,
+            });
+          }
+        }
+      },
+    };
+  },
+};
+const gleam = { rules: { "no-dynamic-import": noDynamicImport, "no-storage-read-modify-write": noStorageReadModifyWrite } };
 const signerFence = (regex) => ({
   "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
   "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
@@ -283,6 +324,12 @@ export default tseslint.config(
         { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE },
       ],
     },
+  },
+  {
+    files: ["packages/runtime/src/**/*.ts"],
+    // The one place a key is read and written, one update per key at a time.
+    ignores: ["**/*.test.ts", "packages/runtime/src/storage-update.ts"],
+    rules: { "gleam/no-storage-read-modify-write": "error" },
   },
   {
     // The app fence. A later block replaces a rule's options wholesale, so

@@ -1,4 +1,4 @@
-import { USER_ERRORS, type LedgerTransport } from "@gleam/core";
+import { USER_ERRORS, createSerializer, type LedgerTransport } from "@gleam/core";
 
 /*
  * Ledger's HID framing is implemented here rather than through
@@ -93,7 +93,7 @@ export class WebHidLedgerTransport implements LedgerTransport {
   private readonly queue: Uint8Array[] = [];
   private waiter: { resolve: (packet: Uint8Array) => void; reject: (error: Error) => void } | null = null;
   private failure: LedgerTransportError | null = null;
-  private chain: Promise<unknown> = Promise.resolve();
+  private readonly serialize = createSerializer();
   private closed = false;
 
   private readonly onReport = (event: { data: DataView }) => {
@@ -134,9 +134,7 @@ export class WebHidLedgerTransport implements LedgerTransport {
   }
 
   exchange(apdu: Uint8Array): Promise<Uint8Array> {
-    const run = this.chain.then(() => this.exchangeNow(apdu));
-    this.chain = run.catch(() => undefined);
-    return run;
+    return this.serialize(() => this.exchangeNow(apdu));
   }
 
   async close(): Promise<void> {

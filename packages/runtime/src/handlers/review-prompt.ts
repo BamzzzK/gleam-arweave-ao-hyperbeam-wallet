@@ -1,10 +1,9 @@
 import type { ActivityEntry, ReviewMoment, StoragePort, Wallet } from "@gleam/core";
+import { WALLETS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
 
 /** `true` once the review prompt was answered or dismissed. Per install, not per wallet. */
 export const REVIEW_PROMPT_DONE_KEY = "local:reviewPrompt:done";
 
-const WALLETS_KEY = "local:wallets";
-const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 
 /** How long Gleam has been in use before a quiet user is asked anyway. */
 export const SETTLED_AFTER_MS = 14 * 24 * 60 * 60_000;

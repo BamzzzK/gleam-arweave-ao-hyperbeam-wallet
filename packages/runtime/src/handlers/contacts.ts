@@ -1,5 +1,13 @@
 import { isValidArweaveAddress, type Contact, type StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { updateStored } from "../storage-update";
+import { CONTACTS_KEY } from "../storage-keys";
+
+const MAX_NAME_LENGTH = 32;
+
+function contactsOf(raw: unknown): Contact[] {
+  return Array.isArray(raw) ? (raw as Contact[]) : [];
+}
 
 /**
  * Background-side implementation of `ProtocolMap`'s `listContacts`/
@@ -13,15 +21,11 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
  *   per-wallet), most-recently-saved first. An address a user has saved
  *   is meaningful regardless of which of their own wallets is active.
  */
-const CONTACTS_KEY = "local:contacts";
-const MAX_NAME_LENGTH = 32;
-
 export class ContactsHandler {
   constructor(private readonly storage: StoragePort) {}
 
   private async loadContacts(): Promise<Contact[]> {
-    const raw = await this.storage.get<unknown>(CONTACTS_KEY);
-    return Array.isArray(raw) ? (raw as Contact[]) : [];
+    return contactsOf(await this.storage.get<unknown>(CONTACTS_KEY));
   }
 
   async listContacts(): Promise<Contact[]> {
@@ -38,24 +42,24 @@ export class ContactsHandler {
       throw new Error(userErrorMessage("enterContactName", { max: MAX_NAME_LENGTH }));
     }
 
-    const existing = await this.loadContacts();
     const contact: Contact = { address, name, createdAt: Date.now() };
-    // Upsert by address: replace an existing entry in place (keeping the
-    // list's order stable) rather than appending a duplicate.
-    const existingIndex = existing.findIndex((candidate) => candidate.address === address);
-    const next =
-      existingIndex === -1
+    await updateStored(this.storage, CONTACTS_KEY, (raw) => {
+      const existing = contactsOf(raw);
+      // Upsert by address: replace an existing entry in place (keeping the
+      // list's order stable) rather than appending a duplicate.
+      const existingIndex = existing.findIndex((candidate) => candidate.address === address);
+      return existingIndex === -1
         ? [contact, ...existing]
         : existing.map((candidate, index) => (index === existingIndex ? contact : candidate));
-
-    await this.storage.set(CONTACTS_KEY, next);
+    });
     return contact;
   }
 
   async deleteContact(req: { address: string }): Promise<void> {
-    const existing = await this.loadContacts();
-    const next = existing.filter((candidate) => candidate.address !== req.address);
-    if (next.length === existing.length) return;
-    await this.storage.set(CONTACTS_KEY, next);
+    await updateStored(this.storage, CONTACTS_KEY, (raw) => {
+      const existing = contactsOf(raw);
+      const next = existing.filter((candidate) => candidate.address !== req.address);
+      return next.length === existing.length ? undefined : next;
+    });
   }
 }

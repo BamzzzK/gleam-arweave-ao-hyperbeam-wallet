@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import type { StoragePort } from "@gleam/core";
 import { COMMUNITY_HYPERBEAM_PEER_URLS, DEFAULT_HYPERBEAM_PEER_URLS } from "@gleam/core";
 import { ReadsHandler, ACTIVITY_PROMOTION_ALARM_NAME, registerActivityPromotionAlarm } from "./reads";
+import { TransferHandler } from "./transfer";
 
 function createFakeStorage(): StoragePort {
   const store = new Map<string, unknown>();
@@ -1176,6 +1177,43 @@ describe("ReadsHandler: getTokenPrices for orderbook tokens", () => {
 });
 
 describe("ReadsHandler: promotePendingActivity", () => {
+  it("keeps a send recorded while the settle waits on the CU", async () => {
+    const storage = createFakeStorage();
+    const alice = { txId: "to-alice", type: "send", status: "pending", address: "alice", amount: "5", tags: [], timestamp: 500, token: "ao-process" };
+    await storage.set("local:activityLog:addr1", [alice]);
+
+    let releaseCu!: () => void;
+    const cuHeld = new Promise<void>((resolve) => (releaseCu = resolve));
+    let cuAsked!: () => void;
+    const cuCalled = new Promise<void>((resolve) => (cuAsked = resolve));
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/result/to-alice")) {
+        cuAsked();
+        await cuHeld;
+        return new Response(JSON.stringify({ Messages: [{ Tags: [{ name: "Action", value: "Debit-Notice" }] }] }));
+      }
+      return new Response(JSON.stringify({ data: { transactions: { edges: [] } } }));
+    }) as unknown as typeof fetch;
+
+    // The minute alarm's settle reads the log, then waits on the CU.
+    const settle = new ReadsHandler(storage).promotePendingActivity("addr1");
+    await cuCalled;
+
+    // The user sends to Bob meanwhile, through the transfer handler's own recording.
+    const transfer = new TransferHandler(storage, { getSigner: async () => null, getWalletMethod: async () => null });
+    const recording = transfer as unknown as { recordSend(address: string, req: object, txId: string): Promise<void> };
+    await recording.recordSend("addr1", { recipient: "bob", amount: "7", token: "ao-process", collectible: null }, "to-bob");
+
+    releaseCu();
+    await settle;
+
+    const log = await storage.get<Array<{ txId: string; status: string }>>("local:activityLog:addr1");
+    expect(log?.map(({ txId, status }) => ({ txId, status }))).toEqual([
+      { txId: "to-bob", status: "pending" },
+      { txId: "to-alice", status: "confirmed" },
+    ]);
+  });
+
   it("promotes a locally-pending entry to confirmed once the gateway indexes it", async () => {
     const storage = createFakeStorage();
     await storage.set("local:activityLog:addr1", [

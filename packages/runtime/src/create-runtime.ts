@@ -47,6 +47,7 @@ import { ReviewPromptHandler } from "./handlers/review-prompt";
 import { ScansHandler } from "./handlers/scans";
 import { SiteWalletHandler } from "./handlers/site-wallet";
 import { SecurityPhraseHandler } from "./handlers/security-phrase";
+import { updateStored } from "./storage-update";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "./handlers/points";
 import { createKeySession } from "./handlers/key-session";
 import {
@@ -71,6 +72,7 @@ import { registerPeerDiscoveryAlarm, saveNetworkSettings } from "./peers";
 import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { NETWORK_SETTINGS_KEY } from "./storage-keys";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -187,7 +189,6 @@ type MessageHandlers = {
     : (data: ProtocolData<K>) => ProtocolResult<K>;
 };
 
-const NETWORK_SETTINGS_KEY = "local:networkSettings";
 
 /**
  * Builds every handler over `platform` and returns the dispatcher in front
@@ -1040,7 +1041,10 @@ export function createRuntime(platform: Platform): Runtime {
 
       const gatewayUrl = await resolveInitialGatewayUrl();
       const settings = await reads.getNetworkSettings();
-      await storage.set(NETWORK_SETTINGS_KEY, { ...settings, gatewayUrl });
+      // The probe takes a while; settings the user saved meanwhile win.
+      await updateStored(storage, NETWORK_SETTINGS_KEY, (current) =>
+        current === null ? { ...settings, gatewayUrl } : undefined,
+      );
     } catch {
       // Never block startup over a first-run gateway probe.
     }
