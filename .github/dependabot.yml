@@ -50,5 +50,11 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      # CodeQL refuses to run when init and analyze differ in version, so
+      # their bumps have to land in one PR.
+      codeql-action:
+        patterns:
+          - github/codeql-action*
     commit-message:
       prefix: chore(ci)
