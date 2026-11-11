@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeDeps } from "./harness.ts";
-import { aboveTheFold, countSyllables, draftWarning, draftWarnings, readability, splitTitle, titleProblems } from "./readability.ts";
+import { MAX_WORDS, aboveTheFold, countSyllables, draftWarning, draftWarnings, readability, splitTitle, titleProblems } from "./readability.ts";
 
 const T = "Title: A connected site can steal the user's tokens\n";
 const LONG_WORDS =
@@ -45,9 +45,9 @@ describe("draft warnings", () => {
     expect(draftWarning("a.md", `${T}The page signs it. The user loses funds.`)).toBeUndefined();
     const wordy = Array.from({ length: 60 }, () => "The page signs a tag the user never saw.").join(" ");
     expect(draftWarning("a.md", T + wordy)).toBe(
-      "! a.md: 540 words above <details> (limit 200); move traces, code and duplicate notes into <details> (security/scan/REPORT.md).",
+      "! a.md: 540 words above <details> (limit 120); move impact, steps, traces and code into <details> (security/scan/REPORT.md).",
     );
-    expect(draftWarning("b.md", T + LONG_WORDS)).toMatch(/^! b\.md: reading grade \d+(\.\d)? \(limit 10\); use shorter sentences and plainer words/);
+    expect(draftWarning("b.md", T + LONG_WORDS)).toMatch(/^! b\.md: reading grade \d+(\.\d)? \(limit 8\); use short sentences and common words/);
     expect(draftWarning("c.md", `${T}${wordy}\n<details>${LONG_WORDS.repeat(50)}</details>`)).not.toContain("grade");
   });
 
@@ -104,8 +104,8 @@ describe("draft warnings", () => {
     const example = /## Example advisory[\s\S]*?```markdown\n([\s\S]*?)\n```/.exec(doc)?.[1];
     expect(example).toContain("<details>");
     expect(draftWarning("example", example!)).toBeUndefined();
-    const { words, grade } = readability(aboveTheFold(example!));
-    expect(words).toBeLessThanOrEqual(200);
-    expect(grade).toBeLessThanOrEqual(9.5);
+    const { words, grade } = readability(aboveTheFold(splitTitle(example!).body));
+    expect(words).toBeLessThanOrEqual(MAX_WORDS);
+    expect(grade).toBeLessThanOrEqual(7);
   });
 });

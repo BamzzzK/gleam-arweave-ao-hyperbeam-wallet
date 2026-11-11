@@ -482,9 +482,9 @@ Save every draft in the round folder, numbered from 1 within the round:
 reports from these files.
 
 Read `security/scan/REPORT.md` before you write the first draft. It gives
-the shape and style of every advisory and PR body: a short summary a
-maintainer can skim, with the trace, test code and reasoning in a
-`<details>` block.
+the shape and style of every advisory and PR body: a plain title and
+summary a maintainer can skim, with everything else in a `<details>`
+block.
 
 **PR draft.** Write the fix in a separate worktree, so the scan checkout
 stays on the tag. Base it on `origin/master` if the file to fix exists
@@ -518,11 +518,12 @@ it names and commit again.
 
 **Advisory draft.** Start with a `Title:` line, written as `REPORT.md`
 § Advisory title gives it: who can do it and what the user loses, in the
-user's words. Then write the severity, and a description in the shape
-`REPORT.md` gives: **Summary**, **Impact**, **Steps**, an optional
-**Fix**, the `Attestation id: {{ATTESTATION_ID}}` line, then the detail
-for the triager in `<details>`. Give the evidence from the verdict once:
-demonstrated, traced, or the exact fact a browser check has to settle.
+user's words. Then write the description in the shape `REPORT.md` gives:
+a plain **Summary** of about 100 words at reading grade 6 to 7, the
+`Attestation id: {{ATTESTATION_ID}}` line, then `<details>` with
+**Impact**, **Steps**, an optional **Fix** and the triager's evidence.
+Give the evidence from the verdict once: demonstrated, traced, or the
+exact fact a browser check has to settle.
 Save it as `.gleam-scan/rounds/<area>/advisory-<n>.md`. `pnpm scan
 finish` warns when the part above `<details>` is too long or too hard to
 read.

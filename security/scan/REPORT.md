@@ -1,8 +1,9 @@
 # Write an advisory or PR body
 
-A maintainer reads your report first in a list of many. Write so they can
-decide in one minute what it is and how bad it is. Put everything else in
-a `<details>` block they open when they triage it.
+A maintainer reads your report first in a list of many. The title and
+summary tell them in one minute what it is and how bad it is, in plain
+words. Everything else goes in a `<details>` block for the agent that
+triages and fixes it.
 
 ## Advisory title
 
@@ -43,18 +44,20 @@ correct: it shows the maintainer one class of bug, not two.
 
 ## Advisory shape
 
-Use these parts, in this order:
+A maintainer sees only the title and the summary. Everything else goes in
+`<details>`, for the agent that triages and fixes it.
 
 - `Title: <title>` as the first line. Filing sends it as the advisory's
   title and the rest as its description.
-- **Summary**: two or three sentences on what is wrong. If master
-  already fixes it, end with `Already fixed on master in <ref>.`
-- **Impact**: who is affected and what they lose. Give the severity and
-  one line on why.
-- **Steps**: numbered, six at most, from the attacker's access to the harm.
-- **Fix** (optional): one line.
+- **Summary**: a short paragraph in plain words. Say what is wrong, who
+  it affects, what they lose and how bad it is. Say whether a test shows
+  it, a trace shows it or it needs a browser check. If master already
+  fixes it, end with `Already fixed on master in <ref>.`
 - `Attestation id: {{ATTESTATION_ID}}`
-- A `<details><summary>Detail for the triager</summary>` block with:
+- A `<details><summary>Details</summary>` block, written for an agent:
+  - **Impact**: who is affected, what they lose, the severity and why;
+  - **Steps**: numbered, from the attacker's access to the harm;
+  - **Fix** (optional): one line;
   - the six-field table from `VERIFY.md` (Attacker, Entry, Control,
     Boundary, Harm, Evidence);
   - the `file:line` trace;
@@ -64,18 +67,23 @@ Use these parts, in this order:
 
 ## Style
 
-- Write for a person, not for a parser.
-- Above `<details>`, keep to about 200 words, at reading grade 8 to 9.
-- One claim per sentence. Keep sentences under about 20 words.
+Above `<details>`:
+
+- Write for a person who doesn't read the code. No file, function or
+  tag names.
+- Keep to about 100 words, at reading grade 6 to 7.
+- Use short sentences, one claim each. Use common words.
 - Use active voice and the present tense.
-- Cut hedges and filler. Don't argue that it isn't by design.
-- Say once whether it is demonstrated, traced or needs a browser check.
+- Cut hedges, filler and adjectives. Don't argue that it isn't by design.
+
+Inside `<details>`, be exact and complete. Code names, `file:line` and
+test code belong there.
 
 `pnpm scan finish` and `pnpm scan file` warn when an `advisory-*.md`
 draft in a round folder has no `Title:` line, a title over 100
-characters or with a check id, code name or parenthetical, more than 200
-words above `<details>`, or a reading grade above 10. The warning never fails the scan. Fix the draft
-and move on.
+characters or with a check id, code name or parenthetical, more than 120
+words above `<details>`, or a reading grade above 8. The warning never
+fails the scan. Fix the draft and move on.
 
 ## Example advisory
 
@@ -84,9 +92,15 @@ This example is invented. It shows the shape, not a real bug.
 ```markdown
 Title: A connected site can get a signature on an action the user never sees
 
-**Summary**: The signing approval shows only the first 16 tags of a data
-item. A page can add a 17th tag that the user never sees. Gleam then signs
-it.
+**Summary**: The approval window shows only the first 16 tags of a
+request. A site can put an extra tag after them. The user can't see it,
+but Gleam signs it. So a site can slip in an action the user would
+refuse, like a token send. The user still has to click Approve, so this
+is Medium. A unit test shows it.
+
+Attestation id: {{ATTESTATION_ID}}
+
+<details><summary>Details</summary>
 
 **Impact**: Any user who approves a `signDataItem` request from a hostile
 page. The page gets a signature on a tag the user didn't review, such as
@@ -102,13 +116,7 @@ still has to approve.
 4. The user clicks Approve.
 5. Gleam signs the item with all 17 tags.
 
-Demonstrated with a unit test.
-
 **Fix**: Render every tag, and scroll the list.
-
-Attestation id: {{ATTESTATION_ID}}
-
-<details><summary>Detail for the triager</summary>
 
 | Field | |
 | --- | --- |

@@ -65,14 +65,26 @@ comment with the reason. To accept one: set the real severity and
 - **Medium and higher:** publish only after the release with the fix is
   live.
 
-Before publishing, set:
+Before publishing, rewrite the advisory in the shape `security/scan/REPORT.md`
+gives, if the reporter didn't:
+
+- `summary` (the title): who can do it and what the user loses, in a
+  user's words. No code names.
+- The description opens with a plain **Summary**: about 100 words at
+  reading grade 6 to 7, in short sentences with common words. It says
+  what is wrong, who it affects, what they lose and how bad it is.
+- Everything else goes in one `<details><summary>Details</summary>`
+  block, written for an agent: the reporter's Impact, Steps, trace, PoC
+  and attestation id, kept exact.
+
+Also set:
 
 - `vulnerabilities`: ecosystem `other`, package `gleam-wallet`,
   `vulnerable_version_range` `<= <current release>`. Fill
   `patched_versions` once a release has the fix, otherwise leave it empty.
-- The description ends with one line on the fix and the release: "Fixed
-  on master in #N (<sha>); it ships in the first release after X.", and
-  one line on why it got its rating.
+- The Summary ends with one line on the fix and the release: "Fixed on
+  master in #N; it ships in the first release after X." The details end
+  with the fix commit sha and one line on why it got its rating.
 - Credit the reporter (`credits: [{login, type: "reporter"}]`).
 
 Then `gh api -X PATCH "$API/<GHSA>" -f state=published`.
