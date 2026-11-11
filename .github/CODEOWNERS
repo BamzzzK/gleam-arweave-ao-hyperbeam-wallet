@@ -39,6 +39,11 @@
 /apps/extension/src/adapters/downloads.ts                           @skyf0xx
 /packages/app/src/screens/onboarding/src/                           @skyf0xx
 /packages/app/src/screens/lock-settings/src/                        @skyf0xx
+/packages/app/src/screens/unlock/                                        @skyf0xx
+/packages/core/src/models/wallet.ts                                        @skyf0xx
+/packages/core/src/models/session.ts                                       @skyf0xx
+/packages/core/src/models/passkey.ts                                       @skyf0xx
+/packages/app/src/keyfile/                                                 @skyf0xx
 
 # 2 Signing
 /packages/core/src/ao/transfer.ts                                          @skyf0xx
@@ -55,6 +60,12 @@
 /packages/core/src/models/capabilities.ts                           @skyf0xx
 /apps/extension/src/hardware/keystone/                              @skyf0xx
 /apps/extension/src/hardware/ledger/                                @skyf0xx
+/packages/core/src/ao/collectible-transfer.ts                              @skyf0xx
+/packages/core/src/arweave/bundler.ts                                      @skyf0xx
+/packages/app/src/screens/send/src/sendFormSchema.ts                       @skyf0xx
+/packages/app/src/screens/activity/src/validateSendAmount.ts               @skyf0xx
+/packages/app/src/screens/activity/src/useSubmitTransfer.ts                @skyf0xx
+/packages/core/src/models/signing.ts                                       @skyf0xx
 
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
@@ -87,6 +98,16 @@
 /packages/core/src/arweave/first-run-gateway.ts                         @skyf0xx
 /packages/core/src/arweave/graphql.ts                                   @skyf0xx
 /packages/messaging/src/protocol.ts                                    @skyf0xx
+/apps/extension/src/adapters/tabs.ts                                       @skyf0xx
+/apps/mobile/src/app-platform.ts                                           @skyf0xx
+/apps/mobile/src/adapters/runtime-port.ts                                  @skyf0xx
+/apps/mobile/src/adapters/lock-guard.ts                                    @skyf0xx
+/apps/mobile/src/adapters/app-away.ts                                      @skyf0xx
+/packages/runtime/src/storage-update.ts                                    @skyf0xx
+/packages/runtime/src/storage-keys.ts                                      @skyf0xx
+/packages/core/src/models/serialize.ts                                     @skyf0xx
+/packages/core/src/models/grant.ts                                         @skyf0xx
+/packages/core/src/models/permission.ts                                    @skyf0xx
 
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
@@ -104,6 +125,19 @@
 /apps/extension/src/adapters/windows.ts                                @skyf0xx
 /packages/core/src/recipients/assess.ts                                @skyf0xx
 /packages/runtime/src/handlers/reads.ts                                @skyf0xx
+/packages/core/src/models/approval.ts                                      @skyf0xx
+/packages/app/src/screens/main-screen/src/formatWinston.ts                 @skyf0xx
+/packages/ui/src/format/truncate-address.ts                                @skyf0xx
+/packages/ui/src/components/wallet/AddressDisplay.tsx                      @skyf0xx
+/packages/ui/src/components/wallet/RecipientCard.tsx                       @skyf0xx
+/packages/ui/src/components/wallet/RecipientWarning.tsx                    @skyf0xx
+/packages/ui/src/components/wallet/MemorableAddress.tsx                    @skyf0xx
+/packages/core/src/recipients/memorable-address.ts                         @skyf0xx
+/packages/core/src/pricing/impersonation.ts                                @skyf0xx
+/packages/core/src/models/tag.ts                                           @skyf0xx
+/packages/app/src/address-identity.tsx                                     @skyf0xx
+/packages/app/src/account-avatar.ts                                        @skyf0xx
+/packages/ui/src/components/wallet/AccountAvatar.tsx                       @skyf0xx
 
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
@@ -155,3 +189,9 @@
 /scripts/well-known.mjs                                            @skyf0xx
 /scripts/release-all.mjs                                           @skyf0xx
 /scripts/pack-release.sh                                            @skyf0xx
+/packages/core/src/points/device-key-store.ts                              @skyf0xx
+/security/surface-exempt.txt                                               @skyf0xx
+/.dependency-cruiser.cjs                                                   @skyf0xx
+/scripts/surface-check.mjs                                                 @skyf0xx
+/apps/extension/build-plugins.ts                                           @skyf0xx
+/scripts/check-bundles.mjs                                                 @skyf0xx

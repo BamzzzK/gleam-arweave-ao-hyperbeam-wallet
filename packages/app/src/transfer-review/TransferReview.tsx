@@ -196,7 +196,7 @@ function Glyph({ transfer, context, size }: { transfer: TransferLine; context: T
       label={glyphLabel(transfer)}
       tone={glyphLabel(transfer) === "?" ? 4 : 1}
       logoUrl={logoFor(transfer, context)}
-      className={size === "hero" ? "h-11 w-11 rounded-full text-[13px]" : "h-8 w-8 rounded-full text-[11px]"}
+      className={size === "hero" ? "h-11 w-11 rounded-full text-label" : "h-8 w-8 rounded-full text-caption"}
     />
   );
 }
@@ -221,7 +221,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
       <Glyph transfer={transfer} context={context} size="hero" />
       {isUnknownScale(transfer) ? (
         <div className="flex max-w-full flex-col items-center gap-1">
-          <span dir="ltr" className="font-mono text-[28px] font-medium leading-tight tracking-[-0.02em] tabular-nums text-foreground [overflow-wrap:anywhere]">
+          <span dir="ltr" className="font-mono text-display-sm font-medium leading-tight tracking-[-0.02em] tabular-nums text-foreground [overflow-wrap:anywhere]">
             {amountText(transfer)}
           </span>
           <span className="text-body text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
@@ -229,7 +229,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
       ) : (
         <div className="flex max-w-full flex-col items-center gap-1">
           <div className="flex max-w-full flex-wrap items-baseline justify-center gap-x-2">
-            <span className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground [overflow-wrap:anywhere]">
+            <span className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground [overflow-wrap:anywhere]">
               {amountText(transfer)}
             </span>
             <span className="text-h3 font-semibold text-muted"><UntrustedText text={unitText(transfer, t)} /></span>
@@ -247,7 +247,7 @@ function BatchHero({ request, context }: { request: TransferRequest; context: Tr
   if (total === undefined) return <div className="pt-6" />;
   return (
     <div className={`flex flex-col items-center gap-1 pb-7 pt-8 text-center ${GUTTER}`}>
-      <span className="text-[40px] font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">{total}</span>
+      <span className="text-display-lg font-semibold leading-[1.1] tracking-[-0.03em] tabular-nums text-foreground">{total}</span>
       <span className="text-body text-muted">{t("transferReview.totalValue")}</span>
     </div>
   );

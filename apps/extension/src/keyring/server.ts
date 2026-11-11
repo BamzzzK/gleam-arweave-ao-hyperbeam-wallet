@@ -1,9 +1,7 @@
-import {
-  base64ToBytes,
-  bytesToBase64,
-  type MessageHashAlgorithm,
-  type SessionKeyStorePort,
-} from "@gleam/core";
+// Deep paths, not the `@gleam/core` barrel: the barrel's closure carries
+// arweave-js, pricing and GraphQL, none of which belongs next to the keys.
+import type { MessageHashAlgorithm, SessionKeyStorePort } from "@gleam/core";
+import { base64ToBytes, bytesToBase64 } from "@gleam/core/src/vault/base64.ts";
 import { KeyringLockedError, zeroize } from "@gleam/core/signer";
 import {
   KEYRING_PORT_NAME,

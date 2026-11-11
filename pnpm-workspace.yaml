@@ -20,6 +20,9 @@ overrides:
   "@keystonehq/bc-ur-registry-arweave>uuid": ^11.1.1
   xcode>uuid: ^11.1.1
   vite: ^8.3.3
+  # typed-rest-client pins qs 6.15.1 (GHSA-4mjr-xmp4-gh2g and three more).
+  # It reaches us only through Stryker's unused dashboard reporter.
+  typed-rest-client>qs: ^6.16.1
   # Exact: recovery-phrase import derives RSA keys with forge's prime search
   # (core/keys/mnemonic-jwk.ts). Bump only with its reference vectors passing.
   node-forge: 1.4.3

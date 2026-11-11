@@ -149,13 +149,12 @@ export default defineContentScript({
       }
     });
 
-    // The background → content-script half of `ProtocolMap.providerEvent`
-    // (`background/index.ts`'s broadcast helper): background only ever
-    // targets this exact tab (via `sendMessage(..., tabId)`), so receiving
-    // this message at all already means this tab's origin held an active
-    // Grant at send time — no further access check belongs here, relaying
-    // straight into `postProviderEvent` is correct.
+    // The background → content-script half of `ProtocolMap.providerEvent`.
+    // The background targets each tab whose origin held an active Grant
+    // when it queried the tabs, but a tab can navigate between that query
+    // and the send, so an event for another origin is dropped here.
     messenger.onMessage("providerEvent", (message) => {
+      if (message.data.origin !== location.origin) return;
       postProviderEvent(message.data.event, message.data.data);
     });
     messenger.onMessage("siteWalletMode", (message) => {

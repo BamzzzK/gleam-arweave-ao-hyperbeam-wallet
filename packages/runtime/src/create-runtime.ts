@@ -47,6 +47,7 @@ import { ReviewPromptHandler } from "./handlers/review-prompt";
 import { ScansHandler } from "./handlers/scans";
 import { SiteWalletHandler } from "./handlers/site-wallet";
 import { SecurityPhraseHandler } from "./handlers/security-phrase";
+import { updateStored } from "./storage-update";
 import { PointsHandler, registerPointsHeartbeatAlarm } from "./handlers/points";
 import { createKeySession } from "./handlers/key-session";
 import {
@@ -71,6 +72,7 @@ import { registerPeerDiscoveryAlarm, saveNetworkSettings } from "./peers";
 import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { NETWORK_SETTINGS_KEY } from "./storage-keys";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -155,10 +157,22 @@ interface GrantedCall {
   activeWalletId(): string;
 }
 
+/**
+ * How a provider handler opens an approval window. Only a method whose
+ * `PAGE_METHODS` entry says `approval: true` gets it, so the table's flag
+ * is what decides whether a page call can put a window in front of the
+ * user (`approval.requestApproval` itself is never called from a handler
+ * here; `create-runtime.dispatch.test.ts` checks the source).
+ */
+interface ApprovalCall {
+  requestApproval: ApprovalHandler["requestApproval"];
+}
+
 type ProviderHandlers = {
   [M in ProviderMethod]: (
     params: PageParams<M>,
-    call: (typeof PAGE_METHODS)[M]["grant"] extends true ? GrantedCall : { origin: string },
+    call: ((typeof PAGE_METHODS)[M]["grant"] extends true ? GrantedCall : { origin: string }) &
+      ((typeof PAGE_METHODS)[M]["approval"] extends true ? ApprovalCall : object),
   ) => Promise<unknown>;
 };
 
@@ -187,7 +201,6 @@ type MessageHandlers = {
     : (data: ProtocolData<K>) => ProtocolResult<K>;
 };
 
-const NETWORK_SETTINGS_KEY = "local:networkSettings";
 
 /**
  * Builds every handler over `platform` and returns the dispatcher in front
@@ -310,7 +323,9 @@ export function createRuntime(platform: Platform): Runtime {
 
   /**
    * Sends a `providerEvent` push to every tab currently showing `origin` —
-   * never a broadcast to every open tab. Each send targets one `tabId`; a
+   * never a broadcast to every open tab. The push names `origin`, and the
+   * receiving page drops it if it has navigated elsewhere since the tab
+   * query. Each send targets one `tabId`; a
    * tab with no content script listening (e.g. mid-navigation) simply
    * rejects that one send, which is swallowed here rather than failing the
    * caller — a missed push is not itself an error the connect/disconnect/
@@ -328,7 +343,7 @@ export function createRuntime(platform: Platform): Runtime {
     const tabIds = await findTabsForOrigin(origin);
     await Promise.all(
       tabIds.map((tabId) =>
-        tabs.send(tabId, "providerEvent", { event, data }).catch(() => undefined),
+        tabs.send(tabId, "providerEvent", { origin, event, data }).catch(() => undefined),
       ),
     );
   }
@@ -467,7 +482,7 @@ export function createRuntime(platform: Platform): Runtime {
    * address to an origin without a grant.
    */
   const PROVIDER_HANDLERS: ProviderHandlers = {
-    async connect({ permissions: wanted, appInfo }, { origin }) {
+    async connect({ permissions: wanted, appInfo }, { origin, requestApproval }) {
       const state = await lifecycle.getState();
       const active = state.wallets.find((candidate) => candidate.id === state.activeWalletId);
       if (active && isWatchWalletMethod(active.method)) throw new Error(WATCH_ONLY_CONNECT_REFUSAL);
@@ -488,7 +503,7 @@ export function createRuntime(platform: Platform): Runtime {
       // With no wallet yet, the approval window runs onboarding before it
       // shows the request, and the grant goes to the wallet created there.
       // A locked wallet is unlocked in that window the same way.
-      const result = await approval.requestApproval({
+      const result = await requestApproval({
         kind: "connect",
         origin,
         walletId: state.activeWalletId,
@@ -545,14 +560,14 @@ export function createRuntime(platform: Platform): Runtime {
     signDataItem: ({ dataItem }, call) => requestDataItemApproval("signDataItem", [dataItem], call),
     batchSignDataItem: ({ dataItems }, call) => requestDataItemApproval("batchSignDataItem", dataItems, call),
 
-    async encrypt({ data, options }, { origin, activeWalletId }) {
-      return approval.requestApproval({ kind: "encrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
+    async encrypt({ data, options }, { origin, activeWalletId, requestApproval }) {
+      return requestApproval({ kind: "encrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
     },
-    async decrypt({ data, options }, { origin, activeWalletId }) {
-      return approval.requestApproval({ kind: "decrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
+    async decrypt({ data, options }, { origin, activeWalletId, requestApproval }) {
+      return requestApproval({ kind: "decrypt", origin, walletId: activeWalletId(), payload: data, encryptAlgorithm: options });
     },
 
-    async transferAoTokens({ token, recipient, amount }, { origin, wallet, activeWalletId }) {
+    async transferAoTokens({ token, recipient, amount }, { origin, wallet, activeWalletId, requestApproval }) {
       if (!wallet) throw new Error(userErrorMessage("noActiveWalletSign"));
 
       // Best-effort: the same denomination/ticker read the token list uses
@@ -568,7 +583,7 @@ export function createRuntime(platform: Platform): Runtime {
         quoteTokenTransferFee(token),
       ]);
 
-      return approval.requestApproval({
+      return requestApproval({
         kind: "transferAoTokens",
         origin,
         walletId: activeWalletId(),
@@ -583,7 +598,7 @@ export function createRuntime(platform: Platform): Runtime {
       });
     },
 
-    async signMessage({ data, options: hashAlgorithm }, { origin, wallet, activeWalletId }) {
+    async signMessage({ data, options: hashAlgorithm }, { origin, wallet, activeWalletId, requestApproval }) {
       if (
         wallet &&
         isHardwareWalletMethod(wallet.method) &&
@@ -591,7 +606,7 @@ export function createRuntime(platform: Platform): Runtime {
       ) {
         throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
       }
-      return approval.requestApproval({ kind: "signMessage", origin, walletId: activeWalletId(), payload: data, hashAlgorithm });
+      return requestApproval({ kind: "signMessage", origin, walletId: activeWalletId(), payload: data, hashAlgorithm });
     },
 
     async verifyMessage({ data, signature, publicKey: givenKey, options: hashAlgorithm }, { wallet }) {
@@ -618,14 +633,14 @@ export function createRuntime(platform: Platform): Runtime {
       return reads.isTokenAdded({ address: wallet.address, processId });
     },
 
-    async addToken({ id: processId }, { origin, wallet }) {
+    async addToken({ id: processId }, { origin, wallet, requestApproval }) {
       if (!wallet) throw new Error(userErrorMessage("noActiveWalletAddToken"));
       // Already listed: nothing to ask the user.
       if (await reads.isTokenAdded({ address: wallet.address, processId })) return undefined;
       // Resolving first proves the id answers as a token, and gives the
       // prompt a ticker and name to show instead of only the id.
       const token = await reads.previewWatchedToken({ address: wallet.address, processId });
-      return approval.requestApproval({
+      return requestApproval({
         kind: "addToken",
         origin,
         walletId: wallet.id,
@@ -641,7 +656,7 @@ export function createRuntime(platform: Platform): Runtime {
   async function requestTransactionApproval(
     kind: "sign" | "dispatch",
     transaction: ProviderTransaction,
-    { origin, wallet, activeWalletId }: GrantedCall,
+    { origin, wallet, activeWalletId, requestApproval }: GrantedCall & ApprovalCall,
   ): Promise<unknown> {
     const { gatewayUrl } = await reads.getNetworkSettings();
     // A token transfer to an arweave-scheduler process moves no AR, so it
@@ -669,7 +684,7 @@ export function createRuntime(platform: Platform): Runtime {
     // than the user approved. A bundled dispatch carries no reward at all.
     const fee =
       transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
-    return approval.requestApproval({
+    return requestApproval({
       kind,
       origin,
       walletId: activeWalletId(),
@@ -702,7 +717,7 @@ export function createRuntime(platform: Platform): Runtime {
   async function requestDataItemApproval(
     kind: "signDataItem" | "batchSignDataItem",
     items: ProviderDataItem[],
-    { origin, wallet, activeWalletId }: GrantedCall,
+    { origin, wallet, activeWalletId, requestApproval }: GrantedCall & ApprovalCall,
   ): Promise<unknown> {
     const [first] = items;
     const signed = kind === "signDataItem" ? items.slice(0, 1) : items;
@@ -714,7 +729,7 @@ export function createRuntime(platform: Platform): Runtime {
         return transfer?.kind === "transfer" && wallet ? resolveTokenDenominationAndTicker(wallet.address, transfer.processId) : null;
       }),
     );
-    return approval.requestApproval({
+    return requestApproval({
       kind,
       origin,
       walletId: activeWalletId(),
@@ -754,9 +769,15 @@ export function createRuntime(platform: Platform): Runtime {
 
   async function runProviderMethod(origin: string, method: ProviderMethod, rawParams: unknown): Promise<unknown> {
     const spec: PageMethodSpec = PAGE_METHODS[method];
-    const handle = PROVIDER_HANDLERS[method] as (params: unknown, call: GrantedCall | { origin: string }) => Promise<unknown>;
+    const handle = PROVIDER_HANDLERS[method] as (
+      params: unknown,
+      call: (GrantedCall | { origin: string }) & Partial<ApprovalCall>,
+    ) => Promise<unknown>;
     const decoded = decodeProviderParams(rawParams);
-    if (!spec.grant) return handle(parseParams(spec.params, decoded), { origin });
+    const approvals: Partial<ApprovalCall> = spec.approval
+      ? { requestApproval: (request) => approval.requestApproval(request) }
+      : {};
+    if (!spec.grant) return handle(parseParams(spec.params, decoded), { origin, ...approvals });
 
     const grant = await approval.findActiveGrant(origin);
     if (!grant) {
@@ -779,6 +800,7 @@ export function createRuntime(platform: Platform): Runtime {
 
     const params = parseParams(spec.params, decoded);
     return handle(params, {
+      ...approvals,
       origin,
       grant,
       state,
@@ -1040,7 +1062,10 @@ export function createRuntime(platform: Platform): Runtime {
 
       const gatewayUrl = await resolveInitialGatewayUrl();
       const settings = await reads.getNetworkSettings();
-      await storage.set(NETWORK_SETTINGS_KEY, { ...settings, gatewayUrl });
+      // The probe takes a while; settings the user saved meanwhile win.
+      await updateStored(storage, NETWORK_SETTINGS_KEY, (current) =>
+        current === null ? { ...settings, gatewayUrl } : undefined,
+      );
     } catch {
       // Never block startup over a first-run gateway probe.
     }

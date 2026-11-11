@@ -29,7 +29,7 @@ export function DataItemCard({ index, item }: { index: number; item: OtherItem }
       {item.decodedData !== null && item.decodedData !== "" ? (
         <div className="flex flex-col gap-0.5">
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.decodedData")}</span>
-          <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-[11px] leading-relaxed text-foreground">
+          <div className="max-h-20 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-mist p-2 font-mono text-caption leading-relaxed text-foreground">
             <UntrustedText text={item.decodedData} />
           </div>
         </div>
@@ -40,7 +40,7 @@ export function DataItemCard({ index, item }: { index: number; item: OtherItem }
           <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.tags")}</span>
           <div className="flex flex-wrap gap-1.5">
             {item.tags.map((tag, tagIndex) => (
-              <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-[10px] text-foreground">
+              <span key={tagIndex} className="rounded-md bg-mist px-2 py-1 font-mono text-micro text-foreground">
                 <span className="text-muted"><UntrustedText text={tag.name} />:</span> <UntrustedText text={tag.value} />
               </span>
             ))}
@@ -50,7 +50,7 @@ export function DataItemCard({ index, item }: { index: number; item: OtherItem }
 
       <div className="flex flex-col gap-0.5">
         <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.payloadHash")}</span>
-        <span className="break-all font-mono text-[11px] text-foreground">{item.payloadHash}</span>
+        <span className="break-all font-mono text-caption text-foreground">{item.payloadHash}</span>
       </div>
     </div>
   );

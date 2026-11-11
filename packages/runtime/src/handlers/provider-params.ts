@@ -53,7 +53,11 @@ export function readBytes(
     return new TextEncoder().encode(value);
   }
   if (typeof value === "string" && strings === "base64url") {
-    return base64UrlToBytes(value);
+    try {
+      return base64UrlToBytes(value);
+    } catch {
+      throw new Error(`"${name}" is not valid base64url.`);
+    }
   }
   throw new Error(`"${name}" must be an ArrayBuffer or Uint8Array.`);
 }

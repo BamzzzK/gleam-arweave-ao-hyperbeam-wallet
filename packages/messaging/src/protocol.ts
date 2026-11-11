@@ -391,12 +391,12 @@ export interface ProtocolMap {
    * background sends this directly to a specific tab (via
    * `@webext-core/messaging`'s `sendMessage(type, data, tabId)`, never
    * broadcast to every tab), and `content/index.ts` relays `event`/`data`
-   * straight into `postProviderEvent`, which the page-side provider's
+   * into `postProviderEvent`, which the page-side provider's
    * already-idle `handleEvent()` picks up. Access control (only a tab
    * whose origin holds an active `Grant` is ever targeted) is enforced by
-   * the caller choosing which tabIds to send to, not by this method
-   * itself — see `provider-bridge`'s broadcast helper in
-   * `background/index.ts`.
+   * the caller choosing which tabIds to send to. `origin` is the origin
+   * the event is for: a tab can navigate between the runtime's tab query
+   * and the send, so the receiving side drops an event for another origin.
    */
-  providerEvent(req: { event: string; data: unknown }): void;
+  providerEvent(req: { origin: string; event: string; data: unknown }): void;
 }

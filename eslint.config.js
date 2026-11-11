@@ -12,6 +12,10 @@ import reactHooks from "eslint-plugin-react-hooks";
  * `packages/core` never imports an adapter, and popup-side UI code never
  * imports background-adapter code directly — every cross-context call
  * crosses `packages/messaging`.
+ *
+ * The fences below match specifier strings and give editor feedback.
+ * `.dependency-cruiser.cjs` (`pnpm deps:check`) checks the same fences on
+ * resolved files, which also catches relative climbs and re-exports.
  */
 // Any path into `packages/core/src/signer`: the `@gleam/core/signer`
 // subpath, any path through `src/signer`, or `../signer` anywhere in a
@@ -51,7 +55,100 @@ const noDynamicImport = {
     };
   },
 };
-const gleam = { rules: { "no-dynamic-import": noDynamicImport } };
+// A `storage.set(K, …)` in a function that also reads `storage.get(K)` is
+// a read-modify-write: another write to K between the two is lost. Such a
+// write goes through `updateStored` (`runtime/src/storage-update.ts`),
+// which runs one update per key at a time. Keys match by source text.
+const noStorageReadModifyWrite = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    const source = context.sourceCode;
+    const gets = [];
+    const sets = [];
+    const isStorage = (node) => {
+      const name = node.type === "MemberExpression" ? node.property.name : node.type === "Identifier" ? node.name : null;
+      return typeof name === "string" && /storage$/i.test(name);
+    };
+    return {
+      CallExpression(node) {
+        const callee = node.callee;
+        if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return;
+        if (!isStorage(callee.object) || node.arguments.length === 0) return;
+        const key = source.getText(node.arguments[0]);
+        if (callee.property.name === "get") gets.push({ key, node });
+        else if (callee.property.name === "set") sets.push({ key, node });
+      },
+      "Program:exit"() {
+        for (const set of sets) {
+          const scope = source.getAncestors(set.node).findLast((ancestor) => /Function/.test(ancestor.type));
+          if (!scope) continue;
+          const read = gets.some(
+            (get) => get.key === set.key && get.node.range[0] >= scope.range[0] && get.node.range[1] <= scope.range[1],
+          );
+          if (read) {
+            context.report({
+              node: set.node,
+              message: `${set.key} is written from a read of itself. Use updateStored (runtime/src/storage-update.ts), which runs one update per key at a time.`,
+            });
+          }
+        }
+      },
+    };
+  },
+};
+// `.dependency-cruiser.cjs` checks the fences on resolved files, and a
+// computed `import()` path can't be resolved, so it would pass unseen.
+const noComputedImport = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    return {
+      ImportExpression(node) {
+        const src = node.source;
+        const literal = src.type === "Literal" || (src.type === "TemplateLiteral" && src.expressions.length === 0);
+        if (!literal) {
+          context.report({ node, message: "import() takes a literal path, so the import fences can check it." });
+        }
+      },
+    };
+  },
+};
+// DESIGN.md's type scale is a set of tokens; a raw `text-[13px]` in a class
+// string is a size outside it.
+const RAW_TEXT_SIZE = /(^|[\s:"'`])text-\[\d+(\.\d+)?(px|rem|em)\]/;
+const typeScale = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    const check = (node, text) => {
+      if (RAW_TEXT_SIZE.test(text)) {
+        context.report({ node, message: "Use a DESIGN.md type-scale token (text-caption … text-display-lg, text-micro), not a raw size." });
+      }
+    };
+    return {
+      Literal(node) {
+        if (typeof node.value === "string") check(node, ` ${node.value}`);
+      },
+      TemplateElement(node) {
+        check(node, ` ${node.value.cooked ?? ""}`);
+      },
+    };
+  },
+};
+const gleam = {
+  rules: {
+    "type-scale": typeScale,
+    "no-dynamic-import": noDynamicImport,
+    "no-computed-import": noComputedImport,
+    "no-storage-read-modify-write": noStorageReadModifyWrite,
+  },
+};
+// `no-restricted-globals` sees a bare `chrome`, not `globalThis.chrome`.
+const NO_GLOBAL_OBJECT_EXTENSION_API = ["globalThis", "self", "window"].flatMap((object) =>
+  ["chrome", "browser"].map((property) => ({
+    object,
+    property,
+    message: "Shell-free packages never touch extension globals. Reach the platform through a port.",
+  })),
+);
 const signerFence = (regex) => ({
   "no-restricted-imports": ["error", { patterns: [{ regex, message: SIGNER_IMPORT_MESSAGE }] }],
   "gleam/no-dynamic-import": ["error", { regex, message: SIGNER_IMPORT_MESSAGE }],
@@ -68,10 +165,18 @@ const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
 }));
+// The one-shot keyfile signers build and sign in one step, with no point
+// between to check the built bytes against the approved request.
+const ONE_SHOT_SIGNING = {
+  regex: "^@gleam/core(/src/vault/signing(\\.ts)?)?$",
+  importNames: ["signTransaction", "dispatchTransaction", "signDataItem", "batchSignDataItem"],
+  message:
+    "Sign a request through prepare → assertPreparedMatches → signPayloadWithSigner → finish (handlers/approval.ts), so the built bytes are checked first.",
+};
 const runtimeFence = (...extraPatterns) => ({
   "no-restricted-imports": [
     "error",
-    { patterns: [...extraPatterns, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
+    { patterns: [...extraPatterns, ONE_SHOT_SIGNING, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
   ],
   "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
 });
@@ -159,6 +264,8 @@ export default tseslint.config(
       "**/.wxt/**",
       "**/node_modules/**",
       "**/.claude/worktrees/**",
+      ".stryker-tmp/**",
+      "reports/**",
       // Generated native projects; `cap sync` copies the built bundle into them.
       "apps/mobile/ios/**",
       "apps/mobile/android/**",
@@ -275,6 +382,40 @@ export default tseslint.config(
         { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE },
       ],
     },
+  },
+  {
+    files: ["packages/**/*.{ts,tsx}", "apps/extension/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: { "gleam/no-computed-import": "error" },
+  },
+  {
+    files: ["packages/{app,ui,keystone}/**/*.tsx", "apps/{extension,mobile}/**/*.tsx"],
+    ignores: ["**/*.test.tsx"],
+    rules: { "gleam/type-scale": "error" },
+  },
+  {
+    // The same fence as `no-restricted-globals` below, through a global object.
+    files: ["packages/**/*.{ts,tsx}"],
+    rules: { "no-restricted-properties": ["error", ...NO_GLOBAL_OBJECT_EXTENSION_API] },
+  },
+  {
+    // core, messaging and ui run in every shell and context, like runtime.
+    files: ["packages/{core,messaging,ui}/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        ...["chrome", "browser"].map((name) => ({
+          name,
+          message: "Shell-free packages never touch extension globals. Reach the platform through a port.",
+        })),
+      ],
+    },
+  },
+  {
+    files: ["packages/runtime/src/**/*.ts"],
+    // The one place a key is read and written, one update per key at a time.
+    ignores: ["**/*.test.ts", "packages/runtime/src/storage-update.ts"],
+    rules: { "gleam/no-storage-read-modify-write": "error" },
   },
   {
     // The app fence. A later block replaces a rule's options wholesale, so

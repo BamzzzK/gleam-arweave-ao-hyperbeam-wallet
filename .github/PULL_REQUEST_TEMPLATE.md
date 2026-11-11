@@ -8,11 +8,9 @@
 
 ## Checklist
 
-- [ ] `pnpm vitest run` passes
-- [ ] `pnpm tsc` passes for all six projects (core, messaging, ui, extension,
-      points-api, scripts/scan)
-- [ ] `pnpm eslint --max-warnings=0 .` passes
-- [ ] `pnpm wxt:build` succeeds
+<!-- CI runs the checks CLAUDE.md "Build and check" lists. -->
+
+- [ ] CI is green
 - [ ] If this touches signing, network, or extension wiring: checked manually
       in Chrome against `.output/chrome-mv3`
-- [ ] Corresponding item removed from `todo.md`, if applicable
+- [ ] Touches `security/surface.txt` paths (the next release needs a fresh audit)

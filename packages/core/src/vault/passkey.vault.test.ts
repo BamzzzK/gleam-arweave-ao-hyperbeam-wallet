@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { unwrapWithPasskey, wrapWithPasskey } from "./passkey";
 
 const CREDENTIAL_ID = "cred-1";
@@ -30,5 +30,19 @@ describe("passkey wrapping", () => {
 
   it("rejects a PRF output that isn't 32 bytes", async () => {
     await expect(wrapWithPasskey("secret", new Uint8Array(16), CREDENTIAL_ID)).rejects.toThrow(/unexpected/);
+  });
+});
+
+describe("passkey wrapping key", () => {
+  it("is a non-extractable AES-256-GCM key", async () => {
+    const deriveKey = vi.spyOn(crypto.subtle, "deriveKey");
+    try {
+      await wrapWithPasskey("secret", prf(7), CREDENTIAL_ID);
+      const key = (await deriveKey.mock.results[0]!.value) as CryptoKey;
+      expect(key.extractable).toBe(false);
+      expect(key.algorithm).toMatchObject({ name: "AES-GCM", length: 256 });
+    } finally {
+      deriveKey.mockRestore();
+    }
   });
 });

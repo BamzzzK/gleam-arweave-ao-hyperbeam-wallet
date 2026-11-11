@@ -17,23 +17,27 @@ Visual design rules are in `DESIGN.md`. The community scans design is in
 
 TypeScript, pnpm workspaces, WXT (MV3), React 19, Tailwind 4, shadcn/Radix
 primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
-(jsdom), `arweave-js`, `@dha-team/arbundles` (web build).
+(jsdom), `arweave-js`, `zod`. `@dha-team/arbundles` is a dev dependency:
+tests check Gleam's ANS-104 bytes against it.
 
 ## Layout
 
 - `packages/core`: pure domain logic. `signer/` (vault envelope, key
   import and signing, keyring; reached only through `@gleam/core/signer`
   and allowed no npm imports but `hash-wasm`), `vault/` and `keys/`
-  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL, bundler), `ao/` (AO
-  balance, transfer, result), `activity/`, `pricing/`, `policy/`, and
-  `models/`. `ports/` holds the interfaces for storage, runtime and
-  windows.
+  (signing pipelines, JWK), `arweave/` (AR balance, transfer, GraphQL,
+  bundler), `ao/` (AO balance, transfer, result, peers), `hardware/`
+  (Ledger APDUs), `points/`, `scan/`, `recipients/`, `activity/`,
+  `pricing/`, `policy/` and `models/`. `ports/` holds the interfaces for
+  storage, session keys, the approval presenter, timer, badge, downloads,
+  device key and the runtime client.
 - `packages/messaging`: the typed `ProtocolMap` wire contracts between
   popup, background, content script and page.
-- `packages/runtime`: `createRuntime(platform)`, the dispatcher
-  (`dispatch/`) and every handler (`handlers/`) such as `wallet-lifecycle`,
-  `reads`, `transfer`, `approval` and `key-session`. It reaches
-  a platform only through `Platform` (`platform.ts`).
+- `packages/runtime`: `createRuntime(platform)` and its dispatcher
+  (`create-runtime.ts`), the method table (`dispatch/methods.ts`) and
+  every handler (`handlers/`) such as `wallet-lifecycle`, `reads`,
+  `transfer`, `approval` and `key-session`. It reaches a platform only
+  through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
 - `packages/app`: every screen (`src/screens/<screen>/`), the router
   (`src/App.tsx`) and the approval UI (`src/approval/`). It reaches a host
@@ -51,8 +55,8 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   `app` may not import `@keystonehq` or `@ngraveio`.
 - `apps/extension`: the WXT shell. `entrypoints/` holds `background`,
   `content`, `provider` (builds `provider.js` from `@gleam/provider`),
-  `approval`, `passkey`, `sidepanel`, `popup` and `connect`; the popup,
-  side panel and approval entrypoints only mount `@gleam/app`.
+  `keyring`, `approval`, `passkey`, `sidepanel`, `popup` and `connect`;
+  the popup, side panel and approval entrypoints only mount `@gleam/app`.
   `src/adapters/` implements the core and runtime ports and `AppPlatform`
   (`adapters/app-platform.ts`) on `chrome.*`; `src/hardware/` holds the
   Ledger transport and panel and opens the connect page in a tab.
@@ -68,8 +72,9 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
 
 ## Patterns
 
-- **Hexagonal.** `core` never imports `chrome.*`, WXT or an adapter. Pass
-  network access in (`fetchImpl`, URLs) and storage through `StoragePort`.
+- **Hexagonal.** `core` never imports `chrome.*`, WXT, Capacitor, another
+  Gleam package or an adapter. Pass network access in (`fetchImpl`, URLs)
+  and storage through `StoragePort`.
   `runtime` is held to the same rule (no `chrome`/`browser`, `wxt/*`,
   `@webext-core/*`, `@capacitor/*` or shell imports; ESLint enforces it).
   The background entrypoint builds a `Platform` from the adapters and
@@ -80,11 +85,30 @@ primitives, `@tanstack/react-query`, `@webext-core/messaging`, Vitest
   same fence and also may not import `@gleam/core`, `runtime`, `app`,
   `ui`, or anything from `@gleam/messaging` but `page-protocol.ts`: it
   runs in the page, and a transport never puts an origin in a request.
+  dependency-cruiser checks these fences on resolved files
+  (`.dependency-cruiser.cjs`, `pnpm deps:check`), so a relative path or a
+  re-export counts the same as a package import.
 - **UI never imports background code.** Every cross-context call goes
   through `packages/messaging`. `packages/runtime/src/dispatch/methods.ts` is the one table
   of each method's caller tier, whether it can open an approval, and the
   zod schema its page-supplied params are parsed with; the background
-  dispatcher enforces it before any handler runs.
+  dispatcher enforces all three before any handler runs. Only a method
+  marked `approval: true` gets `requestApproval` in its handler's call.
+- **Signing** decodes the exact bytes it is about to sign and checks them
+  against the approved request (`assertPreparedMatches`,
+  `handlers/approval.ts`) before any signer runs, for keyfile and
+  hardware wallets alike.
+- **Storage writes.** A value computed from the stored one is written
+  with `updateStored(storage, key, next)` (`runtime/src/storage-update.ts`),
+  which runs one update per key at a time; `next` never awaits. A key
+  more than one module uses is declared once, in
+  `runtime/src/storage-keys.ts`.
+- **Security surface.** `security/surface.txt` lists, by tier, the files
+  that key, signing and page-boundary code depends on.
+  `security/surface-closure.security.test.ts` fails on a file the entry
+  points import that is neither listed nor exempted, with a reason, in
+  `security/surface-exempt.txt`. The keyring page loads only key code,
+  which `pnpm check:bundles` checks in the build.
 - **Signing keys** are decrypted on unlock and imported, by wallet id,
   as non-extractable WebCrypto keys into the keyring offscreen document
   (`entrypoints/keyring/`), which holds them in memory only.
@@ -143,14 +167,22 @@ pnpm install
 pnpm dev                                   # WXT dev build with live reload
 pnpm wxt:build                             # production build → apps/extension/.output/chrome-mv3
 pnpm mobile:build                          # app web bundle → apps/mobile/dist (mobile:ios / mobile:android sync and open the native project)
+pnpm check:bundles                         # after wxt:build: what the keyring page and provider.js contain, and their size
+pnpm test:smoke                            # after wxt:build: loads the built extension in Chromium
 pnpm vitest run [path-fragment]            # tests
-pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan
+pnpm tsc -p packages/core --noEmit         # also: packages/messaging, packages/ui, packages/runtime, packages/app, packages/provider, packages/keystone, apps/extension, apps/mobile, apps/points-api, scripts/scan, tsconfig.scripts.json
 pnpm eslint --max-warnings=0 <files>
+pnpm deps:check                            # the import fences, on resolved files
 ```
 
-The pre-commit hook (lefthook) runs eslint on staged files and tsc on all
-eleven projects. A change is done when tests, tsc, eslint, `pnpm wxt:build`
-and `pnpm mobile:build` pass. If a change touches signing, network or
+The pre-commit hook (lefthook) runs eslint and gitleaks on staged files,
+`pnpm deps:check`, and tsc on all twelve projects; install gitleaks first
+(`brew install gitleaks`). A change is done when tests, tsc, eslint,
+`pnpm deps:check`, `pnpm wxt:build`, `pnpm check:bundles`,
+`pnpm mobile:build` and `pnpm test:smoke` pass. CI also runs zizmor,
+osv-scanner, web-ext lint and Semgrep, and a weekly mutation run
+(`stryker.config.mjs`) over `core/signer`, `core/vault` and
+`runtime/dispatch`. If a change touches signing, network or
 extension wiring, it also needs a manual check in Chrome (load
 `.output/chrome-mv3` unpacked).
 
@@ -158,8 +190,12 @@ extension wiring, it also needs a manual check in Chrome (load
 
 Make one Conventional Commit per change (`fix(ao): …`,
 `feat(activity): …`), group related commits on one branch, open one PR
-for the branch, and merge it once CI is green. `master` accepts only
-signed commits through a PR with passing CI, and admins get no bypass.
+for the branch, and merge it with a merge commit once CI is green
+(`gh pr merge <n> --merge`; the ruleset refuses squash and rebase
+merges). `master` accepts only signed commits through a PR with passing
+CI, and admins get no bypass. The Security surface check fails a PR
+that touches a `security/surface.txt` path until its description ticks
+the surface box; the next release then needs a fresh audit.
 This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`.
 

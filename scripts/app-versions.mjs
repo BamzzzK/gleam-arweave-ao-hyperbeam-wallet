@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Reads, writes and checks the version of the extension and both mobile
 // apps, which release from one tag.
 //

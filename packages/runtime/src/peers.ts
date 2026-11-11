@@ -1,10 +1,11 @@
 import { COMMUNITY_HYPERBEAM_PEER_URLS, type NetworkSettings, type StoragePort, type TimerPort } from "@gleam/core";
 import { discoverHyperBeamPeers, stripTrailingSlashes } from "@gleam/core/src/ao/peer-discovery.ts";
+import { updateStored } from "./storage-update";
+import { NETWORK_SETTINGS_KEY } from "./storage-keys";
 
 export const DISCOVERED_PEERS_KEY = "local:discoveredPeers";
 /** Community or discovered peers the user removed in Network & peers; merging skips them. */
 export const DISMISSED_PEERS_KEY = "local:dismissedPeers";
-const NETWORK_SETTINGS_KEY = "local:networkSettings";
 export const PEER_DISCOVERY_ALARM_NAME = "gleam-peer-discovery";
 
 const DISCOVERY_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -38,10 +39,13 @@ export async function readExtraPeerUrls(storage: StoragePort): Promise<string[]>
 }
 
 /** Community or discovered peers the user has removed. */
+function dismissedPeersOf(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((url): url is string => typeof url === "string") : [];
+}
+
 export async function readDismissedPeers(storage: StoragePort): Promise<string[]> {
   try {
-    const raw = await storage.get<unknown>(DISMISSED_PEERS_KEY);
-    return Array.isArray(raw) ? raw.filter((url): url is string => typeof url === "string") : [];
+    return dismissedPeersOf(await storage.get<unknown>(DISMISSED_PEERS_KEY));
   } catch {
     return [];
   }
@@ -61,8 +65,7 @@ export async function saveNetworkSettings(storage: StoragePort, next: NetworkSet
   const shown = [...(await readStoredPeerUrls(storage)), ...(await readExtraPeerUrls(storage))];
   const removed = [...new Set(shown)].filter((url) => !kept.has(url));
   if (removed.length > 0) {
-    const dismissed = await readDismissedPeers(storage);
-    await storage.set(DISMISSED_PEERS_KEY, [...new Set([...dismissed, ...removed])]);
+    await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...dismissedPeersOf(raw), ...removed])]);
   }
   await storage.set(NETWORK_SETTINGS_KEY, next);
 }

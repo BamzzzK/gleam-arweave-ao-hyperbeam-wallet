@@ -37,3 +37,8 @@ apps/mobile/fastlane/*.json
 apps/mobile/fastlane/*.jks
 apps/mobile/fastlane/*.keystore
 apps/mobile/.bundle/
+
+# Stryker (stryker.config.mjs)
+.stryker-tmp/
+reports/
+stryker-setup-*.js

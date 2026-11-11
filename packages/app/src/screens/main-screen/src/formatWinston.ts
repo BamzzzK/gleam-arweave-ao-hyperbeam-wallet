@@ -49,6 +49,24 @@ export function formatAtomicAsDisplay(atomic: string, denomination: number, maxF
   return trimmed.length > 0 ? `${whole.toString()}.${trimmed}` : whole.toString();
 }
 
+/** AR's decimal places: 1 AR = 10^12 Winston. */
+export const AR_DENOMINATION = 12;
+
+/**
+ * Parses a human-entered amount into an atomic-integer string in
+ * `denomination`'s smallest unit, the inverse of `formatAtomicAsDisplay`
+ * at full precision. `BigInt` throughout; digits past `denomination` are
+ * dropped, which `amountSchema` refuses first. `null` for anything that
+ * isn't digits with an optional fraction.
+ */
+export function parseDisplayToAtomic(amountDisplay: string, denomination: number): string | null {
+  if (!/^\d+(\.\d+)?$/.test(amountDisplay.trim())) return null;
+  const [wholePart, fractionPart = ""] = amountDisplay.trim().split(".");
+  const fraction = fractionPart.padEnd(denomination, "0").slice(0, denomination);
+  const atomic = BigInt(wholePart || "0") * 10n ** BigInt(denomination) + BigInt(fraction || "0");
+  return atomic.toString();
+}
+
 const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
 const COMPACT_SIGNIFICANT_DIGITS = 4;
 

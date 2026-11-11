@@ -131,7 +131,7 @@ export function FoundingGate({ runtime, initialUnlock, onUnlocked }: FoundingGat
       <BeamMark animated />
 
       <div className="mt-7 flex flex-col items-center gap-1.5 text-center">
-        <h1 className="text-[28px] font-bold leading-tight tracking-[-0.025em] text-foreground">{t("onboarding.gateEarlyTitle")}</h1>
+        <h1 className="text-display-sm font-bold leading-tight tracking-[-0.025em] text-foreground">{t("onboarding.gateEarlyTitle")}</h1>
         <p className="text-body text-muted">
           {t("onboarding.gateMembersEarning")}{" "}
           <EarningWord href={sitePageUrl("gleam", version)} />

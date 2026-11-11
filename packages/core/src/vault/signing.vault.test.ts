@@ -17,6 +17,7 @@ import {
   finishDataItems,
   applySignature,
   verifyDeviceSignature,
+  signPayloadWithSigner,
   type UnsignedPayload,
 } from "./signing";
 import { signRsaPss } from "../arweave/rsa-pss";
@@ -351,6 +352,38 @@ describe("vault/signing", () => {
    * the stored owner, have the device sign the deep hash, then finish.
    * The device is played by a key the pipeline never sees.
    */
+  describe("dispatch boundaries", () => {
+    const plan = (bytes: number) =>
+      prepareDispatch(
+        "https://arweave.net",
+        jwk.n,
+        { data: bytesToBase64(new Uint8Array(bytes).fill(3)), reward: "1", last_tx: "b".repeat(64) },
+        { viaBundler: true },
+      );
+
+    it("bundles only payloads over 100 KiB", async () => {
+      expect((await plan(100 * 1024)).kind).toBe("transaction");
+      expect((await plan(100 * 1024 + 1)).kind).toBe("dataItem");
+    });
+
+    it("plans an empty transaction when the dApp sends no data", async () => {
+      const unsigned = await prepareDispatch("https://arweave.net", jwk.n, { reward: "1", last_tx: "b".repeat(64) }, { viaBundler: true });
+      expect(unsigned).toMatchObject({ kind: "transaction", transaction: { data: "", data_size: "0", quantity: "0" } });
+    });
+
+    it.each([
+      [299, true],
+      [300, false],
+    ])("treats a gateway answer of HTTP %i as accepted: %s", async (status, accepted) => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status }));
+      const unsigned = await plan(10);
+      const signature = await signPayloadWithSigner(unsigned, signerFromJwk(jwk, ""));
+      const result = finishDispatch("https://arweave.net", "https://up.arweave.net", unsigned, signature, jwk.n);
+      if (accepted) await expect(result).resolves.toMatchObject({ type: "BASE" });
+      else await expect(result).rejects.toThrow(`HTTP ${status}`);
+    });
+  });
+
   describe("device signing pipeline", () => {
     async function deviceSign(unsigned: UnsignedPayload, key: JWKInterface) {
       if (unsigned.kind === "message") throw new Error("Not a deep-hash payload.");

@@ -55,7 +55,11 @@ export interface ContentScriptMethodSpec<S extends z.ZodType = z.ZodType> {
 
 export interface PageMethodSpec<S extends z.ZodType = z.ZodType> {
   tier: "page";
-  /** Can open an approval window, so it's refused from a plain-http origin. */
+  /**
+   * Can open an approval window. Only these methods' handlers get
+   * `requestApproval` (`create-runtime.ts` `ApprovalCall`), and the
+   * provider waits the approval timeout for them rather than the read one.
+   */
   approval: boolean;
   /** Needs an active grant. Only `connect` and `disconnect`, which manage the grant, don't. */
   grant: boolean;
@@ -150,11 +154,11 @@ const transferAmount = transferField.regex(
 /** Methods that only read the grant or the wallet take no params; extra keys are dropped. */
 const NO_PARAMS = z.object({});
 
-function page<S extends z.ZodType, const G extends boolean>(spec: {
-  approval: boolean;
+function page<S extends z.ZodType, const A extends boolean, const G extends boolean>(spec: {
+  approval: A;
   grant: G;
   params: S;
-}): PageMethodSpec<S> & { grant: G } {
+}): PageMethodSpec<S> & { approval: A; grant: G } {
   return { tier: "page", ...spec };
 }
 

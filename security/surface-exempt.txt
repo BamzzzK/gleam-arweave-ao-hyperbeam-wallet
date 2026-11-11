@@ -1,0 +1,122 @@
+# Files the key, signing and page-boundary entry points import that are
+# not on the security surface, each with the reason it stays off.
+# security/surface-closure.security.test.ts fails on a file in that
+# closure that is neither in surface.txt nor here.
+#
+# Format: <path> <reason>. A path ending in / covers the whole directory.
+
+packages/ui/src/primitives/ Layout and input primitives: they render what they are given and decide nothing.
+packages/ui/src/components/onboarding/ Onboarding visuals; the password and key steps are the tier 1 onboarding screens.
+packages/ui/src/components/security-phrase/ The security phrase picture; shown to the user, never trusted.
+apps/extension/src/adapters/badge.ts Badge and alarm adapters: no data crosses them.
+apps/extension/src/adapters/timer.ts Badge and alarm adapters: no data crosses them.
+apps/extension/src/site-pages.ts Opens Gleam site pages in a tab; takes no page input.
+apps/mobile/package.json Read for the app version only.
+apps/mobile/src/adapters/timer.ts Badge and alarm adapters: no data crosses them.
+packages/app/src/app-platform/context.tsx The AppPlatform port and its React context; the shells' implementations are listed.
+packages/app/src/app-platform/hardware.ts The AppPlatform port and its React context; the shells' implementations are listed.
+packages/app/src/app-platform/qr-scanner.ts The AppPlatform port and its React context; the shells' implementations are listed.
+packages/app/src/app-platform/types.ts The AppPlatform port and its React context; the shells' implementations are listed.
+packages/app/src/display-settings.ts Display preferences and share text.
+packages/app/src/points-share.ts Display preferences and share text.
+packages/app/src/screens/activity/src/AddressRow.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/queryKeys.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/useActivity.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/useArFee.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/useBalances.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/useContacts.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/activity/src/useOtherWallets.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/contacts/index.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/contacts/src/ContactsView.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/main-screen/src/useTokenPrices.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/onboarding/index.tsx Route entry; mounts onboarding/src, which is listed.
+packages/app/src/screens/points/src/JoinNote.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/formatPoints.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/useCopy.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/usePoints.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/SendView.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/send/src/TokenInfoPanel.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/useLookalikeOf.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/useSendQuotes.ts A screen outside the key, signing and approval paths.
+packages/app/src/security-phrase-icon.ts Display preferences and share text.
+packages/app/src/token-visibility.ts Display preferences and share text.
+packages/core/src/activity/index.ts Activity merge for display; the settle that writes the log is in reads.ts.
+packages/core/src/activity/merge.ts Activity merge for display; the settle that writes the log is in reads.ts.
+packages/core/src/ao/asset-scan.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/balance.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/collectibles.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/index.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/legacy-token.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/result.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/token-discovery.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/ao/token-state.ts Balance, token and result reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/arweave/balance.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/arweave/client.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/arweave/gateway.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/arweave/token-metadata.ts Balance, gateway and metadata reads: a bug shows a wrong number, it doesn't sign.
+packages/core/src/index.ts A barrel: re-exports only.
+packages/core/src/models/activity.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/announcement.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/balance.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/collectible.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/contact.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/display.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/index.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/points.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/portfolio-history.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/review-prompt.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/security-phrase.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/site-links.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/site.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/theme.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/token-metadata.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/models/transfer.ts A data shape or display helper; the code that acts on it is listed.
+packages/core/src/points/curve.ts Points scoring math; ownership proofs and identity are listed.
+packages/core/src/points/formula.ts Points scoring math; ownership proofs and identity are listed.
+packages/core/src/points/index.ts Points scoring math; ownership proofs and identity are listed.
+packages/core/src/policy/index.ts A barrel: re-exports only.
+packages/core/src/ports/approval-presenter.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/badge.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/device-key.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/downloads.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/runtime.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/storage.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/ports/timer.ts A port interface; the adapters that hold keys or sign are listed.
+packages/core/src/pricing/best-ask.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/fx.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/historical.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/index.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/portfolio.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/snapshots.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/spot.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/timeout.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/pricing/token-sources.ts Fiat prices: display only, never part of what is signed.
+packages/core/src/recipients/index.ts A barrel: re-exports only.
+packages/runtime/src/handlers/browser-sites.ts User settings and lists: no keys, no signing, no page access.
+packages/runtime/src/handlers/contacts.ts User settings and lists: no keys, no signing, no page access.
+packages/runtime/src/handlers/review-prompt.ts User settings and lists: no keys, no signing, no page access.
+packages/runtime/src/handlers/scans.ts User settings and lists: no keys, no signing, no page access.
+packages/runtime/src/handlers/security-phrase.ts User settings and lists: no keys, no signing, no page access.
+packages/runtime/src/index.ts The runtime barrel and the Platform port interface.
+packages/runtime/src/platform.ts The runtime barrel and the Platform port interface.
+packages/ui/src/components/wallet/ActivityRow.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/BalanceDisplay.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/CollectibleThumbnail.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/EmptyState.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/NetworkErrorBanner.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/PortfolioChart.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/QrCode.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/SendReceiveActions.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/SkeletonRow.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/SkeletonTile.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/TokenGlyph.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/TokenRow.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/WatchOnlyBadge.tsx Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/image-cache.ts Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/index.ts Wallet, balance and activity display outside the approval preview.
+packages/ui/src/components/wallet/logo-cache.ts Wallet, balance and activity display outside the approval preview.
+packages/ui/src/format/currency.ts Barrel, labels, fiat formatting and token defaults; display only.
+packages/ui/src/index.ts Barrel, labels, fiat formatting and token defaults; display only.
+packages/ui/src/labels.tsx Barrel, labels, fiat formatting and token defaults; display only.
+packages/ui/src/tokens/default-token-icons.ts Barrel, labels, fiat formatting and token defaults; display only.
+packages/ui/src/tokens/default-tokens.ts Barrel, labels, fiat formatting and token defaults; display only.

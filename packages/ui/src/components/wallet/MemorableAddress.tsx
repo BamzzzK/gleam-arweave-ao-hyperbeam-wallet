@@ -55,6 +55,7 @@ export function MemorableAddress({
         </span>
       ) : null}
       {/* Seven chunks with their padding are 32.9ch, or 31.5ch with the phone's tighter padding; `ch` here is the address's own font, so the switch follows the type size. */}
+      {/* eslint-disable-next-line gleam/type-scale -- 12.5px fits seven chunks on one line at confirm width; the grid below depends on it. */}
       <span className={cn("@container flex min-w-0 flex-1 font-mono [justify-content:inherit]", confirm ? "text-[12.5px]" : "text-label")}>
         <span
           translate="no"

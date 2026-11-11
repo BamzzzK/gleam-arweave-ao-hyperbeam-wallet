@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // Checks, before anything is signed, that the web bundle inside a native
 // project is the one CI published for the tag.
 //
@@ -25,6 +26,10 @@ const BASE_URL =
 // `cap sync` adds these two files next to the copied bundle.
 const SYNC_ADDED = ["cordova.js", "cordova_plugins.js"];
 
+/**
+ * @param {string} message
+ * @returns {never}
+ */
 function fail(message) {
   console.error(`FAIL ${message}`);
   process.exit(1);
@@ -52,7 +57,7 @@ if (process.env.GLEAM_ALLOW_UNVERIFIED_BUNDLE === "1") {
     });
     manifest = JSON.parse(body);
   } catch (err) {
-    fail(`could not fetch or parse release-manifest.json for ${tag}: ${err.message}`);
+    fail(`could not fetch or parse release-manifest.json for ${tag}: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (manifest.tag !== tag) fail(`manifest is for ${manifest.tag}, not ${tag}`);
   if (typeof manifest.mobileBundleSha256 !== "string" || !/^[0-9a-f]{64}$/.test(manifest.mobileBundleSha256)) {

@@ -34,8 +34,10 @@ import {
   type Wallet,
   type Winston,
 } from "@gleam/core";
+import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { WALLETS_KEY, NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -82,10 +84,6 @@ function approvedFee(req: SubmitTransferRequest): Winston {
   return req.fee;
 }
 
-const NETWORK_SETTINGS_KEY = "local:networkSettings";
-const WALLETS_KEY = "local:wallets";
-const CONTACTS_KEY = "local:contacts";
-const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
 const FIRST_SEEN_LOOKUP_LIMIT = 100;
 
 const DEFAULT_NETWORK_SETTINGS: NetworkSettings = {
@@ -162,8 +160,10 @@ export class TransferHandler {
   }
 
   private async appendActivityLog(address: string, entry: ActivityEntry): Promise<void> {
-    const existing = await this.loadActivityLog(address);
-    await this.storage.set(`${ACTIVITY_LOG_KEY_PREFIX}${address}`, [entry, ...existing]);
+    await updateStored(this.storage, `${ACTIVITY_LOG_KEY_PREFIX}${address}`, (raw) => [
+      entry,
+      ...(Array.isArray(raw) ? raw.filter(isValidActivityEntry) : []),
+    ]);
   }
 
   /** The unlocked wallet's signer. Throws if the wallet isn't currently unlocked. */

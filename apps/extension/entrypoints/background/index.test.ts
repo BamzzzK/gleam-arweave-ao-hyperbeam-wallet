@@ -568,7 +568,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await vi.waitFor(() =>
       expect(sendMessage).toHaveBeenCalledWith(
         "providerEvent",
-        { event: "connect", data: { activeAddress: created.address } },
+        { origin: expect.any(String), event: "connect", data: { activeAddress: created.address } },
         42,
       ),
     );
@@ -1134,7 +1134,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await vi.waitFor(() =>
         expect(sendMessage).toHaveBeenCalledWith(
           "providerEvent",
-          { event: "connect", data: { activeAddress: "addr-1" } },
+          { origin: expect.any(String), event: "connect", data: { activeAddress: "addr-1" } },
           42,
         ),
       );
@@ -1153,7 +1153,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await providerCall({ origin: "https://bazar.arweave.net", method: "disconnect", params: {} });
 
       await vi.waitFor(() =>
-        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 42),
+        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, 42),
       );
       expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 99);
     });
@@ -1168,7 +1168,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await revokeHandler({ data: { origin: "https://bazar.arweave.net" } });
 
       await vi.waitFor(() =>
-        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7),
+        expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, 7),
       );
     });
 
@@ -1195,13 +1195,13 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await vi.waitFor(() =>
         expect(sendMessage).toHaveBeenCalledWith(
           "providerEvent",
-          { event: "walletSwitch", data: { address: "addr-2" } },
+          { origin: expect.any(String), event: "walletSwitch", data: { address: "addr-2" } },
           1,
         ),
       );
       expect(sendMessage).toHaveBeenCalledWith(
         "providerEvent",
-        { event: "walletSwitch", data: { address: "addr-2" } },
+        { origin: expect.any(String), event: "walletSwitch", data: { address: "addr-2" } },
         2,
       );
       expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", expect.anything(), 3);
@@ -1526,12 +1526,12 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
         await vi.waitFor(() =>
           expect(sendMessage).toHaveBeenCalledWith(
             "providerEvent",
-            { event: "walletSwitch", data: { address: "addr-wallet-1" } },
+            { origin: expect.any(String), event: "walletSwitch", data: { address: "addr-wallet-1" } },
             tabId,
           ),
         );
       }
-      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, expect.anything());
+      expect(sendMessage).not.toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, expect.anything());
       await expect(providerCall({ origin: "https://b.example", method: "getActiveAddress", params: {} })).resolves.toBe(
         "addr-wallet-1",
       );
@@ -1558,12 +1558,12 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       expect(await grantOrigins()).toEqual([]);
       for (const tabId of [1, 2]) {
         await vi.waitFor(() =>
-          expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, tabId),
+          expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, tabId),
         );
       }
       expect(sendMessage).not.toHaveBeenCalledWith(
         "providerEvent",
-        expect.objectContaining({ event: "walletSwitch" }),
+        expect.objectContaining({ origin: expect.any(String), event: "walletSwitch" }),
         expect.anything(),
       );
     });
@@ -1683,7 +1683,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
       await registeredHandlers.get("stopGleamOnSite")!({ data: { origin: ORIGIN } });
 
       expect(await getItem("local:grants")).toEqual([]);
-      expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7);
+      expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, 7);
       expect(sendMessage).toHaveBeenCalledWith("siteWalletMode", { useGleam: false }, 7);
       expect(tabsReload).toHaveBeenCalledWith(7);
     });
@@ -1718,7 +1718,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
 
       expect(await getItem("local:grants")).toEqual([]);
       await expect(fromContent("getSiteWalletMode", undefined)).resolves.toEqual({ useGleam: true });
-      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("providerEvent", { event: "disconnect", data: {} }, 7));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith("providerEvent", { origin: expect.any(String), event: "disconnect", data: {} }, 7));
       expect(sendMessage).not.toHaveBeenCalledWith("siteWalletMode", expect.anything(), expect.anything());
     });
 

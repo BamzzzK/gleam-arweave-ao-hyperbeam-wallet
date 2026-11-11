@@ -19,7 +19,7 @@ export function BeamMark({ tagline, animated = false, className }: BeamMarkProps
   return (
     <div className={cn("flex flex-col items-center gap-[18px]", className)}>
       <Beam className={cn("w-10", animated && "gleam-beam-sweep")} />
-      <div className="text-[22px] font-bold tracking-[-0.015em] text-foreground">gleam</div>
+      <div className="text-h2 font-bold tracking-[-0.015em] text-foreground">gleam</div>
       {tagline ? <div className="-mt-[10px] text-body text-muted">{tagline}</div> : null}
     </div>
   );

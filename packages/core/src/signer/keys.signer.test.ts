@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import Arweave from "arweave";
 import type { JWKInterface } from "../models/wallet";
 import { validateJWKShape } from "../keys/jwk";
@@ -179,4 +179,51 @@ describe("signer/keys: importSessionKeys", () => {
       await expect(crypto.subtle.exportKey("pkcs8", key)).rejects.toThrow();
     }
   });
+});
+
+describe("signer/keys: key properties", () => {
+  it("generates an RSA-PSS key with a 4096-bit modulus and e = 65537", async () => {
+    const generate = vi.spyOn(crypto.subtle, "generateKey");
+    try {
+      await generateJWK();
+      const pair = (await generate.mock.results[0]!.value) as CryptoKeyPair;
+      expect(pair.privateKey.algorithm).toMatchObject({
+        name: "RSA-PSS",
+        modulusLength: 4096,
+        publicExponent: new Uint8Array([1, 0, 1]),
+      });
+    } finally {
+      generate.mockRestore();
+    }
+  }, 20_000);
+
+  it("imports a keyfile's signing and decryption keys non-extractable", async () => {
+    const importKey = vi.spyOn(crypto.subtle, "importKey");
+    try {
+      const signer = signerFromJwk(jwk, "address");
+      await signer.signPss(new Uint8Array([1, 2, 3]), { hash: "SHA-256", saltLength: 32 });
+      await signer.decryptOaep(new Uint8Array(await encrypt(jwk.n, new Uint8Array([1]), { name: "RSA-OAEP" })));
+      const keys = (await Promise.all(importKey.mock.results.map((result) => result.value))) as CryptoKey[];
+      const privateKeys = keys.filter((key) => key.type === "private");
+      expect(privateKeys.map((key) => key.algorithm.name).sort()).toEqual(["RSA-OAEP", "RSA-PSS"]);
+      for (const key of privateKeys) expect(key.extractable).toBe(false);
+    } finally {
+      importKey.mockRestore();
+    }
+  });
+});
+
+describe("signer/keys: generateJWK completeness", () => {
+  it.each(["kty", "e", "n", "d", "p", "q", "dp", "dq", "qi"])("refuses a generated key missing %s", async (field) => {
+    const exportKey = vi.spyOn(crypto.subtle, "exportKey").mockImplementationOnce(async () => {
+      const partial: Record<string, string> = { ...(jwk as unknown as Record<string, string>) };
+      delete partial[field];
+      return partial as JsonWebKey;
+    });
+    try {
+      await expect(generateJWK()).rejects.toThrow("incomplete RSA key");
+    } finally {
+      exportKey.mockRestore();
+    }
+  }, 20_000);
 });

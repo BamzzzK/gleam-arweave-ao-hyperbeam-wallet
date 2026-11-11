@@ -108,6 +108,12 @@
   --text-h3--line-height: 1.3;
   --text-h2: 1.5rem; /* 24px */
   --text-h2--line-height: 1.25;
+  /* Glyph letters in small avatars and token marks. */
+  --text-micro: 0.625rem; /* 10px */
+  /* Amounts and balances, the screen's one large figure. No line height, as with a raw size. */
+  --text-display-sm: 1.75rem; /* 28px */
+  --text-display: 2.25rem; /* 36px */
+  --text-display-lg: 2.5rem; /* 40px */
 
   /* ---- Spacing scale — the values repeated across shared.css/screens (padding, gaps) ---- */
   --spacing-3xs: 0.125rem; /* 2px */

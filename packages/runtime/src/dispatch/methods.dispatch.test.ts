@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APPROVAL_METHODS, KEY_METHODS, PROVIDER_METHODS } from "@gleam/core";
 import { APPROVAL_GATED_METHODS } from "@gleam/messaging/src/page-protocol.ts";
@@ -15,6 +17,15 @@ describe("dispatch/methods: tiers", () => {
       .filter(([, spec]) => spec.approval)
       .map(([method]) => method);
     expect(approval.sort()).toEqual([...APPROVAL_GATED_METHODS].sort());
+  });
+
+  // A page method opens a window only through the `requestApproval` its
+  // call carries, which `ProviderHandlers` types give only to methods marked
+  // `approval: true`. A direct call from a handler would skip the flag.
+  it("calls approval.requestApproval in create-runtime.ts only to hand it to approval methods", () => {
+    const source = readFileSync(join(import.meta.dirname, "../create-runtime.ts"), "utf8");
+    expect(source.match(/approval\.requestApproval\(/g)).toHaveLength(1);
+    expect(source).toMatch(/spec\.approval\s*\?\s*\{ requestApproval: \(request\) => approval\.requestApproval\(request\) \}/);
   });
 
   it("lets only connect and disconnect run without a grant", () => {

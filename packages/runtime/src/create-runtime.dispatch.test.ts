@@ -361,7 +361,7 @@ describe("createRuntime", () => {
         expect(platform.tabs.sent).toContainEqual({
           tabId: 7,
           type: "providerEvent",
-          data: { event: "walletSwitch", data: { address: second.address } },
+          data: { origin: ORIGIN, event: "walletSwitch", data: { address: second.address } },
         }),
       );
     });
@@ -417,7 +417,7 @@ describe("createRuntime", () => {
         expect(platform.tabs.sent).toContainEqual({
           tabId: 7,
           type: "providerEvent",
-          data: { event: "connect", data: { activeAddress: first.address } },
+          data: { origin: ORIGIN, event: "connect", data: { activeAddress: first.address } },
         }),
       );
     });

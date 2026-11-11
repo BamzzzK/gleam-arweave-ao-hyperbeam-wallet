@@ -105,6 +105,18 @@ No excessive shadows, thick borders, oversized cards or enterprise-dashboard den
 
 ---
 
+## In the app
+
+- **Spacing before lines.** Separate groups with padding and gaps. Add a
+  divider or border only when spacing can't separate them, and never
+  stack borders, such as a row's own separator inside a bordered section.
+- **One short line.** UI copy has no hint lines and no second sentences.
+  Fix a confusing control with structure (a clear label, an action
+  button, the reason a button is disabled), not more words. If a control
+  already says it, say nothing.
+
+---
+
 ## Color System
 
 ### Foundation (Neutral Palette)
@@ -163,6 +175,12 @@ Optimized for the 400px popup frame and designed to feel crisp and modern.
 | **Body** | `0.875rem` | 14px | 1.5 | Main content, lists, activity descriptions |
 | **H3** | `1.125rem` | 18px | 1.3 | Section headings, card titles |
 | **H2** | `1.5rem` | 24px | 1.25 | Screen titles, primary headings |
+| **Display S** | `1.75rem` | 28px | inherited | Amounts on approval and review screens |
+| **Display** | `2.25rem` | 36px | inherited | Wallet balance, chart value |
+| **Display L** | `2.5rem` | 40px | inherited | The hero amount on transfer review and Points |
+| **Micro** | `0.625rem` | 10px | inherited | Glyph letters in small avatars and token marks |
+
+Each level is a token in `packages/ui/src/tokens/theme.css` (`text-caption` … `text-display-lg`, `text-micro`). The phone layout raises Caption, Label and Body by 1px. ESLint (`gleam/type-scale`) refuses a raw `text-[Npx]` size.
 
 ### Font Families
 

@@ -1,3 +1,4 @@
+// @ts-check
 // Shared by the surface test and the release gate, so both read
 // security/surface.txt the same way. Plain .mjs so the gate runs on bare Node.
 

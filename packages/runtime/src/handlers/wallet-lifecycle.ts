@@ -44,8 +44,10 @@ import {
   type EncryptOptions,
   generateJWK,
 } from "@gleam/core/signer";
-import { isSessionExpired, isValidSession, SESSION_KEY, WALLETS_KEY, type KeySession } from "./key-session";
+import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { updateStored } from "../storage-update";
+import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -90,13 +92,9 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
  * `withSessionLock`, so a lock and an unlock never interleave.
  */
 
-const ACTIVE_WALLET_ID_KEY = "local:activeWalletId";
 const LOCK_SETTINGS_KEY = "local:lockSettings";
 const THEME_SETTINGS_KEY = "local:themeSettings";
 const DISPLAY_SETTINGS_KEY = "local:displaySettings";
-// Written by ReadsHandler and TransferHandler, keyed by address.
-const ACTIVITY_LOG_KEY_PREFIX = "local:activityLog:";
-const WATCHED_PROCESS_IDS_KEY_PREFIX = "local:watchedProcessIds:";
 
 const DEFAULT_LOCK_SETTINGS: LockSettings = { autoLockTimeout: "1hr" };
 const DEFAULT_THEME_SETTINGS: ThemeSettings = { theme: "light" };
@@ -1149,9 +1147,10 @@ export class WalletLifecycleHandler {
    */
   async keepLockTimeoutOnUpdate(): Promise<void> {
     return this.keySession.withSessionLock(async () => {
-      if ((await this.storage.get<unknown>(LOCK_SETTINGS_KEY)) !== null) return;
       if ((await loadWallets(this.storage)).length === 0) return;
-      await this.storage.set(LOCK_SETTINGS_KEY, { autoLockTimeout: "never" } satisfies LockSettings);
+      await updateStored(this.storage, LOCK_SETTINGS_KEY, (current) =>
+        current === null ? ({ autoLockTimeout: "never" } satisfies LockSettings) : undefined,
+      );
     });
   }
 

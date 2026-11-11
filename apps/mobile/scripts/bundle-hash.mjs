@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 // The hash of a web bundle: sha256 over the sorted lines
 // `<relative-path>\0<sha256-of-file>\n`, paths relative to the directory
 // with `/` separators, sorted by UTF-16 code unit order (JavaScript's `<`).
@@ -17,9 +18,16 @@ import console from "node:console";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+/** @param {string | Buffer} data */
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
+/**
+ * @param {string} root
+ * @param {string} [rel]
+ * @returns {string[]}
+ */
 function listFiles(root, rel = "") {
+  /** @type {string[]} */
   const files = [];
   for (const name of readdirSync(join(root, rel))) {
     const path = rel === "" ? name : `${rel}/${name}`;
@@ -33,6 +41,10 @@ function listFiles(root, rel = "") {
   return files;
 }
 
+/**
+ * @param {string} dir
+ * @param {{ exclude?: string[] }} [options]
+ */
 export function hashDirectory(dir, { exclude = [] } = {}) {
   const skip = new Set(exclude);
   const paths = listFiles(dir)
@@ -49,7 +61,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(2);
   };
   const args = process.argv.slice(2);
+  /** @type {string[]} */
   const exclude = [];
+  /** @type {string | null} */
   let dir = null;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--exclude" && i + 1 < args.length) exclude.push(args[++i]);
@@ -58,9 +72,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   if (dir === null) usage();
   try {
-    console.log(hashDirectory(dir, { exclude }));
+    console.log(hashDirectory(/** @type {string} */ (dir), { exclude }));
   } catch (err) {
-    console.error(err.message);
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 }

@@ -44,6 +44,7 @@ export function ScreenHeader({ title, center, onBack, busy = false, end, subtitl
         <div className="h-8 w-8 flex-shrink-0 phone:h-11 phone:w-11" aria-hidden="true" />
       )}
       <div className="flex flex-1 flex-col items-center gap-px">
+        {/* eslint-disable-next-line gleam/type-scale -- the phone's screen title is 16px, between Body and H3, as iOS and Android titles are. */}
         {center ?? <span className="text-body font-semibold text-foreground phone:text-[1rem]">{title}</span>}
         {subtitle}
       </div>

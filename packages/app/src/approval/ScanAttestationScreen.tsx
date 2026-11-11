@@ -239,10 +239,10 @@ function AttestationReview({
         <ol className="flex flex-col gap-2">
           {preview.answers.map((answer, index) => (
             <li key={index} className="flex flex-col gap-0.5 rounded-md border border-line p-2.5">
-              <span className="break-all font-mono text-[11px] text-foreground">
+              <span className="break-all font-mono text-caption text-foreground">
                 {answer.file}:{answer.line}
               </span>
-              <span className="break-all font-mono text-[11px] text-muted">{answer.symbol}</span>
+              <span className="break-all font-mono text-caption text-muted">{answer.symbol}</span>
               <span className="break-words text-caption text-foreground">{answer.check}</span>
             </li>
           ))}
@@ -259,7 +259,7 @@ function AttestationReview({
       </Field>
 
       <Field label={t("approval.attestationId")}>
-        <span className="break-all font-mono text-[11px] text-foreground">{preview.attestationId}</span>
+        <span className="break-all font-mono text-caption text-foreground">{preview.attestationId}</span>
       </Field>
 
       {checkError ? (
@@ -320,7 +320,7 @@ export function ScanAttestationResult({ result, onClose }: { result: SiteAttestR
   } else if (result.paid) {
     content = (
       <>
-        <p className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+        <p className="text-display-sm font-semibold tracking-[-0.02em] tabular-nums text-foreground">
           {t("approval.pointsEarned", { points: formatPoints(result.points) })}
         </p>
         <p className="text-label leading-relaxed text-muted">

@@ -1,4 +1,5 @@
 import {
+  createSerializer,
   isHardwareWalletMethod,
   isWatchWalletMethod,
   vaultHasPassword,
@@ -13,6 +14,9 @@ import {
 } from "@gleam/core";
 import { signerFromKeyStore } from "@gleam/core/signer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { updateStored } from "../storage-update";
+import { WALLETS_KEY } from "../storage-keys";
+export { WALLETS_KEY } from "../storage-keys";
 
 /**
  * The signing keys of currently-unlocked wallets, held in two places:
@@ -41,10 +45,13 @@ import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
  */
 const KEY_PREFIX = "session:key:";
 const CACHED_WALLET_IDS_KEY = "session:cachedWalletIds";
+
+function cachedIds(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
+}
+
 /** Written by `wallet-lifecycle.ts`; read here so every key read can enforce auto-lock. */
 export const SESSION_KEY = "session:unlockedSession";
-/** Written by `wallet-lifecycle.ts`; read here to tell a hardware wallet from a locked one. */
-export const WALLETS_KEY = "local:wallets";
 
 /**
  * Thrown instead of reporting "locked" when a caller asks for the key of
@@ -255,33 +262,27 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     const key = entryKey(walletId);
     const entry = await storage.get<unknown>(key);
     if (entry !== null) {
+      // Overwritten only to wipe it before the remove below.
+      // eslint-disable-next-line gleam/no-storage-read-modify-write
       await storage.set(key, zeroStrings(entry));
     }
     await storage.remove(key);
   }
 
   async function trackWalletId(walletId: string): Promise<void> {
-    const ids = (await storage.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
-    if (!ids.includes(walletId)) {
-      await storage.set(CACHED_WALLET_IDS_KEY, [...ids, walletId]);
-    }
+    await updateStored<string[]>(storage, CACHED_WALLET_IDS_KEY, (current) => {
+      const ids = cachedIds(current);
+      return ids.includes(walletId) ? undefined : [...ids, walletId];
+    });
   }
 
   async function untrackWalletId(walletId: string): Promise<void> {
-    const ids = (await storage.get<string[]>(CACHED_WALLET_IDS_KEY)) ?? [];
-    await storage.set(
-      CACHED_WALLET_IDS_KEY,
-      ids.filter((id) => id !== walletId),
+    await updateStored<string[]>(storage, CACHED_WALLET_IDS_KEY, (current) =>
+      cachedIds(current).filter((id) => id !== walletId),
     );
   }
 
-  let sessionQueue: Promise<unknown> = Promise.resolve();
-
-  function withSessionLock<T>(task: () => Promise<T>): Promise<T> {
-    const result = sessionQueue.then(task);
-    sessionQueue = result.catch(() => undefined);
-    return result;
-  }
+  const withSessionLock = createSerializer();
 
   async function cacheKey(walletId: string, jwk: JWKInterface, address: string): Promise<void> {
     if (!jwk.d) throw new Error(userErrorMessage("keyfileNoPrivateKey"));

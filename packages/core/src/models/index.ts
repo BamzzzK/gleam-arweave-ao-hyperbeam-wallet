@@ -143,3 +143,4 @@ export type {
   VerifyMessageRequest,
   VerifyMessageResult,
 } from "./signing";
+export { KeyedQueue, createSerializer, type Serializer } from "./serialize";
