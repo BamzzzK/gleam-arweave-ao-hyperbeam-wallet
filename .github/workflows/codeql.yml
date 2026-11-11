@@ -140,8 +140,9 @@ jobs:
   # The code scanning rule waits for a result in every category master has,
   # so a pull request that skips the Swift build still needs a Swift result.
   # Its Swift is master's, so master's latest Swift analysis is its result:
-  # this uploads that SARIF for the pull request. With no master analysis to
-  # reuse, the job fails rather than pass the gate empty.
+  # this uploads that SARIF for the pull request. It takes the newest one
+  # that finished without error; with none to reuse, the job fails rather
+  # than pass the gate empty.
   reuse-swift:
     name: Analyze (swift, from master)
     runs-on: ubuntu-latest
@@ -163,7 +164,7 @@ jobs:
         run: |
           set -euo pipefail
           id=$(gh api "repos/$REPO/code-scanning/analyses?ref=refs/heads/master&tool_name=CodeQL&per_page=100" \
-            --jq '[.[] | select(.category == "/language:swift")][0].id // empty')
+            --jq '[.[] | select(.category == "/language:swift" and .error == "")][0].id // empty')
           if [ -z "$id" ]; then
             echo "::error::master has no Swift analysis to reuse"
             exit 1
