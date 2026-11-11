@@ -7,6 +7,7 @@
     "prepare": "lefthook install",
     "dev": "pnpm --filter @gleam/extension exec wxt",
     "wxt:build": "pnpm --filter @gleam/extension exec wxt build",
+    "check:bundles": "node scripts/check-bundles.mjs",
     "mobile:build": "pnpm --filter @gleam/mobile build",
     "mobile:ios": "pnpm --filter @gleam/mobile ios",
     "mobile:android": "pnpm --filter @gleam/mobile android",

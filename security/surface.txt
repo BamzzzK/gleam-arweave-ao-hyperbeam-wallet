@@ -196,3 +196,5 @@
 5 security/surface-exempt.txt
 5 .dependency-cruiser.cjs
 5 scripts/surface-check.mjs
+5 apps/extension/build-plugins.ts
+5 scripts/check-bundles.mjs

@@ -193,3 +193,5 @@
 /security/surface-exempt.txt                                               @skyf0xx
 /.dependency-cruiser.cjs                                                   @skyf0xx
 /scripts/surface-check.mjs                                                 @skyf0xx
+/apps/extension/build-plugins.ts                                           @skyf0xx
+/scripts/check-bundles.mjs                                                 @skyf0xx

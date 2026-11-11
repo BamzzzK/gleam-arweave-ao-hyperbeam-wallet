@@ -124,6 +124,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm wxt:build
+      # The keyring page holds only key code; provider.js and the content
+      # script stay small and free of new npm packages.
+      - run: pnpm check:bundles
       - run: pnpm mobile:build
       # wxt:build passing doesn't mean the bundle runs; load it in Chromium.
       - run: pnpm exec playwright install --with-deps chromium

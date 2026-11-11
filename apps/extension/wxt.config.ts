@@ -5,6 +5,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { DEFAULT_HYPERBEAM_PEER_URLS } from '../../packages/core/src/models/network';
 import { FALLBACK_GATEWAY_URLS } from '../../packages/core/src/arweave/first-run-gateway';
 import { FALLBACK_GATEWAYS as GRAPHQL_FALLBACK_GATEWAYS } from '../../packages/core/src/arweave/graphql';
+import { isolateKeyring, recordBundleModules } from './build-plugins';
 import { extensionPagesCsp } from './src/csp';
 import { DEV_SITE_HOSTS, SITE_ORIGIN } from './src/site-pages';
 
@@ -123,6 +124,8 @@ export default defineConfig({
       // plugin's default globals also supply the `Buffer` those libraries
       // and keystone/sign-request.ts use.
       nodePolyfills({ include: ['stream', 'events'] }),
+      isolateKeyring(),
+      recordBundleModules(),
     ],
     resolve: {
       alias: [{ find: /^function-bind$/, replacement: fileURLToPath(new URL('./src/shims/function-bind.cjs', import.meta.url)) }],
