@@ -46,6 +46,11 @@
 1 apps/extension/src/adapters/downloads.ts
 1 packages/app/src/screens/onboarding/src/
 1 packages/app/src/screens/lock-settings/src/
+1 packages/app/src/screens/unlock/
+1 packages/core/src/models/wallet.ts
+1 packages/core/src/models/session.ts
+1 packages/core/src/models/passkey.ts
+1 packages/app/src/keyfile/
 
 2 packages/core/src/ao/transfer.ts
 2 packages/core/src/arweave/data-item.ts
@@ -61,6 +66,12 @@
 2 packages/core/src/models/capabilities.ts
 2 apps/extension/src/hardware/keystone/
 2 apps/extension/src/hardware/ledger/
+2 packages/core/src/ao/collectible-transfer.ts
+2 packages/core/src/arweave/bundler.ts
+2 packages/app/src/screens/send/src/sendFormSchema.ts
+2 packages/app/src/screens/activity/src/validateSendAmount.ts
+2 packages/app/src/screens/activity/src/useSubmitTransfer.ts
+2 packages/core/src/models/signing.ts
 
 3 apps/extension/entrypoints/background/
 3 packages/runtime/src/create-runtime.ts
@@ -92,6 +103,16 @@
 3 packages/core/src/arweave/first-run-gateway.ts
 3 packages/core/src/arweave/graphql.ts
 3 packages/messaging/src/protocol.ts
+3 apps/extension/src/adapters/tabs.ts
+3 apps/mobile/src/app-platform.ts
+3 apps/mobile/src/adapters/runtime-port.ts
+3 apps/mobile/src/adapters/lock-guard.ts
+3 apps/mobile/src/adapters/app-away.ts
+3 packages/runtime/src/storage-update.ts
+3 packages/runtime/src/storage-keys.ts
+3 packages/core/src/models/serialize.ts
+3 packages/core/src/models/grant.ts
+3 packages/core/src/models/permission.ts
 
 4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
@@ -108,6 +129,19 @@
 4 apps/extension/src/adapters/windows.ts
 4 packages/core/src/recipients/assess.ts
 4 packages/runtime/src/handlers/reads.ts
+4 packages/core/src/models/approval.ts
+4 packages/app/src/screens/main-screen/src/formatWinston.ts
+4 packages/ui/src/format/truncate-address.ts
+4 packages/ui/src/components/wallet/AddressDisplay.tsx
+4 packages/ui/src/components/wallet/RecipientCard.tsx
+4 packages/ui/src/components/wallet/RecipientWarning.tsx
+4 packages/ui/src/components/wallet/MemorableAddress.tsx
+4 packages/core/src/recipients/memorable-address.ts
+4 packages/core/src/pricing/impersonation.ts
+4 packages/core/src/models/tag.ts
+4 packages/app/src/address-identity.tsx
+4 packages/app/src/account-avatar.ts
+4 packages/ui/src/components/wallet/AccountAvatar.tsx
 
 5 packages/runtime/src/points-invite.ts
 5 packages/runtime/src/points-attest.ts
@@ -158,3 +192,6 @@
 5 scripts/well-known.mjs
 5 scripts/release-all.mjs
 5 scripts/pack-release.sh
+5 packages/core/src/points/device-key-store.ts
+5 security/surface-exempt.txt
+5 .dependency-cruiser.cjs
