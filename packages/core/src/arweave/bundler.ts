@@ -1,14 +1,14 @@
 import { userErrorMessage } from "../models/user-errors";
 
-const BUNDLER_TX_ENDPOINT_SUFFIX = "/tx";
-
 /**
  * POSTs an already-signed ANS-104 data item's raw bytes to
- * `<bundlerUrl>/tx`. Throws on any non-2xx response, so a caller never
- * reports an id for data the bundler didn't accept.
+ * `<bundlerUrl>/tx`. The bundler's own path is kept, so a bundler that
+ * serves under one (`https://upload.ardrive.io/v1`) works as entered.
+ * Throws on any non-2xx response, so a caller never reports an id for
+ * data the bundler didn't accept.
  */
 export async function postDataItemToBundler(bundlerUrl: string, rawBytes: Uint8Array<ArrayBuffer>): Promise<void> {
-  const endpoint = new URL(BUNDLER_TX_ENDPOINT_SUFFIX, bundlerUrl).toString();
+  const endpoint = `${bundlerUrl.replace(/\/+$/, "")}/tx`;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },

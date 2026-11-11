@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_BUNDLER_URL, WATCH_ONLY_CONNECT_REFUSAL, type WalletSummary } from "@gleam/core";
+import { DEFAULT_BUNDLER_URL, WATCH_ONLY_CONNECT_REFUSAL, type NetworkSettings, type WalletSummary } from "@gleam/core";
 import type { CallerContext } from "@gleam/messaging/src/caller.ts";
 import { GLEAM_SITES_KEY, otherWalletKey } from "./handlers/site-wallet";
 import { SITE_ORIGIN } from "@gleam/core/src/models/site-origin.ts";
@@ -92,13 +92,15 @@ describe("createRuntime", () => {
       globalThis.fetch = originalFetch;
     });
 
+    const CUSTOM_BUNDLER = "https://upload.ardrive.io/v1";
+
     /** A gateway that quotes low for the preview and high for anything after it. */
     function stubLyingGateway() {
       const quotes = ["1", "999999999999"];
       const posted: Array<Record<string, unknown>> = [];
       globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
-        if (url.startsWith(DEFAULT_BUNDLER_URL)) return new Response("OK");
+        if (url.startsWith(DEFAULT_BUNDLER_URL) || url.startsWith(CUSTOM_BUNDLER)) return new Response("OK");
         if (url.includes("/price/")) return new Response(quotes.shift() ?? "999999999999");
         if (url.includes("tx_anchor")) return new Response("b".repeat(64));
         if (url.endsWith("/balance")) return new Response("1000000000000");
@@ -160,6 +162,22 @@ describe("createRuntime", () => {
       const urls = vi.mocked(globalThis.fetch).mock.calls.map(([url]) => String(url));
       expect(urls).toContain(`${DEFAULT_BUNDLER_URL}/tx`);
       expect(urls.some((url) => url.includes("/price/"))).toBe(false);
+    });
+
+    it("a data dispatch posts to the bundler set in network settings, under its path", async () => {
+      stubLyingGateway();
+      const { runtime, present } = await setupGranted();
+      const settings = (await runtime.dispatch("getNetworkSettings", undefined, EXTENSION)) as NetworkSettings;
+      await runtime.dispatch("setNetworkSettings", { ...settings, bundlerUrl: CUSTOM_BUNDLER }, EXTENSION);
+
+      const pending = runtime.dispatch("providerCall", { method: "dispatch", params: { transaction: { data: "aGVsbG8" } } }, CONTENT_SCRIPT);
+      await vi.waitFor(() => expect(present).toHaveBeenCalled());
+      await runtime.dispatch("resolveApproval", { requestId: present.mock.calls[0]![0], approved: true }, EXTENSION);
+
+      await expect(pending).resolves.toMatchObject({ type: "BUNDLED" });
+      const urls = vi.mocked(globalThis.fetch).mock.calls.map(([url]) => String(url));
+      expect(urls).toContain(`${CUSTOM_BUNDLER}/tx`);
+      expect(urls.some((url) => url.startsWith(DEFAULT_BUNDLER_URL))).toBe(false);
     });
 
     it("a dApp's sign of an L1 token transfer shows the token, recipient and amount it moves", async () => {

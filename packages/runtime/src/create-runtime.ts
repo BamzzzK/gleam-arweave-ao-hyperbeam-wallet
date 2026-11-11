@@ -3,6 +3,7 @@ import {
   DEFAULT_BUNDLER_URL,
   POINTS_API_URL,
   REFUSED_PROVIDER_METHODS,
+  bundlerUrlOf,
   bytesToBase64,
   capabilitiesFor,
   dispatchesViaBundler,
@@ -660,7 +661,8 @@ export function createRuntime(platform: Platform): Runtime {
     transaction: ProviderTransaction,
     { origin, wallet, activeWalletId, requestApproval }: GrantedCall & ApprovalCall,
   ): Promise<unknown> {
-    const { gatewayUrl } = await reads.getNetworkSettings();
+    const settings = await reads.getNetworkSettings();
+    const { gatewayUrl } = settings;
     // A token transfer to an arweave-scheduler process moves no AR, so it
     // shows as the token it sends, read from the transaction's own tags.
     // One that can't be read cleanly shows as the plain transaction, warned.
@@ -716,6 +718,7 @@ export function createRuntime(platform: Platform): Runtime {
       payload: transaction.data,
       tags: transaction.tags,
       gatewayUrl,
+      ...(bundled ? { bundlerUrl: bundlerUrlOf(settings) } : {}),
       target: transaction.target,
       quantity: transaction.quantity,
       reward: fee ?? undefined,

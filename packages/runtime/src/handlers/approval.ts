@@ -238,6 +238,8 @@ export interface SigningRequestInput {
    * no network-settings storage access of its own.
    */
   gatewayUrl?: string;
+  /** Bundler a bundled `dispatch` posts to, from the same settings read; the handler's own default otherwise. */
+  bundlerUrl?: string;
   /** `sign`/`dispatch`'s transaction-shaped fields beyond `payload`/`tags` — `target`/`quantity`/`reward`/`last_tx`. */
   target?: string;
   quantity?: string;
@@ -1602,7 +1604,7 @@ export class ApprovalHandler {
       case "sign":
         return finishSignTransaction(transactionOf(payload).transaction, signature!, owner);
       case "dispatch":
-        return finishDispatch(this.requireGatewayUrl(input), this.bundlerUrl, payload!, signature!, owner);
+        return finishDispatch(this.requireGatewayUrl(input), input.bundlerUrl ?? this.bundlerUrl, payload!, signature!, owner);
       case "signDataItem":
         // Wander resolves to the raw signed item as an ArrayBuffer, which
         // aoconnect's createDataItemSigner parses directly.

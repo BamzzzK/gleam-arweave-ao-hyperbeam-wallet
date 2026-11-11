@@ -9,6 +9,8 @@ export interface NetworkSettings {
   peers: HyperBeamPeer[];
   /** URL of the currently active peer, or `null` if none is selected. */
   activePeerUrl: string | null;
+  /** Bundler a dApp's `dispatch` posts data items to. Unset or `null` is automatic: `DEFAULT_BUNDLER_URL`. */
+  bundlerUrl?: string | null;
 }
 
 /**
@@ -67,6 +69,11 @@ export const L1_TOKEN_NODE_URLS: readonly string[] = [
  * Also listed in apps/extension/wxt.config.ts's `host_permissions`.
  */
 export const DEFAULT_BUNDLER_URL = "https://up.arweave.net";
+
+/** The bundler `dispatch` uses under these settings. */
+export function bundlerUrlOf(settings: Pick<NetworkSettings, "bundlerUrl">): string {
+  return settings.bundlerUrl || DEFAULT_BUNDLER_URL;
+}
 
 /**
  * lunar.arweave.net's block explorer, used everywhere a tx id or address

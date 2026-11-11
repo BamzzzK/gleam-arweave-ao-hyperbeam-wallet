@@ -501,3 +501,97 @@ describe("NetworkPeersView (7.3 network-peers)", () => {
     expect(onBack).toHaveBeenCalled();
   });
 });
+
+describe("NetworkPeersView bundler", () => {
+  it("shows Automatic until a bundler is set", async () => {
+    render(<NetworkPeersView runtime={fakeRuntime({ send: vi.fn().mockResolvedValue(SETTINGS) })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Automatic")).toBeTruthy());
+  });
+
+  it("saves a custom bundler as entered once its host is granted, with no reachability check", async () => {
+    permissionsRequest.mockResolvedValue(true);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Automatic")).toBeTruthy());
+    fireEvent.click(screen.getByText("Automatic"));
+    fireEvent.change(screen.getByPlaceholderText("https://up.arweave.net"), {
+      target: { value: "https://upload.ardrive.io/v1/" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenLastCalledWith({
+        type: "setNetworkSettings",
+        payload: { ...SETTINGS, bundlerUrl: "https://upload.ardrive.io/v1" },
+      }),
+    );
+    expect(permissionsRequest).toHaveBeenCalledWith(["https://upload.ardrive.io/*"]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText("upload.ardrive.io")).toBeTruthy();
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses an http bundler", async () => {
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Automatic")).toBeTruthy());
+    fireEvent.click(screen.getByText("Automatic"));
+    fireEvent.change(screen.getByPlaceholderText("https://up.arweave.net"), { target: { value: "http://bundler.example" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Enter a valid https:// bundler URL.");
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the bundler when its host isn't granted", async () => {
+    permissionsRequest.mockResolvedValue(false);
+    const send = vi.fn().mockResolvedValue(SETTINGS);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("Automatic")).toBeTruthy());
+    fireEvent.click(screen.getByText("Automatic"));
+    fireEvent.change(screen.getByPlaceholderText("https://up.arweave.net"), { target: { value: "https://bundler.example" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "Gleam wasn't given access to that site so the bundler didn't change.",
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("goes back to automatic", async () => {
+    const custom = { ...SETTINGS, bundlerUrl: "https://bundler.example" };
+    const send = vi.fn().mockResolvedValueOnce(custom).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText("bundler.example")).toBeTruthy());
+    fireEvent.click(screen.getByText("bundler.example"));
+    fireEvent.click(screen.getByRole("button", { name: "Use automatic" }));
+
+    await waitFor(() =>
+      expect(send).toHaveBeenLastCalledWith({ type: "setNetworkSettings", payload: { ...custom, bundlerUrl: null } }),
+    );
+    expect(await screen.findByText("Automatic")).toBeTruthy();
+  });
+
+  it("finishes a bundler edit granted while the popup was closed", async () => {
+    sessionStore.set("session:pendingNetworkEdit", { kind: "bundler", url: "https://bundler.example" });
+    permissionsContains.mockResolvedValue(true);
+    const send = vi.fn().mockResolvedValueOnce(SETTINGS).mockResolvedValueOnce(undefined);
+    render(<NetworkPeersView runtime={fakeRuntime({ send })} onBack={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(send).toHaveBeenLastCalledWith({
+        type: "setNetworkSettings",
+        payload: { ...SETTINGS, bundlerUrl: "https://bundler.example" },
+      }),
+    );
+    expect(sessionStore.has("session:pendingNetworkEdit")).toBe(false);
+  });
+});
