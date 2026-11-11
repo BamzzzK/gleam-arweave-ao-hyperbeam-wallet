@@ -23,6 +23,7 @@
     "scripts/*.mjs",
     "security/*.ts",
     "security/*.mjs",
+    "docs/*.ts",
     "e2e/**/*.ts",
     "apps/mobile/*.test.ts",
     "apps/mobile/scripts/*.ts",
