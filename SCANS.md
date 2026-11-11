@@ -169,7 +169,10 @@ canonical JSON, so the page decodes it with plain JS (base64url, UTF-8,
 proof. A dApp's `signMessage` is never involved, so the site needs no
 wallet connection. That sha256 is the **attestation id**. Every PR and
 advisory a scan files includes it, which links each finding to a
-wallet.
+wallet. The id only names the wallet: any attestation that wallet signed
+and that isn't voided can carry a finding, whichever round or release
+found it. A round's own id is the default, and a wallet that has used
+all five rounds can still report and earn.
 
 The points API stores attestations. Nothing goes on-chain or into git.
 `GET /attestations?release=<v>` returns each attestation with its
@@ -276,9 +279,9 @@ These are the current values. They are tuned per release.
   PR that restates a By design entry is closed with a link to that
   entry.
 - **Advisories:** check for an `Attestation id:` line first. If it is
-  missing or reads `none`, comment on the advisory asking for the id
-  while it is still in triage, since only the id links the finding to a
-  wallet. Then reproduce the finding, set the real severity, fix it
+  missing or reads `none`, comment on the advisory asking for the id of
+  any attestation the reporter's wallet has signed, while it is still in
+  triage, since only the id links the finding to a wallet. Then reproduce the finding, set the real severity, fix it
   privately, ship the fix, and publish the advisory with credit to
   the reporter. Close duplicates, reports that don't reproduce, and
   by-design reports with a one-line reason.
