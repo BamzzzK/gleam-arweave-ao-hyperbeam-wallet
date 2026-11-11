@@ -401,6 +401,10 @@ function jwkToBytes(jwk: JWKInterface): Uint8Array<ArrayBuffer> {
  * the key cache (an expired session, or a session that listed only
  * hardware wallets before this keyfile gave the vault a password), and
  * that must not take the new key with it.
+ *
+ * `persist` writes the wallet and the active pointer. It runs only once
+ * the keyring has taken the key, so a key it refuses leaves nothing stored
+ * that a later unlock would trip on.
  */
 async function unlockNewWallet(
   storage: StoragePort,
@@ -409,9 +413,16 @@ async function unlockNewWallet(
   walletId: string,
   jwk: JWKInterface,
   address: string,
+  persist: () => Promise<void>,
 ): Promise<void> {
   const existing = await loadSession(storage, keySession, wallets);
   await keySession.cacheKey(walletId, jwk, address);
+  try {
+    await persist();
+  } catch (error) {
+    await keySession.removeCachedKey(walletId).catch(() => {});
+    throw error;
+  }
   const lockSettings = await loadLockSettings(storage);
   const now = Date.now();
 
@@ -578,9 +589,10 @@ export class WalletLifecycleHandler {
 
       const wallets = await loadWallets(this.storage);
       wallets.push(wallet);
-      await saveWallets(this.storage, wallets);
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await unlockNewWallet(this.storage, this.keySession, wallets, wallet.id, jwk, address);
+      await unlockNewWallet(this.storage, this.keySession, wallets, wallet.id, jwk, address, async () => {
+        await saveWallets(this.storage, wallets);
+        await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
+      });
 
       return toSummary(wallet);
     });
@@ -614,8 +626,9 @@ export class WalletLifecycleHandler {
         throw new Error(userErrorMessage("addressInGleamWatch", { name: existing.name }));
       }
       if (existing) {
-        await this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id);
-        await unlockNewWallet(this.storage, this.keySession, wallets, existing.id, shapeCheck.jwk, address);
+        await unlockNewWallet(this.storage, this.keySession, wallets, existing.id, shapeCheck.jwk, address, () =>
+          this.storage.set(ACTIVE_WALLET_ID_KEY, existing.id),
+        );
         return toSummary(existing);
       }
 
@@ -645,9 +658,10 @@ export class WalletLifecycleHandler {
       // Re-read: an envelope upgrade may have written while Argon2id ran.
       const current = await loadWallets(this.storage);
       current.push(wallet);
-      await saveWallets(this.storage, current);
-      await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
-      await unlockNewWallet(this.storage, this.keySession, current, wallet.id, shapeCheck.jwk, address);
+      await unlockNewWallet(this.storage, this.keySession, current, wallet.id, shapeCheck.jwk, address, async () => {
+        await saveWallets(this.storage, current);
+        await this.storage.set(ACTIVE_WALLET_ID_KEY, wallet.id);
+      });
 
       return toSummary(wallet);
     });
@@ -968,6 +982,7 @@ export class WalletLifecycleHandler {
       const unlockedWalletIds: string[] = [];
       const opened: { wallet: Wallet; envelope: VaultEnvelope }[] = [];
       let kdfError: VaultKdfError | null = null;
+      let keyError: unknown = null;
       const importedWalletIds: string[] = [];
       try {
         for (const wallet of ordered) {
@@ -992,14 +1007,23 @@ export class WalletLifecycleHandler {
             if (error instanceof VaultKdfError) kdfError ??= error;
             continue;
           }
-          // Outside the wrong-password catch: a storage failure here must
-          // reach the user as itself.
+          // Outside the wrong-password catch: a key the keyring refuses
+          // leaves that one wallet locked, so one bad record can't keep the
+          // others shut. When nothing else unlocks, the failure reaches the
+          // user as itself.
           importedWalletIds.push(wallet.id);
-          await this.keySession.cacheKey(wallet.id, jwk, wallet.address);
+          try {
+            await this.keySession.cacheKey(wallet.id, jwk, wallet.address);
+          } catch (error) {
+            keyError ??= error;
+            await this.keySession.removeCachedKey(wallet.id).catch(() => {});
+            continue;
+          }
           unlockedWalletIds.push(wallet.id);
           opened.push({ wallet, envelope: wallet.encryptedKeyfile });
         }
 
+        if (unlockedWalletIds.length === 0 && keyError) throw keyError;
         if (unlockedWalletIds.length === 0 && kdfError) throw kdfError;
         // A vault of only hardware and watch wallets has no password, so
         // there is nothing to check it against.
