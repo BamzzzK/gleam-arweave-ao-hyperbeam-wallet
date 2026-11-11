@@ -6,6 +6,7 @@ import type {
   DispatchResult,
 } from "../models/signing";
 import { postDataItemToBundler } from "../arweave/bundler";
+import { readL1TokenTransfer } from "../ao/l1-transfer";
 import {
   applyTransactionSignature,
   buildUnsignedTransaction,
@@ -109,9 +110,6 @@ export async function signPayloadWithSigner(unsigned: UnsignedPayload, signer: S
   }
 }
 
-/** Threshold (bytes) above which `dispatch()` bundles rather than posts as a base AR tx. Below it, dispatch posts directly to the gateway as a `BASE` transaction. */
-const DISPATCH_BUNDLE_THRESHOLD_BYTES = 100 * 1024;
-
 /** Anything other than an empty or all-zero quantity moves AR, including malformed values arweave-js will reject. */
 function transfersAr(quantity: string | undefined): boolean {
   return !/^0*$/.test(quantity?.trim() ?? "");
@@ -183,24 +181,41 @@ export interface DispatchOptions {
 }
 
 /**
- * Builds what `dispatch` will sign. Payloads over
- * `DISPATCH_BUNDLE_THRESHOLD_BYTES` become an ANS-104 data item for the
- * bundler (`BUNDLED`) when the wallet can sign one for it; everything
- * else is a base transaction for the gateway (`BASE`).
+ * Whether `dispatch` posts this transaction to the bundler as an ANS-104
+ * data item (`BUNDLED`) rather than to the gateway as a base transaction
+ * (`BASE`). The bundler answers in seconds, at any size; a base
+ * transaction waits to be mined before its data can be read.
  *
- * A data item has no `quantity` field, so bundling a transaction that
- * sends AR would store the data and quietly drop the transfer. Those
- * always go to the gateway as a base transaction, whatever their size.
+ * Two kinds stay on L1. A data item has no `quantity` field, so bundling
+ * one that sends AR would store the data and quietly drop the transfer.
+ * And a token transfer to an `arweave-scheduler` process, readable or
+ * not, has to be an L1 transaction for the token to see it.
  */
+export function dispatchesViaBundler(
+  input: Pick<SignTransactionInput, "target" | "quantity" | "tags">,
+  dataSize: number,
+  { viaBundler }: DispatchOptions,
+): boolean {
+  if (!viaBundler || transfersAr(input.quantity)) return false;
+  const tokenTransfer = readL1TokenTransfer({
+    target: input.target ?? "",
+    quantity: input.quantity ?? "0",
+    data_size: String(dataSize),
+    tags: input.tags ?? [],
+  });
+  return tokenTransfer === null;
+}
+
+/** Builds what `dispatch` will sign; `dispatchesViaBundler` decides which kind. */
 export async function prepareDispatch(
   gatewayUrl: string,
   ownerB64Url: string,
   input: SignTransactionInput,
-  { viaBundler }: DispatchOptions,
+  options: DispatchOptions,
 ): Promise<UnsignedPayload> {
   const payloadBytes = input.data ? base64ToBytes(input.data) : new Uint8Array(0);
 
-  if (viaBundler && payloadBytes.byteLength > DISPATCH_BUNDLE_THRESHOLD_BYTES && !transfersAr(input.quantity)) {
+  if (dispatchesViaBundler(input, payloadBytes.byteLength, options)) {
     const raw = buildUnsignedDataItem(ownerB64Url, {
       data: payloadBytes,
       tags: plainTags(input.tags),

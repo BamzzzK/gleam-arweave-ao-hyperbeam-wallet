@@ -4,6 +4,8 @@ import {
   POINTS_API_URL,
   REFUSED_PROVIDER_METHODS,
   bytesToBase64,
+  capabilitiesFor,
+  dispatchesViaBundler,
   missingPermissions,
   HARDWARE_MESSAGE_HASH,
   isHardwareWalletMethod,
@@ -681,9 +683,16 @@ export function createRuntime(platform: Platform): Runtime {
         : null;
     // The dApp's reward is the fee actually charged. Without one, the quote
     // the preview shows becomes the reward, so a gateway can't charge more
-    // than the user approved. A bundled dispatch carries no reward at all.
-    const fee =
-      transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee;
+    // than the user approved. A bundled dispatch carries no reward at all,
+    // so its preview shows no fee.
+    const bundled =
+      kind === "dispatch" &&
+      dispatchesViaBundler(transaction, transaction.data.byteLength, {
+        viaBundler: capabilitiesFor(wallet?.method ?? "jwk").dispatchViaBundler,
+      });
+    const fee = bundled
+      ? null
+      : (transaction.reward ?? (await estimateFee(gatewayUrl, transaction.target, transaction.data.byteLength)).fee);
     return requestApproval({
       kind,
       origin,
@@ -709,7 +718,7 @@ export function createRuntime(platform: Platform): Runtime {
       gatewayUrl,
       target: transaction.target,
       quantity: transaction.quantity,
-      reward: fee,
+      reward: fee ?? undefined,
       last_tx: transaction.last_tx,
     });
   }
