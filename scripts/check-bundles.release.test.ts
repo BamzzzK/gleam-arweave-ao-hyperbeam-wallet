@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { closureOf, keyringProblems, packageOf, pageScriptProblems } from "./check-bundles.mjs";
+import { BUNDLE_PACKAGES, closureOf, entryPackageProblems, keyringProblems, packageOf, pageScriptProblems } from "./check-bundles.mjs";
 
 const PNPM = "node_modules/.pnpm/x@1.0.0/node_modules";
 
@@ -50,6 +50,27 @@ describe("page scripts", () => {
     expect(pageScriptProblems("provider.js", 20_000, [`${PNPM}/buffer/index.js`])).toEqual([
       "provider.js is 20000 bytes, over its 16384-byte budget",
       "provider.js contains npm package buffer",
+    ]);
+  });
+});
+
+describe("entry package allowlists", () => {
+  const allowed = BUNDLE_PACKAGES["passkey.html"];
+  const modules = allowed.map((name) => `${PNPM}/${name}/index.js`);
+
+  it("passes an entry that holds exactly its list", () => {
+    expect(entryPackageProblems("passkey.html", modules)).toEqual([]);
+  });
+
+  it("flags a package outside the list", () => {
+    expect(entryPackageProblems("passkey.html", [...modules, `${PNPM}/bs58check/index.js`])).toEqual([
+      "passkey.html contains npm package bs58check, which isn't in its allowlist",
+    ]);
+  });
+
+  it("flags a listed package that no longer appears", () => {
+    expect(entryPackageProblems("passkey.html", modules.slice(1))).toEqual([
+      `passkey.html no longer contains ${allowed[0]}; remove it from its allowlist`,
     ]);
   });
 });
