@@ -17,7 +17,9 @@ updates:
       # Listed before the minor-patch groups because a dependency joins
       # the first group it matches. A major in this group needs the manual
       # Chrome check (load .output/chrome-mv3 unpacked) before merging.
-      # It writes the shipped bundle, so it never auto-merges.
+      # It writes the shipped bundle, so it never auto-merges. A dev
+      # dependency that runs in the build or is bundled into the shipped
+      # code belongs here too (scripts/workflows.ci.test.ts checks).
       build-toolchain:
         patterns:
           - vite
@@ -25,8 +27,13 @@ updates:
           - wxt
           - "@wxt-dev/*"
           - rolldown
+          - tailwindcss
           - "@tailwindcss/vite"
           - vite-plugin-node-polyfills
+          - hash-wasm
+          - "@keystonehq/*"
+          - jsqr
+          - qrcode-generator
       # Dev and production dependencies never share a group, so
       # fetch-metadata reports one dependency type for the PR and
       # dependabot-automerge.yml merges only the dev group on its own.
