@@ -1336,7 +1336,8 @@ function formatDataSize(bytes: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
     style: "unit",
     unit: DATA_SIZE_UNITS[unit],
-    unitDisplay: "short",
+    // CLDR's short form of "byte" is "byte" for every count in English; the long form plurals it.
+    unitDisplay: unit === 0 ? "long" : "short",
     maximumFractionDigits: unit === 0 ? 0 : 1,
   }).format(value);
 }
