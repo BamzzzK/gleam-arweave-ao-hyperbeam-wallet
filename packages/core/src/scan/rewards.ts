@@ -1,5 +1,9 @@
-/** Scans paid per release; later ones are recorded and earn nothing. */
+import { CHALLENGE_SIZE } from "./attestation";
+
+/** The most paid places a release opens; later scans are recorded and earn nothing. */
 export const PAID_SCANS_PER_RELEASE = 100;
+/** The fewest paid places a release opens, so every release gets fresh reviews even when little is unexamined. */
+export const MIN_PAID_SCANS_PER_RELEASE = 10;
 /** The first this-many paid scans of a release earn the full reward; the rest earn the tail reward. */
 export const FULL_REWARD_SCANS = 20;
 /** A full-reward scan earns 1/1000 (0.1%) of the previous day's total holding points. */
@@ -12,9 +16,19 @@ export function scanRewards(issuedAtomic: bigint): { fullAtomic: bigint; tailAto
   return { fullAtomic: issuedAtomic / FULL_REWARD_DIVISOR, tailAtomic: issuedAtomic / TAIL_REWARD_DIVISOR };
 }
 
-/** Whether the next scan of a release with `paidPlacesLeft` open places earns the full reward. */
-export function nextScanIsFull(paidPlacesLeft: number): boolean {
-  return paidPlacesLeft > PAID_SCANS_PER_RELEASE - FULL_REWARD_SCANS;
+/**
+ * The paid places a release opens when it has `unexamined` surface functions
+ * no scan has examined in their current form: enough scans to answer each
+ * once, within the floor and the cap.
+ */
+export function paidPlacesFor(unexamined: number): number {
+  const needed = Math.ceil(Math.max(0, unexamined) / CHALLENGE_SIZE);
+  return Math.min(PAID_SCANS_PER_RELEASE, Math.max(MIN_PAID_SCANS_PER_RELEASE, needed));
+}
+
+/** Whether the next scan of a release that already has `paidScans` paid scans earns the full reward. */
+export function nextScanIsFull(paidScans: number): boolean {
+  return paidScans < FULL_REWARD_SCANS;
 }
 
 /** Each further round a wallet scans in one release earns this much more than the base reward, per round. */
