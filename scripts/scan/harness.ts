@@ -50,7 +50,6 @@ export const REWARDS = {
   day: "2026-10-15",
   issuedAtomic: "12400000000000000",
   scanRewardAtomic: "12400000000000",
-  tailScanRewardAtomic: "2480000000000",
   bountyPoolAtomic: "0",
   roundStepPercent: 10,
 };
@@ -93,7 +92,7 @@ export type Handler = (url: URL, init?: RequestInit) => Response | Promise<Respo
 
 /** Answers the check with the id of what it received, as the server does. */
 export const acceptCheck =
-  (paidPlacesLeft = 90, paidScans = 10): Handler =>
+  (paidPlacesLeft = 90, paidScans = 100 - paidPlacesLeft): Handler =>
   async (_url, init) => {
     const { attestation } = JSON.parse(String(init?.body)) as { attestation: unknown };
     const parsed = parseAttestation(attestation);

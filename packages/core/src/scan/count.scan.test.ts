@@ -3,7 +3,7 @@ import { fetchScanStats } from "./count";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const COUNT = { release: "1.2.3", total: 7, paidPlacesLeft: 93, paidScans: 7 };
-const REWARDS = { day: "2026-10-19", issuedAtomic: "10000000", scanRewardAtomic: "10000", tailScanRewardAtomic: "2000", bountyPoolAtomic: "5000000" };
+const REWARDS = { day: "2026-10-19", issuedAtomic: "10000000", scanRewardAtomic: "10000", bountyPoolAtomic: "5000000" };
 
 /** Answers each route by its parsed pathname. */
 function api(routes: { count?: () => Response; rewards?: () => Response }): typeof fetch {
@@ -27,14 +27,9 @@ describe("fetchScanStats", () => {
     );
   });
 
-  it("answers the tail reward once the full-reward places are taken", async () => {
-    const fetchImpl = api({ count: () => json({ ...COUNT, paidPlacesLeft: 5, paidScans: 20 }), rewards: () => json(REWARDS) });
-    expect(await run(fetchImpl)).toMatchObject({ paidPlacesLeft: 5, rewardAtomic: "2000" });
-  });
-
-  it("has no reward from a server that doesn't send the paid scans", async () => {
-    const fetchImpl = api({ count: () => json({ release: "1.2.3", total: 7, paidPlacesLeft: 93 }), rewards: () => json(REWARDS) });
-    expect(await run(fetchImpl)).toMatchObject({ paidPlacesLeft: 93, rewardAtomic: null });
+  it("answers the same reward for every paid place", async () => {
+    const fetchImpl = api({ count: () => json({ ...COUNT, paidPlacesLeft: 5, paidScans: 95 }), rewards: () => json(REWARDS) });
+    expect(await run(fetchImpl)).toMatchObject({ paidPlacesLeft: 5, rewardAtomic: "10000" });
   });
 
   it("reads a release with no scans as the zero the server answers", async () => {

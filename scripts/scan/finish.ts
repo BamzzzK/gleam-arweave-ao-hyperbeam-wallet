@@ -6,7 +6,6 @@ import {
   findFunction,
   isJsxPath,
   isScanAreaId,
-  nextScanIsFull,
   parseAttestation,
   roundReward,
   scanArea,
@@ -49,7 +48,7 @@ const DEAD_CHALLENGE = new Set(["challenge_unknown", "challenge_expired", "chall
 
 export type Validated =
   | { ok: false; notes: string[]; issues: Problem[] }
-  | { ok: true; notes: string[]; attestation: ParsedAttestation; id: string; challenge: ChallengeResponse; paidPlacesLeft: number | undefined; paidScans: number | undefined };
+  | { ok: true; notes: string[]; attestation: ParsedAttestation; id: string; challenge: ChallengeResponse; paidPlacesLeft: number | undefined };
 
 /** A failure that says nothing about the round: retrying the same command can pass. */
 export function isTransient(issue: Problem): boolean {
@@ -217,7 +216,7 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
     );
     return failed(fixed, notes);
   }
-  const result = sent.body as { attestationId?: unknown; paidPlacesLeft?: unknown; paidScans?: unknown } | null;
+  const result = sent.body as { attestationId?: unknown; paidPlacesLeft?: unknown } | null;
   const id = await attestationId(attestation);
   if (typeof result?.attestationId !== "string" || result.attestationId !== id) {
     return failed([
@@ -232,17 +231,16 @@ async function validate(deps: Deps, area: ScanAreaId, rerun: string, then: strin
     id,
     challenge,
     paidPlacesLeft: typeof result.paidPlacesLeft === "number" ? result.paidPlacesLeft : undefined,
-    paidScans: typeof result.paidScans === "number" ? result.paidScans : undefined,
   };
 }
 
 /** `GET /scan/rewards`, or undefined when it can't be read: the offer then leaves the amount out. */
-async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string; tail: string } | undefined> {
+async function fetchRewards(deps: Deps): Promise<{ day: string | null; full: string } | undefined> {
   const fetched = await callApi(deps, "/scan/rewards", undefined, "pnpm scan finish");
   const body = fetched.ok ? (fetched.body as Record<string, unknown> | null) : null;
   const atomic = (v: unknown): v is string => typeof v === "string" && /^\d{1,40}$/.test(v);
-  if (!body || !atomic(body.scanRewardAtomic) || !atomic(body.tailScanRewardAtomic)) return undefined;
-  return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic, tail: body.tailScanRewardAtomic };
+  if (!body || !atomic(body.scanRewardAtomic)) return undefined;
+  return { day: typeof body.day === "string" ? body.day : null, full: body.scanRewardAtomic };
 }
 
 /** Resolves `--area`, or the current round, to an area id. */
@@ -269,7 +267,7 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
   const rerun = options.area === undefined ? "pnpm scan finish" : `pnpm scan finish --area ${area}`;
   const checked = await validateRound(deps, area, rerun, `\`pnpm scan finish --area ${area}\``);
   if (!checked.ok) return { ok: false, command: "finish", lines: checked.notes, issues: checked.issues, json: {} };
-  const { attestation, id, paidPlacesLeft, paidScans } = checked;
+  const { attestation, id, paidPlacesLeft } = checked;
   await writeJson(deps, paths.finished, { attestationId: id });
 
   const rounds = await listRounds(deps);
@@ -287,13 +285,11 @@ export async function runFinish(deps: Deps, options: { area?: string } = {}): Pr
   if (suggestion !== undefined) {
     // Every waiting round takes a paid place when it is signed, before the next round does.
     const placesAfter = paidPlacesLeft === undefined ? undefined : paidPlacesLeft - waiting.length;
-    const scansAfter = paidScans === undefined ? undefined : paidScans + waiting.length;
     if (placesAfter !== undefined && placesAfter <= 0) nextAmountAtomic = "0";
     else {
       const rewards = await fetchRewards(deps);
       if (rewards !== undefined) {
-        const place = scansAfter === undefined || nextScanIsFull(scansAfter) ? rewards.full : rewards.tail;
-        nextAmountAtomic = roundReward(BigInt(place), nextRound).toString();
+        nextAmountAtomic = roundReward(BigInt(rewards.full), nextRound).toString();
       }
     }
   }

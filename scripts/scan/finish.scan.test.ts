@@ -195,9 +195,9 @@ describe("pnpm scan finish: the round offer", () => {
     );
   });
 
-  it("forecasts the tail reward, and no points once the waiting rounds take the last places", async () => {
-    const tail = setup(goodAttestation(), { fetchImpl: fakeApi({ "/attestations/check": acceptCheck(81, 19) }) });
-    expect(closing(render(await runFinish(tail), false))).toContain("Round 2 earns 2.72 points even with no findings");
+  it("forecasts the full reward for a late place, and no points once the waiting rounds take the last places", async () => {
+    const late = setup(goodAttestation(), { fetchImpl: fakeApi({ "/attestations/check": acceptCheck(2) }) });
+    expect(closing(render(await runFinish(late), false))).toContain("Round 2 earns 13.64 points even with no findings");
 
     const gone = setup(goodAttestation(), { fetchImpl: fakeApi({ "/attestations/check": acceptCheck(1) }) });
     expect(closing(render(await runFinish(gone), false))).toContain("Round 2 is recorded but earns no points, and nobody has examined");

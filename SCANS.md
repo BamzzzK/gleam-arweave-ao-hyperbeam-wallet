@@ -128,8 +128,8 @@ Examples:
 
 `finish` forecasts the next round: its number is the wallet's last
 signed round known here plus the rounds waiting plus 1, and its base
-reward is the full or tail amount from `GET /scan/rewards` for the paid
-places left after the waiting rounds take theirs. `next` takes both from
+reward is the amount from `GET /scan/rewards` while paid places are
+left after the waiting rounds take theirs. `next` takes both from
 `GET /scan/next`. With no paid place left the offer says the round is
 recorded but earns no points, and still offers it. With no area left
 `finish` offers only "file", and `next` says the next release opens new
@@ -238,7 +238,8 @@ voids it with `scan-void`, which removes its points and frees its paid
 place.
 
 **Limited payoff.** A scan earns a small, fixed amount, and a release
-pays at most 100 scans, all but the first 20 at a fifth of the rate. Each further round adds only 10% of that amount. Finding real
+pays at most 100 scans, fewer when little of its code is unexamined.
+Each further round adds only 10% of that amount. Finding real
 problems pays far more, and that can't be faked.
 
 ## Points
@@ -254,11 +255,10 @@ challenge, so it doesn't fall as scans examine functions. A patch
 release that changes little opens 10, so it still gets fresh reviews;
 releases scanned before this rule opened 100.
 
-**Scans.** The first 20 paid scans of each release earn **0.1% of the
-previous day's total holding points**, and later ones earn
-**0.02%**, credited as soon as they're accepted. The tail keeps
-clean scans worth reporting after the first 20 without letting total
-spend grow with the number of scans. Once the paid places are taken,
+**Scans.** Each paid scan earns **0.1% of the previous day's total
+holding points**, credited as soon as it's accepted. Every paid place
+answers unexamined code, so each earns the same; the place count, not
+the rate, keeps total spend in line with the work. Once the paid places are taken,
 scans are still recorded and shown but earn nothing. Each round takes a place like any
 other scan, and earns the place's amount times its round multiplier
 (Areas and rounds). A scan that earns no points, such as one made before the

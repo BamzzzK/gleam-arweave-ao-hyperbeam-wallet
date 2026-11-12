@@ -1,12 +1,11 @@
 import { isRelease } from "./attestation";
-import { nextScanIsFull } from "./rewards";
 
 export interface ScanStats {
   /** Non-voided attestations of the release. */
   total: number;
   /** Of the release's paid places, how many are still open. */
   paidPlacesLeft: number;
-  /** Atomic points the release's next paid scan earns now, full or tail; null before the first snapshot day or when it can't be read. */
+  /** Atomic points a paid scan earns now; null before the first snapshot day or when it can't be read. */
   rewardAtomic: string | null;
   /** Atomic points in the bounty pool; null when it's empty or can't be read. */
   bountyPoolAtomic: string | null;
@@ -43,17 +42,13 @@ export async function fetchScanStats(deps: {
     readJson(deps.fetchImpl, `${deps.apiUrl}/attestations/count?release=${encodeURIComponent(deps.release)}`),
     readJson(deps.fetchImpl, `${deps.apiUrl}/scan/rewards`),
   ]);
-  const { total, paidPlacesLeft, paidScans } = (count ?? {}) as { total?: unknown; paidPlacesLeft?: unknown; paidScans?: unknown };
+  const { total, paidPlacesLeft } = (count ?? {}) as { total?: unknown; paidPlacesLeft?: unknown };
   if (!isCount(total) || !isCount(paidPlacesLeft)) return null;
-  const taken = isCount(paidScans) ? paidScans : null;
-  const { day, scanRewardAtomic, tailScanRewardAtomic, bountyPoolAtomic } = (rewards ?? {}) as {
+  const { day, scanRewardAtomic, bountyPoolAtomic } = (rewards ?? {}) as {
     day?: unknown;
     scanRewardAtomic?: unknown;
-    tailScanRewardAtomic?: unknown;
     bountyPoolAtomic?: unknown;
   };
-  // Which reward is next depends on the paid scans taken, so a server that doesn't send them gives no reward.
-  const next = taken === null ? undefined : nextScanIsFull(taken) ? scanRewardAtomic : tailScanRewardAtomic;
-  const rewardAtomic = typeof day === "string" && isAtomic(next) ? next : null;
+  const rewardAtomic = typeof day === "string" && isAtomic(scanRewardAtomic) ? scanRewardAtomic : null;
   return { total, paidPlacesLeft, rewardAtomic, bountyPoolAtomic: isAtomic(bountyPoolAtomic) ? bountyPoolAtomic : null };
 }

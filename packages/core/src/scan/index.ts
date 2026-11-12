@@ -22,14 +22,12 @@ export { decodeAttestationPayload, encodeAttestationPayload } from "./payload";
 export { fetchScanStats } from "./count";
 export type { ScanStats } from "./count";
 export {
-  FULL_REWARD_SCANS,
   MIN_PAID_SCANS_PER_RELEASE,
   PAID_SCANS_PER_RELEASE,
   ROUND_STEP_PERCENT,
-  nextScanIsFull,
   paidPlacesFor,
   roundReward,
-  scanRewards,
+  scanRewardOf,
 } from "./rewards";
 export { SCAN_AREAS, areaOfTier, isScanAreaId, scanArea, surfaceFileTiers } from "./areas";
 export type { ScanArea, ScanAreaId } from "./areas";
