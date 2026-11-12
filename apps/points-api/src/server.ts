@@ -6,6 +6,7 @@ import { readConfig } from "./config";
 import { dbFromPool } from "./db";
 import { createGithubClient } from "./github";
 import { migrate } from "./migrate";
+import { createPriceService } from "./prices";
 import { startSnapshotScheduler } from "./scheduler";
 
 const config = readConfig(process.env);
@@ -18,7 +19,18 @@ if (!config.githubToken) {
   console.warn("Set GITHUB_TOKEN; unauthenticated GitHub allows 60 requests an hour, which community scans can exhaust.");
 }
 
-serve({ fetch: createApp({ db, pointsPhase: config.pointsPhase, github: createGithubClient({ repo: config.githubRepo, token: config.githubToken }) }).fetch, port: config.port }, (info) => {
+if (!config.coinGeckoApiKey) {
+  console.warn("Set COINGECKO_API_KEY; without it, prices come from CoinPaprika alone.");
+}
+
+const app = createApp({
+  db,
+  pointsPhase: config.pointsPhase,
+  github: createGithubClient({ repo: config.githubRepo, token: config.githubToken }),
+  prices: createPriceService({ coinGeckoApiKey: config.coinGeckoApiKey }),
+});
+
+serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Points API listening on :${info.port}`);
 });
 

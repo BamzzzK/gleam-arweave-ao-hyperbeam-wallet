@@ -10,6 +10,8 @@ export interface Config {
   githubRepo: string;
   /** Optional; raises GitHub's API rate limit. */
   githubToken?: string;
+  /** Optional; without it, prices come from CoinPaprika alone. */
+  coinGeckoApiKey?: string;
 }
 
 export function readConfig(env: Record<string, string | undefined>): Config {
@@ -30,5 +32,6 @@ export function readConfig(env: Record<string, string | undefined>): Config {
     pointsPhase: phase === "1" ? 1 : 2,
     githubRepo: env.GITHUB_REPO || DEFAULT_GITHUB_REPO,
     ...(env.GITHUB_TOKEN ? { githubToken: env.GITHUB_TOKEN } : {}),
+    ...(env.COINGECKO_API_KEY ? { coinGeckoApiKey: env.COINGECKO_API_KEY } : {}),
   };
 }
