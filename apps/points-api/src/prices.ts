@@ -2,15 +2,26 @@ import { isFiatCurrency, type FiatCurrency } from "@gleam/core/src/models/displa
 import { DEFAULT_TOKEN_REGISTRY, type HistoricalPricePoint, type HistoricalRange } from "@gleam/core/src/pricing/index.ts";
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
-/** Public demo key — CoinGecko's free tier, not a secret. */
-const COINGECKO_DEMO_API_KEY = "CG-XG6hdjK9NPY2vfPVZQbAptqY";
 const COINPAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1";
 
-const SPOT_TTL_MS = 60_000;
-const HISTORY_TTL_MS = 5 * 60_000;
-const FX_TTL_MS = 60 * 60_000;
-/** A failed lookup is remembered briefly so an upstream outage isn't hammered once per client. */
-const FAILURE_TTL_MS = 15_000;
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+/**
+ * CoinGecko's demo plan allows 10,000 calls a month. Each cache key
+ * refreshes at most once per TTL however many clients ask, so a month
+ * costs at most: spot 4,320 (one call for every id), history
+ * 2 ids × (1,440 + 360 + 120 + 30) = 3,900, FX 120. About 8,300.
+ */
+const SPOT_TTL_MS = 10 * MINUTE_MS;
+const HISTORY_TTL_MS: Record<number, number> = { 1: 30 * MINUTE_MS, 7: 2 * HOUR_MS, 30: 6 * HOUR_MS, 365: 24 * HOUR_MS };
+const FX_TTL_MS = 6 * HOUR_MS;
+/** A failed lookup is retried after this long, so an outage isn't hammered once per client. */
+const FAILURE_TTL_MS = MINUTE_MS;
+/** After any CoinGecko failure (a spent quota answers 429), CoinPaprika answers alone for this long. */
+const COINGECKO_COOLDOWN_MS = 15 * MINUTE_MS;
+/** A failed refresh keeps serving the last good answer for up to this long. */
+const MAX_STALE_MS = 24 * HOUR_MS;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 export const HISTORICAL_RANGES: readonly HistoricalRange[] = ["24H", "7D", "1M", "1Y", "ALL"];
@@ -52,46 +63,61 @@ export function parseFxQuery(query: Record<string, string | undefined>): FiatCur
   return isFiatCurrency(query.currency) ? query.currency : null;
 }
 
-interface Entry<T> {
-  value: T;
+interface Entry {
+  value: unknown;
   expiresAt: number;
 }
 
 export interface PriceServiceOptions {
+  /** Without one, CoinGecko is never called and CoinPaprika answers alone. */
+  coinGeckoApiKey?: string;
   fetchImpl?: typeof fetch;
   now?: () => number;
 }
 
+const SPOT_IDS = [...PAPRIKA_ID_BY_GECKO_ID.keys()];
+
 /**
- * Looks prices up at CoinGecko, then CoinPaprika, behind a short cache.
- * Keys are bounded by the registry (ids × ranges), so the maps can't grow
- * from client input.
+ * Looks prices up at CoinGecko, then CoinPaprika, behind a cache. Keys are
+ * bounded by the registry (ids × ranges, currencies), so the maps can't
+ * grow from client input.
  */
 export function createPriceService(options: PriceServiceOptions = {}): PriceService {
-  const fetchImpl = options.fetchImpl ?? ((input: string) => fetch(input, { signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }));
+  const fetchImpl: typeof fetch =
+    options.fetchImpl ?? ((input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) }));
   const now = options.now ?? Date.now;
-  const spotCache = new Map<string, Entry<number | null>>();
-  const historyCache = new Map<string, Entry<HistoricalPricePoint[]>>();
-  const fxCache = new Map<string, Entry<number | null>>();
+  const coinGeckoApiKey = options.coinGeckoApiKey;
+  const entries = new Map<string, Entry>();
+  const lastGood = new Map<string, { value: unknown; at: number }>();
   const inFlight = new Map<string, Promise<unknown>>();
+  let coinGeckoPausedUntil = 0;
 
-  // Concurrent misses for one key share a single upstream round trip.
+  // Concurrent misses for one key share a single upstream round trip. An
+  // empty answer is retried sooner, and is replaced by the last good one
+  // (`fillFromStale` decides how) while that is recent enough.
   function cached<T>(
-    cache: Map<string, Entry<T>>,
     key: string,
     ttlMs: number,
     isEmpty: (value: T) => boolean,
     load: () => Promise<T>,
+    fillFromStale: (fresh: T, stale: T) => T = (_fresh, stale) => stale,
   ): Promise<T> {
-    const hit = cache.get(key);
-    if (hit && now() < hit.expiresAt) return Promise.resolve(hit.value);
+    const hit = entries.get(key);
+    if (hit && now() < hit.expiresAt) return Promise.resolve(hit.value as T);
 
     const pending = inFlight.get(key) as Promise<T> | undefined;
     if (pending) return pending;
 
     const request = load()
-      .then((value) => {
-        cache.set(key, { value, expiresAt: now() + (isEmpty(value) ? FAILURE_TTL_MS : ttlMs) });
+      .then((fresh) => {
+        let value = fresh;
+        if (isEmpty(fresh)) {
+          const good = lastGood.get(key);
+          if (good && now() - good.at < MAX_STALE_MS) value = fillFromStale(fresh, good.value as T);
+        } else {
+          lastGood.set(key, { value: fresh, at: now() });
+        }
+        entries.set(key, { value, expiresAt: now() + (isEmpty(fresh) ? FAILURE_TTL_MS : ttlMs) });
         return value;
       })
       .finally(() => inFlight.delete(key));
@@ -99,10 +125,21 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     return request;
   }
 
-  async function getJson(url: string): Promise<unknown> {
-    const response = await fetchImpl(url);
+  async function getJson(url: string, headers?: Record<string, string>): Promise<unknown> {
+    const response = await fetchImpl(url, headers ? { headers } : undefined);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
+  }
+
+  // The key goes in a header so it stays out of URLs that get logged.
+  async function coinGecko(path: string): Promise<unknown> {
+    if (!coinGeckoApiKey || now() < coinGeckoPausedUntil) throw new Error("CoinGecko is not in use.");
+    try {
+      return await getJson(`${COINGECKO_BASE_URL}${path}`, { "x-cg-demo-api-key": coinGeckoApiKey });
+    } catch (error) {
+      coinGeckoPausedUntil = now() + COINGECKO_COOLDOWN_MS;
+      throw error;
+    }
   }
 
   async function firstSuccess<T>(isEmpty: (value: T) => boolean, empty: T, ...sources: (() => Promise<T>)[]): Promise<T> {
@@ -117,12 +154,12 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     return empty;
   }
 
-  async function geckoSpot(id: string): Promise<number | null> {
-    const body = (await getJson(
-      `${COINGECKO_BASE_URL}/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd&x_cg_demo_api_key=${COINGECKO_DEMO_API_KEY}`,
-    )) as Record<string, { usd?: unknown }> | null;
-    const usd = body?.[id]?.usd;
-    return typeof usd === "number" ? usd : null;
+  async function geckoSpot(): Promise<Record<string, number | null>> {
+    const body = (await coinGecko(`/simple/price?ids=${SPOT_IDS.map(encodeURIComponent).join(",")}&vs_currencies=usd`)) as Record<
+      string,
+      { usd?: unknown }
+    > | null;
+    return Object.fromEntries(SPOT_IDS.map((id) => [id, typeof body?.[id]?.usd === "number" ? body[id].usd : null]));
   }
 
   async function paprikaSpot(id: string): Promise<number | null> {
@@ -133,10 +170,20 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     return typeof usd === "number" ? usd : null;
   }
 
+  async function loadSpot(): Promise<Record<string, number | null>> {
+    const prices: Record<string, number | null> = await geckoSpot().catch(() => ({}));
+    await Promise.all(
+      SPOT_IDS.filter((id) => typeof prices[id] !== "number").map(async (id) => {
+        prices[id] = await paprikaSpot(id).catch(() => null);
+      }),
+    );
+    return prices;
+  }
+
   async function geckoHistory(id: string, range: HistoricalRange): Promise<HistoricalPricePoint[]> {
-    const body = (await getJson(
-      `${COINGECKO_BASE_URL}/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${geckoDays(range)}&x_cg_demo_api_key=${COINGECKO_DEMO_API_KEY}`,
-    )) as { prices?: unknown } | null;
+    const body = (await coinGecko(`/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${geckoDays(range)}`)) as {
+      prices?: unknown;
+    } | null;
     if (!Array.isArray(body?.prices)) return [];
     return sorted(
       body.prices
@@ -158,12 +205,19 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     );
   }
 
+  // One CoinGecko call returns BTC quotes in every currency, so the table is
+  // cached once for all of them.
+  function geckoRates(): Promise<Record<string, { value?: unknown }> | null> {
+    return cached("fx-rates", FX_TTL_MS, (value) => value === null, async () => {
+      const body = (await coinGecko("/exchange_rates").catch(() => null)) as { rates?: Record<string, { value?: unknown }> } | null;
+      return body?.rates ?? null;
+    });
+  }
+
   // Both providers quote fiat against BTC, so the USD rate is the ratio of two BTC quotes.
   async function geckoFx(currency: FiatCurrency): Promise<number | null> {
-    const body = (await getJson(`${COINGECKO_BASE_URL}/exchange_rates?x_cg_demo_api_key=${COINGECKO_DEMO_API_KEY}`)) as {
-      rates?: Record<string, { value?: unknown }>;
-    } | null;
-    return ratio(body?.rates?.[currency.toLowerCase()]?.value, body?.rates?.usd?.value);
+    const rates = await geckoRates();
+    return ratio(rates?.[currency.toLowerCase()]?.value, rates?.usd?.value);
   }
 
   async function paprikaFx(currency: FiatCurrency): Promise<number | null> {
@@ -175,26 +229,27 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
 
   return {
     async spot(ids) {
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          const price = await cached(spotCache, id, SPOT_TTL_MS, (value) => value === null, () =>
-            firstSuccess<number | null>((value) => value === null, null, () => geckoSpot(id), () => paprikaSpot(id)),
-          );
-          return [id, price] as const;
-        }),
+      const all = await cached(
+        "spot",
+        SPOT_TTL_MS,
+        (prices) => SPOT_IDS.some((id) => prices[id] === null),
+        loadSpot,
+        (fresh, stale) => Object.fromEntries(SPOT_IDS.map((id) => [id, fresh[id] ?? stale[id] ?? null])),
       );
-      return Object.fromEntries(entries);
+      return Object.fromEntries(ids.map((id) => [id, all[id] ?? null]));
     },
 
-    history(id, range) {
-      return cached(historyCache, `${id}:${range}`, HISTORY_TTL_MS, (value) => value.length === 0, () =>
+    history(id, requested) {
+      // ALL is served as 1Y (see `geckoDays`), so the two share one entry.
+      const range = requested === "ALL" ? "1Y" : requested;
+      return cached(`history:${id}:${range}`, HISTORY_TTL_MS[geckoDays(range)]!, (value) => value.length === 0, () =>
         firstSuccess<HistoricalPricePoint[]>((value) => value.length === 0, [], () => geckoHistory(id, range), () => paprikaHistory(id, range)),
       );
     },
 
     fx(currency) {
       if (currency === "USD") return Promise.resolve(1);
-      return cached(fxCache, currency, FX_TTL_MS, (value) => value === null, () =>
+      return cached(`fx:${currency}`, FX_TTL_MS, (value) => value === null, () =>
         firstSuccess<number | null>((value) => value === null, null, () => geckoFx(currency), () => paprikaFx(currency)),
       );
     },

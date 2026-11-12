@@ -21,6 +21,11 @@ describe("readConfig", () => {
     expect(config.githubToken).toBe("t");
   });
 
+  it("reads the CoinGecko key, leaving it out when unset", () => {
+    expect(readConfig({ DATABASE_URL: "postgres://x", COINGECKO_API_KEY: "k" }).coinGeckoApiKey).toBe("k");
+    expect(readConfig({ DATABASE_URL: "postgres://x", COINGECKO_API_KEY: "" })).not.toHaveProperty("coinGeckoApiKey");
+  });
+
   it("reads POINTS_PHASE and treats empty as Phase 1", () => {
     const env = { DATABASE_URL: "postgres://x" };
     expect(readConfig({ ...env, POINTS_PHASE: "2" }).pointsPhase).toBe(2);
