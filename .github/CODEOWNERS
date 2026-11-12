@@ -52,6 +52,7 @@
 /packages/core/src/arweave/transaction.ts                                  @skyf0xx
 /packages/core/src/arweave/transfer.ts                                     @skyf0xx
 /packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
+/packages/runtime/src/handlers/prepared-check.ts                           @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
 /packages/keystone/src/                                                 @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx

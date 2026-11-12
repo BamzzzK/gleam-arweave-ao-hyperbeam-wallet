@@ -2,8 +2,8 @@ import {
   estimateFee,
   finishTransfer as finishArweaveTransfer,
   prepareTransfer as prepareArweaveTransfer,
-  submitTransfer as submitArweaveTransfer,
 } from "@gleam/core/src/arweave/transfer.ts";
+import { signDataItemWithSigner } from "@gleam/core/src/arweave/data-item.ts";
 import { queryActivityTransactions } from "@gleam/core/src/arweave/graphql.ts";
 import { getBalance as getArBalance } from "@gleam/core/src/arweave/balance.ts";
 import { signTransactionWithSigner, type ArweaveTransactionJson } from "@gleam/core/src/arweave/transaction.ts";
@@ -12,7 +12,6 @@ import { prepareL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import {
   finishTransfer as finishAoTransfer,
   prepareTransfer as prepareAoTransfer,
-  submitTransfer as submitAoTransfer,
 } from "@gleam/core/src/ao/transfer.ts";
 import { assessRecipient } from "@gleam/core/src/recipients/index.ts";
 import {
@@ -39,6 +38,7 @@ import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { WALLETS_KEY, NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
 import { dappError } from "../dapp-error";
+import { assertTransferMatches } from "./prepared-check";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -355,27 +355,31 @@ export class TransferHandler {
 
     let txId: string;
     try {
-      if (req.collectible) {
-        const unsigned = await this.prepareCollectibleSend(req, signer.owner);
+      // The same build a hardware wallet signs, read back against the
+      // request before the keyfile signs it.
+      const unsigned = await this.prepareDeviceTransfer(req, signer.owner);
+      assertTransferMatches(
+        {
+          recipient: req.recipient,
+          amount: req.amount,
+          token: req.token,
+          // An AO data item carries no fee; every transaction carries the approved one.
+          fee: unsigned.kind === "transaction" ? approvedFee(req) : "",
+          collectible: req.collectible,
+        },
+        unsigned,
+      );
+      if (unsigned.kind === "transaction") {
         ({ txId } = await finishArweaveTransfer(
           settings.gatewayUrl,
-          unsigned,
-          await signTransactionWithSigner(unsigned, signer),
+          unsigned.transaction,
+          await signTransactionWithSigner(unsigned.transaction, signer),
           signer.owner,
         ));
-      } else if (req.token === null) {
-        ({ txId } = await submitArweaveTransfer(settings.gatewayUrl, signer, req.recipient, req.amount, approvedFee(req)));
-      } else if (transport === "l1") {
-        const unsigned = await this.prepareL1TokenSend(req, signer.owner);
-        ({ txId } = await finishArweaveTransfer(
-          settings.gatewayUrl,
-          unsigned,
-          await signTransactionWithSigner(unsigned, signer),
-          signer.owner,
-        ));
+      } else if (unsigned.kind === "dataItem") {
+        ({ messageId: txId } = await finishAoTransfer(unsigned.raw, await signDataItemWithSigner(unsigned.raw, signer), signer.owner));
       } else {
-        const { messageId } = await submitAoTransfer(signer, req.token, req.recipient, req.amount);
-        txId = messageId;
+        throw new Error(dappError("A transfer can't be signed as a message."));
       }
     } catch (error) {
       // Logged here, not just re-thrown: this runs in the background
