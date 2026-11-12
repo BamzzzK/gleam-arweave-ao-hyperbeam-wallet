@@ -10,8 +10,9 @@ import {
 } from "@gleam/core/src/scan/index.ts";
 import type { Queryable } from "./db";
 import { GithubUnavailableError, type GithubClient } from "./github";
-import { answeredFunctions, areaSummaries, canChallenge, functionKey } from "./scan-areas";
+import { areaSummaries, byLeastCovered, canChallenge, examinedFunctions, functionKey } from "./scan-areas";
 import { GITHUB_UNAVAILABLE, NO_RELEASE, failure, type ScanFailure } from "./scan-errors";
+import { openRelease } from "./scan-places";
 
 /** Long enough for a session that scans several areas and signs them all at the end. */
 export const CHALLENGE_TTL_MS = 72 * 3_600_000;
@@ -36,9 +37,10 @@ export function parseChallengeQuery(query: { area?: string }): { area: ScanAreaI
 
 /**
  * Draws a challenge from one area's functions, the first of them from those
- * no scan of the release has examined yet. Without an area it takes the one
- * with the fewest scans (ties go to the lower tier), among areas with enough
- * functions to challenge.
+ * no scan has examined in their current text. Without an area it takes the
+ * least covered one (ties go to the lower tier), among areas with enough
+ * functions to challenge. The release's first challenge fixes its paid
+ * places.
  */
 export async function issueChallenge(
   db: Queryable,
@@ -50,6 +52,7 @@ export async function issueChallenge(
     const latest = await github.latestRelease();
     if (!latest) return NO_RELEASE;
     const { functions } = await github.filesAt(latest.commit);
+    await openRelease(db, latest.release, functions);
 
     let area: ScanAreaId;
     if (requested) {
@@ -64,8 +67,8 @@ export async function issueChallenge(
       area = requested;
     } else {
       const open = (await areaSummaries(db, latest.release, functions)).filter(canChallenge);
-      const quietest = open.sort((a, b) => a.scans - b.scans || a.tier - b.tier)[0];
-      if (!quietest) {
+      const least = open.sort(byLeastCovered)[0];
+      if (!least) {
         return failure(
           503,
           "challenge_unavailable",
@@ -73,12 +76,12 @@ export async function issueChallenge(
           `v${latest.release} has fewer than ${CHALLENGE_SIZE} security functions to ask about in any area; tell the maintainers, since scans can't start until it does.`,
         );
       }
-      area = quietest.id;
+      area = least.id;
     }
 
     const pool = functions.filter((fn) => fn.area === area);
-    const answered = await answeredFunctions(db, latest.release);
-    const unexamined = pool.filter((fn) => !answered.has(functionKey(fn)));
+    const examined = await examinedFunctions(db, latest.release, pool);
+    const unexamined = pool.filter((fn) => !examined.has(functionKey(fn)));
     const picked = await pickChallenge(pool, randomBytes(32), unexamined);
     const id = randomBytes(24).toString("base64url");
     const expiresAt = new Date(now.getTime() + CHALLENGE_TTL_MS);

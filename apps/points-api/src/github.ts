@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   MAX_SCAN_FILE_BYTES,
   RELEASE_PATTERN,
@@ -23,6 +24,18 @@ export interface Release {
 /** A surface function and the area (its file's tier) it is scanned in. */
 export interface ReleaseFunction extends SurfaceFunction {
   area: ScanAreaId;
+  /** SHA-256 of the function's lines, so a scan of it on one release counts on another where it is unchanged. */
+  fingerprint: string;
+}
+
+/**
+ * Hex SHA-256 of lines `startLine`..`endLine` (1-based, split on `\n` as the
+ * scan lexer numbers them) of `text`: the function's text, wherever in the
+ * file it sits.
+ */
+export function functionFingerprint(text: string, fn: { startLine: number; endLine: number }): string {
+  const lines = text.split("\n").slice(fn.startLine - 1, fn.endLine);
+  return createHash("sha256").update(lines.join("\n")).digest("hex");
 }
 
 /** The security-surface files at a commit, read once and kept. */
@@ -253,6 +266,7 @@ export function createGithubClient(options: GithubClientOptions = {}): GithubCli
       const functions = listSurfaceFunctions(wanted.map((path) => ({ path, text: texts.get(path)! }))).map((fn) => ({
         ...fn,
         area: areaOfTier(tiers.get(fn.file)!).id,
+        fingerprint: functionFingerprint(texts.get(fn.file)!, fn),
       }));
       return { files: texts, functions };
     } catch (cause) {

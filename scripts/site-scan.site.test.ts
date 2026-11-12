@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   FULL_REWARD_SCANS as CORE_FULL_REWARD_SCANS,
+  MIN_PAID_SCANS_PER_RELEASE as CORE_MIN_PAID_SCANS_PER_RELEASE,
   PAID_SCANS_PER_RELEASE as CORE_PAID_SCANS_PER_RELEASE,
   ROUND_STEP_PERCENT as CORE_ROUND_STEP_PERCENT,
   SCAN_AREAS as CORE_SCAN_AREAS,
@@ -12,6 +13,7 @@ import {
   DEV_EXTENSION_KEY,
   EXTENSION_ID,
   FULL_REWARD_SCANS,
+  MIN_PAID_SCANS_PER_RELEASE,
   PAID_SCANS_PER_RELEASE,
   ROUND_STEP_PERCENT,
   SCAN_AREAS,
@@ -33,6 +35,7 @@ import {
   idFromHash,
   isFinal,
   nextScanReward,
+  placesOf,
   releaseFromSearch,
   resultsHref,
   roundLabel,
@@ -352,14 +355,24 @@ describe("site scan lib: the points API", () => {
     expect(await fetchRewards(vi.fn(async () => { throw new Error("offline"); }))).toMatchObject({ ok: false, status: 0 });
   });
 
-  it("gives the first 20 paid places the full reward and the rest the tail reward", () => {
+  it("gives a release's first 20 paid scans the full reward and the rest the tail reward", () => {
     const rewards = { scanRewardAtomic: "1000", tailScanRewardAtomic: "200" };
-    expect(nextScanReward(rewards, 100)).toBe("1000");
-    expect(nextScanReward(rewards, 81)).toBe("1000");
-    expect(nextScanReward(rewards, 80)).toBe("200");
-    expect(nextScanReward(rewards, 1)).toBe("200");
-    expect(nextScanReward(rewards, 0)).toBe("0");
-    expect([PAID_SCANS_PER_RELEASE, FULL_REWARD_SCANS]).toEqual([CORE_PAID_SCANS_PER_RELEASE, CORE_FULL_REWARD_SCANS]);
+    expect(nextScanReward(rewards, 10, 0)).toBe("1000");
+    expect(nextScanReward(rewards, 5, 19)).toBe("1000");
+    expect(nextScanReward(rewards, 80, 20)).toBe("200");
+    expect(nextScanReward(rewards, 0, 10)).toBe("0");
+    expect(nextScanReward(rewards, 7, undefined)).toBeNull();
+    expect([MIN_PAID_SCANS_PER_RELEASE, PAID_SCANS_PER_RELEASE, FULL_REWARD_SCANS]).toEqual([
+      CORE_MIN_PAID_SCANS_PER_RELEASE,
+      CORE_PAID_SCANS_PER_RELEASE,
+      CORE_FULL_REWARD_SCANS,
+    ]);
+  });
+
+  it("names the paid places a release opened when the server says", () => {
+    expect(placesOf({ paidPlacesLeft: 7, paidScans: 3 })).toBe(" of 10");
+    expect(placesOf({ paidPlacesLeft: 0, paidScans: 100 })).toBe(" of 100");
+    expect(placesOf({ paidPlacesLeft: 7 })).toBe("");
   });
 
   it("works out each bounty tier from the pool, rounding down as the server pays", () => {

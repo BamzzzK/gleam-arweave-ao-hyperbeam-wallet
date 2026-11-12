@@ -1,5 +1,5 @@
 import { areaOfTier, listSurfaceFunctions, parseSurfaceText, surfaceFileTiers, surfaceFiles } from "@gleam/core/src/scan/index.ts";
-import type { ReleaseFunction } from "./github";
+import { functionFingerprint, type ReleaseFunction } from "./github";
 
 export const TEST_REPO = "owner/repo";
 export const COMMIT = "c".repeat(40);
@@ -138,5 +138,6 @@ export function functionsOf(files: Record<string, string>): ReleaseFunction[] {
   return listSurfaceFunctions(wanted.map((path) => ({ path, text: files[path]! }))).map((fn) => ({
     ...fn,
     area: areaOfTier(tiers.get(fn.file)!).id,
+    fingerprint: functionFingerprint(files[fn.file]!, fn),
   }));
 }

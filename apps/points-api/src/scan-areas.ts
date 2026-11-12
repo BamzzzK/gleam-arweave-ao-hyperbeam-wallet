@@ -9,7 +9,7 @@ export interface AreaSummary {
   tier: number;
   /** The area's checking functions at the release's commit. */
   functions: number;
-  /** Distinct functions of the area answered by non-voided attestations. */
+  /** The area's functions examined in their current text, on this release or an earlier one. */
   examined: number;
   /** Non-voided attestations of this area. */
   scans: number;
@@ -28,10 +28,32 @@ export async function answeredFunctions(db: Queryable, release: string): Promise
   return new Set(rows.map(functionKey));
 }
 
+/**
+ * The `functionKey`s of the release's functions a non-voided scan has
+ * examined: answered on this release, or on any release where the function's
+ * text was the same. The first covers scans recorded before fingerprints.
+ */
+export async function examinedFunctions(db: Queryable, release: string, functions: readonly ReleaseFunction[]): Promise<Set<string>> {
+  const files = [...new Set(functions.map((fn) => fn.file))];
+  const [answered, printed] = await Promise.all([
+    answeredFunctions(db, release),
+    db.query<{ file: string; symbol: string; fingerprint: string }>(
+      `SELECT DISTINCT e.file, e.symbol, e.fingerprint
+         FROM examined_functions e JOIN attestations a ON a.id = e.attestation_id
+        WHERE a.voided_at IS NULL AND e.file = ANY($1::text[])`,
+      [files],
+    ),
+  ]);
+  const seen = new Set(printed.rows.map(fingerprintKey));
+  return new Set(functions.filter((fn) => answered.has(functionKey(fn)) || seen.has(fingerprintKey(fn))).map(functionKey));
+}
+
+const fingerprintKey = (fn: { file: string; symbol: string; fingerprint: string }) => `${functionKey(fn)}\n${fn.fingerprint}`;
+
 /** Each area of the release in tier order, with its functions, coverage and scans. */
 export async function areaSummaries(db: Queryable, release: string, functions: readonly ReleaseFunction[]): Promise<AreaSummary[]> {
   const [answered, counted] = await Promise.all([
-    answeredFunctions(db, release),
+    examinedFunctions(db, release, functions),
     db.query<{ area: string; scans: string }>(
       "SELECT area, count(*)::text AS scans FROM attestations WHERE release = $1 AND voided_at IS NULL AND area IS NOT NULL GROUP BY area",
       [release],

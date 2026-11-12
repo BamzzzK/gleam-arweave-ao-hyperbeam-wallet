@@ -11,7 +11,6 @@ import {
   isRelease,
   isScanAreaId,
   nextScanIsFull,
-  PAID_SCANS_PER_RELEASE,
   parseAttestation,
   roundReward,
   scanArea,
@@ -25,7 +24,7 @@ import {
 import type { Db, Queryable } from "./db";
 import { GithubUnavailableError, type GithubClient, type ReleaseFunction } from "./github";
 import { BASE64URL, MAX_MESSAGE_LENGTH, MAX_OWNER_LENGTH, MAX_SIGNATURE_LENGTH } from "./register";
-import { answeredFunctions, areaSummaries, areasLeft, functionKey, walletAreas, type AreaSummary } from "./scan-areas";
+import { answeredFunctions, areaSummaries, areasLeft, examinedFunctions, functionKey, walletAreas, type AreaSummary } from "./scan-areas";
 import {
   GITHUB_UNAVAILABLE,
   NO_RELEASE,
@@ -35,6 +34,7 @@ import {
   type ScanFailure,
   type ServerIssue,
 } from "./scan-errors";
+import { paidPlaces } from "./scan-places";
 import { LIVENESS_WINDOW_MS } from "./snapshot";
 
 export interface CheckRequest {
@@ -76,6 +76,8 @@ export interface CheckResult {
   /** What the wallet signs. */
   message: string;
   paidPlacesLeft: number;
+  /** Paid scans the release has taken; the next is full-reward while this is under FULL_REWARD_SCANS. */
+  paidScans: number;
   /** The area the challenge was drawn from. */
   area: ScanAreaId;
 }
@@ -91,6 +93,8 @@ export interface SubmitResult {
   /** Null when `paid`, and for a scan recorded before the reason was kept. */
   unpaidReason: UnpaidReason | null;
   paidPlacesLeft: number;
+  /** Paid scans the release has taken, this one included. */
+  paidScans: number;
   /** Null only when retrying a scan recorded before areas. */
   area: ScanAreaId | null;
   /** 1 for the wallet's first scan of the release; null only when retrying a scan recorded before rounds. */
@@ -196,14 +200,6 @@ async function distinctModels(db: Queryable, release: string): Promise<string[]>
   return rows.map((row) => row.model);
 }
 
-export async function paidPlacesLeft(db: Queryable, release: string): Promise<number> {
-  const { rows } = await db.query<{ taken: string }>(
-    "SELECT count(*)::text AS taken FROM attestations WHERE release = $1 AND paid AND voided_at IS NULL",
-    [release],
-  );
-  return Math.max(0, PAID_SCANS_PER_RELEASE - Number(rows[0]!.taken));
-}
-
 /** Everything `POST /attestations` checks except the signature, wallet liveness and registration; the one-per-area rule only when the request names the wallet. */
 export async function checkAttestation(
   db: Queryable,
@@ -221,12 +217,14 @@ export async function checkAttestation(
       if (refused) return refused;
     }
     const id = await attestationId(parsed.attestation);
+    const places = await paidPlaces(db, github, parsed.attestation.release);
     return {
       ok: true,
       result: {
         attestationId: id,
         message: buildAttestMessage(parsed.attestation.release, id),
-        paidPlacesLeft: await paidPlacesLeft(db, parsed.attestation.release),
+        paidPlacesLeft: places.left,
+        paidScans: places.taken,
         area: checked.area,
       },
     };
@@ -295,6 +293,7 @@ export async function submitAttestation(
   );
   if (earlier.rows[0]) {
     const { paid, points, unpaid_reason: unpaidReason, area, round } = earlier.rows[0];
+    const places = await paidPlaces(db, github, attestation.release);
     return {
       ok: true,
       result: {
@@ -302,7 +301,8 @@ export async function submitAttestation(
         points,
         paid,
         unpaidReason,
-        paidPlacesLeft: await paidPlacesLeft(db, attestation.release),
+        paidPlacesLeft: places.left,
+        paidScans: places.taken,
         area: isScanAreaId(area) ? area : null,
         round,
       },
@@ -342,8 +342,8 @@ export async function submitAttestation(
     // recorded. A scan that earns nothing (no snapshot day yet) doesn't use
     // one up. Each further round pays ROUND_STEP_PERCENT more of the place.
     const round = (await walletRoundsDone(tx, address, attestation.release)) + 1;
-    const left = await paidPlacesLeft(tx, attestation.release);
-    const points = left > 0 ? roundReward(await scanReward(tx, now, left), round) : 0n;
+    const { left, taken } = await paidPlaces(tx, github, attestation.release);
+    const points = left > 0 ? roundReward(await scanReward(tx, now, taken), round) : 0n;
     const paid = points > 0n;
     const unpaidReason: UnpaidReason | null = paid ? null : left > 0 ? "no_snapshot" : "places_taken";
 
@@ -356,6 +356,14 @@ export async function submitAttestation(
       ],
     );
     await tx.query("UPDATE challenges SET used_by_attestation = $2 WHERE id = $1", [attestation.challenge, id]);
+    const answered = attestation.answers.flatMap(({ file, symbol }) =>
+      checked.functions.filter((fn) => fn.file === file && fn.symbol === symbol),
+    );
+    await tx.query(
+      `INSERT INTO examined_functions (attestation_id, file, symbol, fingerprint)
+       SELECT $1, * FROM unnest($2::text[], $3::text[], $4::text[]) ON CONFLICT DO NOTHING`,
+      [id, answered.map((fn) => fn.file), answered.map((fn) => fn.symbol), answered.map((fn) => fn.fingerprint)],
+    );
     if (points > 0n) {
       await tx.query(
         "INSERT INTO scan_points (address, attestation_id, kind, amount_atomic, created_at) VALUES ($1, $2, 'scan', $3, $4)",
@@ -370,6 +378,7 @@ export async function submitAttestation(
         paid,
         unpaidReason,
         paidPlacesLeft: paid ? left - 1 : left,
+        paidScans: paid ? taken + 1 : taken,
         area: checked.area,
         round,
       },
@@ -437,10 +446,10 @@ export async function scanRewardBasis(db: Queryable, now: Date): Promise<ScanRew
   return { day: rows[0]!.day, issuedAtomic, rewardAtomic: fullAtomic, tailRewardAtomic: tailAtomic };
 }
 
-/** What the next paid place earns before its round's step: the full reward for the first places, the tail one after. */
-export async function scanReward(tx: Queryable, now: Date, placesLeft: number): Promise<bigint> {
+/** What the next paid place earns before its round's step, after `paidScans` paid scans: the full reward for the first places, the tail one after. */
+export async function scanReward(tx: Queryable, now: Date, paidScans: number): Promise<bigint> {
   const basis = await scanRewardBasis(tx, now);
-  return nextScanIsFull(placesLeft) ? basis.rewardAtomic : basis.tailRewardAtomic;
+  return nextScanIsFull(paidScans) ? basis.rewardAtomic : basis.tailRewardAtomic;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -455,6 +464,7 @@ interface ReleaseSummary {
   commit: string;
   total: number;
   paidPlacesLeft: number;
+  paidScans: number;
   models: string[];
   /** Null until a first page (no cursor) has computed it. */
   coverage: AttestationListing["coverage"] | null;
@@ -539,6 +549,8 @@ export interface AttestationListing {
   total: number;
   /** Over every attestation of the release, whatever page this is. */
   paidPlacesLeft: number;
+  /** Paid scans the release has taken, whatever page this is; the places it opened are this plus `paidPlacesLeft`. */
+  paidScans: number;
   /** The distinct model labels of the release's non-voided attestations, whatever page this is, sorted. At most MAX_MODEL_LABELS. */
   models: string[];
   /**
@@ -579,18 +591,25 @@ export interface AttestationListing {
 }
 
 /**
- * Non-voided attestations of one release, and nothing else: no coverage and
- * no GitHub call. A release with none is 0, whether or not it exists.
+ * Non-voided attestations of one release and its paid places, with no
+ * coverage. A release with none is 0, whether or not it exists. GitHub is
+ * read only once per release, to open the latest one's places.
  */
 export async function countAttestations(
   db: Queryable,
+  github: GithubClient,
   query: { release?: string },
-): Promise<{ ok: true; release: string; total: number; paidPlacesLeft: number } | ScanFailure> {
+): Promise<{ ok: true; release: string; total: number; paidPlacesLeft: number; paidScans: number } | ScanFailure> {
   if (query.release === undefined || !isRelease(query.release)) {
     return failure(400, "malformed_request", "release", "release must be a version like 1.4.0 (no leading v).");
   }
-  const [total, placesLeft] = await Promise.all([attestationTotal(db, query.release), paidPlacesLeft(db, query.release)]);
-  return { ok: true, release: query.release, total, paidPlacesLeft: placesLeft };
+  try {
+    const [total, places] = await Promise.all([attestationTotal(db, query.release), paidPlaces(db, github, query.release)]);
+    return { ok: true, release: query.release, total, paidPlacesLeft: places.left, paidScans: places.taken };
+  } catch (error) {
+    if (error instanceof GithubUnavailableError) return GITHUB_UNAVAILABLE;
+    throw error;
+  }
 }
 
 /**
@@ -646,10 +665,12 @@ export async function listAttestations(
 
     let summary = cache.summary(release);
     if (!summary || (summary.coverage === null && query.cursor === null)) {
+      const places = await paidPlaces(db, github, release);
       summary = {
         commit,
         total: await attestationTotal(db, release),
-        paidPlacesLeft: await paidPlacesLeft(db, release),
+        paidPlacesLeft: places.left,
+        paidScans: places.taken,
         models: await distinctModels(db, release),
         coverage: query.cursor === null ? await coverageOf(db, github, { release, commit, isLatest, storedTotal }) : null,
       };
@@ -685,6 +706,7 @@ export async function listAttestations(
       commit,
       total: summary.total,
       paidPlacesLeft: summary.paidPlacesLeft,
+      paidScans: summary.paidScans,
       models: summary.models,
       coverage: summary.coverage,
       attestations: page.map((row) => ({
@@ -717,11 +739,11 @@ export async function listAttestations(
 }
 
 /**
- * Distinct functions answered by non-voided attestations, out of the
- * release's checking functions. The latest release reads its function list
- * from GitHub (cached) to name the unexamined ones; if GitHub is down it
- * falls back to the total stored when the first attestation was accepted.
- * Any other release uses the stored total alone and never calls GitHub.
+ * The latest release's checking functions examined in their current text,
+ * on it or an earlier release, read from GitHub (cached) to name the
+ * unexamined ones. If GitHub is down, and for any other release, it counts
+ * only the functions the release's own scans answered, out of the total
+ * stored when its first attestation was accepted.
  */
 async function coverageOf(
   db: Queryable,
@@ -734,10 +756,11 @@ async function coverageOf(
   if (release.isLatest) {
     try {
       const { functions } = await github.filesAt(release.commit);
-      const unexamined = functions.filter((fn) => !seen.has(functionKey(fn))).map(({ file, symbol }) => ({ file, symbol }));
+      const examined = await examinedFunctions(db, release.release, functions);
+      const unexamined = functions.filter((fn) => !examined.has(functionKey(fn))).map(({ file, symbol }) => ({ file, symbol }));
       const byArea = SCAN_AREAS.map(({ id, label }) => {
         const own = functions.filter((fn) => fn.area === id);
-        return { id, label, examined: own.filter((fn) => seen.has(functionKey(fn))).length, total: own.length };
+        return { id, label, examined: own.filter((fn) => examined.has(functionKey(fn))).length, total: own.length };
       });
       return { examined: functions.length - unexamined.length, total: functions.length, unexamined, byArea };
     } catch (error) {

@@ -275,10 +275,10 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get("/attestations/count", async (c) => {
     if (!attestationsListByIp.allow(clientIp(c), now().getTime())) return scanRateLimited(c, attestationsListByIp, now().getTime());
-    const outcome = await countAttestations(deps.db, c.req.query());
+    const outcome = await countAttestations(deps.db, github, c.req.query());
     if (!outcome.ok) return scanFailure(c, outcome);
     c.header("Cache-Control", "public, max-age=60");
-    return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft });
+    return c.json({ release: outcome.release, total: outcome.total, paidPlacesLeft: outcome.paidPlacesLeft, paidScans: outcome.paidScans });
   });
 
   app.get("/attestations", async (c) => {

@@ -82,10 +82,17 @@ is round 1, and each round earns 10% of the base reward more than the
 last: round 2 earns 110%, round 3 120% (`roundReward`, truncated to an
 atomic integer).
 
-`GET /scan/challenge` without `area` picks the area with the fewest
-non-voided scans on the latest release, the lower tier on a tie. It
-draws the 3 functions from that area only, and from the functions no
-scan of the release has answered yet while there are any.
+`GET /scan/challenge` without `area` picks the area with the smallest
+share of its functions examined, the lower tier on a tie. It draws the
+3 functions from that area only, and from the unexamined ones while
+there are any.
+
+**Coverage carries across releases.** The server keeps a SHA-256 of
+each answered function's text at the attestation's commit. A function
+counts as examined on a release when a non-voided scan answered it on
+that release, or on any release where its text was the same. Moving a
+function within its file doesn't change its text; editing it does. So
+each release's challenges go to new and changed functions first.
 
 ### The CLI
 
@@ -130,7 +137,7 @@ rounds. Points show with two decimals below 1,000, as in the extension.
 
 A scan from before areas has `area` and `round` null and counts as one
 round of its release. `GET /scan/areas` gives each area's function
-count, how many of them scans have examined, and its scan count.
+count, how many of them are examined, and its scan count on the release.
 
 ## The attestation
 
@@ -187,8 +194,8 @@ Gleam.
    automatic check (see Proof of scan).
 4. The wallet hasn't already scanned this area of this release. The
    failure names an area that is still free, or says every area is done.
-5. The release has fewer than 100 paid scans so far. If it has 100,
-   the attestation is still recorded, with no points.
+5. The release has a paid place left (Points). If not, the
+   attestation is still recorded, with no points.
 
 `POST /attestations/check` runs checks 2 and 3 and the attestation's
 shape, without a signature, and fails with the same issues as the
@@ -230,9 +237,8 @@ sign.
 voids it with `scan-void`, which removes its points and frees its paid
 place.
 
-**Limited payoff.** A scan earns a small, fixed amount, and only 100
-scans are paid per release, all but the first 20 at a fifth of the
-rate. Each further round adds only 10% of that amount. Finding real
+**Limited payoff.** A scan earns a small, fixed amount, and a release
+pays at most 100 scans, all but the first 20 at a fifth of the rate. Each further round adds only 10% of that amount. Finding real
 problems pays far more, and that can't be faked.
 
 ## Points
@@ -240,12 +246,20 @@ problems pays far more, and that can't be faked.
 Both amounts scale with the holding points Gleam pays out, so rewards
 rise as the community grows.
 
-**Scans.** The first 20 scans of each release earn **0.1% of the
-previous day's total holding points**, and scans 21 to 100 earn
+**Paid places.** A release opens one paid place for every 3 of its
+functions that aren't examined (Coverage carries across releases),
+rounded up, at least 10 and at most 100 (`paidPlacesFor`). The number
+is fixed the first time the release is asked for, normally by its first
+challenge, so it doesn't fall as scans examine functions. A patch
+release that changes little opens 10, so it still gets fresh reviews;
+releases scanned before this rule opened 100.
+
+**Scans.** The first 20 paid scans of each release earn **0.1% of the
+previous day's total holding points**, and later ones earn
 **0.02%**, credited as soon as they're accepted. The tail keeps
 clean scans worth reporting after the first 20 without letting total
-spend grow with the number of scans. After 100, scans are still
-recorded and shown but earn nothing. Each round takes a place like any
+spend grow with the number of scans. Once the paid places are taken,
+scans are still recorded and shown but earn nothing. Each round takes a place like any
 other scan, and earns the place's amount times its round multiplier
 (Areas and rounds). A scan that earns no points, such as one made before the
 first daily snapshot, doesn't use up a paid place. `scan.html`,
@@ -423,7 +437,9 @@ the latest. A `#<attestation id>` opens that entry. It shows:
 
 - **Coverage.** For example, "41 of 64 security functions examined by
   at least one review", split by area, with the functions no one has
-  examined yet listed. The figure comes from the challenge answers, which the server
+  examined yet listed. For the latest release this counts scans of
+  earlier releases where a function is unchanged; for an older one,
+  only that release's own scans. The figure comes from the challenge answers, which the server
   has already checked against the code, so a made-up model label can't
   raise it.
 - **Attestations.** Each with its area, round, model label, result,

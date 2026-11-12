@@ -93,12 +93,12 @@ export type Handler = (url: URL, init?: RequestInit) => Response | Promise<Respo
 
 /** Answers the check with the id of what it received, as the server does. */
 export const acceptCheck =
-  (paidPlacesLeft = 90): Handler =>
+  (paidPlacesLeft = 90, paidScans = 10): Handler =>
   async (_url, init) => {
     const { attestation } = JSON.parse(String(init?.body)) as { attestation: unknown };
     const parsed = parseAttestation(attestation);
     if (!parsed.ok) return json({ code: "invalid_attestation" }, 400);
-    return json({ ok: true, attestationId: await attestationId(parsed.attestation), message: "m", paidPlacesLeft, area: "keys" });
+    return json({ ok: true, attestationId: await attestationId(parsed.attestation), message: "m", paidPlacesLeft, paidScans, area: "keys" });
   };
 
 /** A points API keyed by path; `calls` collects each requested path and query. */

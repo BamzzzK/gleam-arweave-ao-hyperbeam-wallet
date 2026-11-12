@@ -12,6 +12,7 @@ import {
   fetchRewards,
   formatPoints,
   nextScanReward,
+  placesOf,
   resultsHref,
   roundStepPercent,
 } from "./scan-lib.js";
@@ -110,16 +111,18 @@ function gleam(atomic) {
   return text === "0" && /^0*[1-9]\d*$/.test(atomic) ? "<0.01" : text;
 }
 
-/** Which reward the next review gets depends on the release's places left, so it needs both responses. */
+/** Which reward the next review gets depends on the release's paid scans, so it needs both responses. */
 function renderReviewFigures(rewards, listing) {
   $("[data-stat-places]").textContent = String(Math.max(0, listing.paidPlacesLeft));
+  $("[data-stat-places-of]").textContent = placesOf(listing);
   const reward = $("[data-stat-reward]");
+  const next = nextScanReward(rewards, listing.paidPlacesLeft, listing.paidScans);
   // Before the first daily snapshot a review is recorded unpaid, so "0" would mislead.
   if (rewards.day === null) {
     reward.textContent = "After the first snapshot";
     reward.parentElement.classList.add("figures-pending");
   } else {
-    reward.textContent = gleam(nextScanReward(rewards, listing.paidPlacesLeft));
+    reward.textContent = next === null ? "–" : gleam(next);
     reward.parentElement.classList.remove("figures-pending");
   }
   reveal($("[data-review-figures]"));

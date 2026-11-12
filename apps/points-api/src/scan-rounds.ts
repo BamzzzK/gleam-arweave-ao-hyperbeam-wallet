@@ -1,9 +1,10 @@
 import { isAttestationId, isScanAreaId, roundReward, type ScanAreaId } from "@gleam/core/src/scan/index.ts";
-import { paidPlacesLeft, scanReward, walletRoundsDone } from "./attestations";
+import { scanReward, walletRoundsDone } from "./attestations";
 import type { Queryable } from "./db";
 import { GithubUnavailableError, type GithubClient } from "./github";
 import { areaSummaries, areasLeft, walletAreas, type AreaSummary } from "./scan-areas";
 import { GITHUB_UNAVAILABLE, NO_RELEASE, failure, type ScanFailure } from "./scan-errors";
+import { paidPlaces } from "./scan-places";
 
 /** `GET /scan/areas`: the latest release's areas in tier order. */
 export async function listAreas(
@@ -67,8 +68,8 @@ export async function scanNext(
 
   try {
     const nextRound = (await walletRoundsDone(db, row.address, row.release)) + 1;
-    const placesLeft = await paidPlacesLeft(db, row.release);
-    const nextReward = placesLeft > 0 ? roundReward(await scanReward(db, now, placesLeft), nextRound) : 0n;
+    const places = await paidPlaces(db, github, row.release);
+    const nextReward = places.left > 0 ? roundReward(await scanReward(db, now, places.taken), nextRound) : 0n;
 
     let left: AreaSummary[] = [];
     const latest = await github.latestRelease();
