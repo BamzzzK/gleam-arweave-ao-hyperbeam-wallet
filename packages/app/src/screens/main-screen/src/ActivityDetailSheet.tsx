@@ -12,7 +12,7 @@ export interface ActivityDetail {
   entry: ActivityEntry;
   title: string;
   subtitle: string;
-  amountLabel: string;
+  amountLabel: string | undefined;
   /** The saved contact or own-wallet name for `entry.address`, if any. */
   name: string | undefined;
   /** Opens send prefilled with `entry.address`; absent when the entry's token can't be sent from here. */
@@ -72,7 +72,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
   return (
     <div className="flex flex-col gap-6 px-6 pb-6 pt-4 phone:px-5">
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p>
+        {detail.amountLabel ? <p className="text-h2 font-semibold tracking-tight text-foreground">{detail.amountLabel}</p> : null}
         <button
           type="button"
           onClick={() => onViewInExplorer(entry.txId)}
@@ -84,7 +84,7 @@ function DetailBody({ runtime, detail, onViewInExplorer }: { runtime: RuntimePor
             <path d="M7 17 17 7M8 7h9v9" />
           </svg>
         </button>
-        {knownName === undefined && !naming ? (
+        {knownName === undefined && !naming && entry.type !== "upload" ? (
           <button type="button" onClick={() => setNaming(true)} className="text-caption text-muted underline-offset-2 hover:underline phone:min-h-11">
             {t("mainScreen.saveAddress")}
           </button>
