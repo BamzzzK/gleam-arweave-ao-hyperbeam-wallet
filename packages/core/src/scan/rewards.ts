@@ -2,8 +2,8 @@ import { CHALLENGE_SIZE } from "./attestation";
 
 /** The most paid places a release opens; later scans are recorded and earn nothing. */
 export const PAID_SCANS_PER_RELEASE = 100;
-/** The fewest paid places a release opens, so every release gets fresh reviews even when little is unexamined. */
-export const MIN_PAID_SCANS_PER_RELEASE = 10;
+/** The fewest paid places a release opens, so a release with nothing unexamined still pays one scan. */
+export const MIN_PAID_SCANS_PER_RELEASE = 1;
 /** A paid scan earns 1/1000 (0.1%) of the previous day's total holding points. */
 const SCAN_REWARD_DIVISOR = 1000n;
 

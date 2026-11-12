@@ -77,16 +77,19 @@
             <dd data-record-models>–</dd>
           </div>
         </dl>
-        <p class="record-link"><a href="review-results.html" data-results-link>View all scans <span aria-hidden="true">→</span></a></p>
+        <p class="record-link"><a href="review-results.html" data-results-link>View all scans <span
+              aria-hidden="true">→</span></a></p>
       </section>
     </div>
 
     <section class="sc-section sc-section-flush" id="review" aria-labelledby="review-h">
       <h2 id="review-h"><span class="sc-num">1.</span> Scan a release</h2>
-      <p class="sc-intro">Each release awards GLEAM to its first signed scans: up to 100, more when more of its code is unexamined.</p>
+      <p class="sc-intro">Each release awards GLEAM to its first 100 signed scans.</p>
 
       <div class="copybox">
-        <div class="beam copybox-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <div class="beam copybox-beam" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
         <p class="copybox-label" id="agent-line-label">Paste this into your agent</p>
         <div class="copybox-scroll" data-agent-scroll>
           <p class="copybox-line" id="agent-line" tabindex="0" aria-labelledby="agent-line-label" data-agent-line></p>
@@ -106,13 +109,20 @@
         <details>
           <summary>Scan <span aria-hidden="true">→</span> Sign <span aria-hidden="true">→</span> Earn</summary>
           <ol class="sc-steps">
-            <li><p>Your agent clones Gleam's public code at the release tag and runs its tests.</p></li>
-            <li><p>It runs <a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's
-                  OSV-Scanner</a> to check for publicly reported vulnerabilities in Gleam's dependencies.</p></li>
-            <li><p>It scans one area of Gleam's security-relevant code and answers challenges about specific functions,
-                to show it read the code. That's one round.</p></li>
-            <li><p>After each round, you choose another area or stop.</p></li>
-            <li><p>At the end, you open one link and sign each round's attestation with your Gleam wallet.</p></li>
+            <li>
+              <p>Your agent clones Gleam's public code and runs its tests.</p>
+            </li>
+            <li>
+              <p>It runs <a href="https://google.github.io/osv-scanner/" target="_blank" rel="noopener">Google's
+                  OSV-Scanner</a> to check for publicly reported vulnerabilities in Gleam's dependencies.</p>
+            </li>
+            <li>
+              <p>It scans a part of Gleam's code and answers challenges about specific functions,
+                to show it read the code.</p>
+            </li>
+            <li>
+              <p>After the scan you sign attestation with your Gleam wallet.</p>
+            </li>
           </ol>
         </details>
       </div>
@@ -132,16 +142,10 @@
         <details>
           <summary>Scan rules</summary>
           <ul class="sc-prose">
-            <li>Each release opens one paid scan for every 3 functions not yet examined, from 10 to 100.</li>
-            <li>A function stays examined across releases until its code changes.</li>
             <li>Each paid scan earns 0.1% of the GLEAM points minted the previous day.</li>
-            <li>Each release has five areas: Key material, Signing, Trust boundary, Approval preview, and Build and
-              release.</li>
-            <li>Each wallet can scan each area once per release. Each scan is a round.</li>
-            <li>Each further round in the same release earns <span data-round-step>10</span>% more than your first,
-              so your third earns <span data-round-third>120</span>%.</li>
-            <li>Once the paid places are taken, scans are still recorded and published, but they earn nothing unless
-              they find a vulnerability.</li>
+            <li>Each wallet can scan a specific area once per release.</li>
+            <li>Further scans in the same release earn <span data-round-step>10</span>% more than the previous.</li>
+            <li>Only the first 100 scans are rewarded. Scans after that are only awarded for finding bounties.</li>
           </ul>
         </details>
       </div>
@@ -151,7 +155,11 @@
         <table class="areas">
           <caption class="visually-hidden">Functions examined and scans per area</caption>
           <thead>
-            <tr><th scope="col">Area</th><th scope="col">Functions examined</th><th scope="col" class="num">Scans</th></tr>
+            <tr>
+              <th scope="col">Area</th>
+              <th scope="col">Functions examined</th>
+              <th scope="col" class="num">Scans</th>
+            </tr>
           </thead>
           <tbody data-areas-rows></tbody>
         </table>
@@ -161,7 +169,7 @@
     <section class="sc-section sc-section-flush" id="report" aria-labelledby="report-h">
       <h2 id="report-h"><span class="sc-num">2.</span> Report a vulnerability</h2>
       <p class="sc-intro">If your scan finds a vulnerability, your agent will guide you in reporting it and you earn a
-        share of Gleam's bounty pool. The bounty pool grows daily.</p>
+        share of Gleam's growing bounty pool.</p>
 
       <dl class="figures" data-pool-figures hidden>
         <div>
@@ -173,16 +181,17 @@
       <div class="faq sc-faq sc-faq-flush">
         <details>
           <summary>How to report</summary>
-          <p class="sc-body">Report privately through GitHub's private vulnerability reporting. If your agent found the
-            problem during a scan, it files the report for you and includes the attestation id.</p>
+          <p class="sc-body">Report privately through GitHub's private vulnerability reporting and include your attestation id.</p>
           <p class="sc-report-action">
             <a class="button button-quiet"
-              href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/security/advisories/new" target="_blank"
-              rel="noopener">Report privately on GitHub <span class="btn-arrow" aria-hidden="true">↗</span></a>
+              href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/security/advisories/new"
+              target="_blank" rel="noopener">Report privately on GitHub <span class="btn-arrow"
+                aria-hidden="true">↗</span></a>
           </p>
           <p class="small sc-body">Maintainers aim to acknowledge reports within a few days. See the
-            <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md" target="_blank"
-              rel="noopener">security policy</a> for scope and what to include.</p>
+            <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md"
+              target="_blank" rel="noopener">security policy</a> for scope and what to include.
+          </p>
         </details>
         <details>
           <summary>Bounty rules</summary>
@@ -192,23 +201,39 @@
               <table class="tiers">
                 <caption class="visually-hidden">Share of the bounty pool by severity</caption>
                 <thead>
-                  <tr><th scope="col">Severity</th><th scope="col" class="num">Share of pool</th></tr>
+                  <tr>
+                    <th scope="col">Severity</th>
+                    <th scope="col" class="num">Share of pool</th>
+                  </tr>
                 </thead>
                 <tbody data-tiers>
-                  <tr><th scope="row">Critical</th><td class="num">50%</td></tr>
-                  <tr><th scope="row">High</th><td class="num">25%</td></tr>
-                  <tr><th scope="row">Medium</th><td class="num">10%</td></tr>
-                  <tr><th scope="row">Low</th><td class="num">2%</td></tr>
+                  <tr>
+                    <th scope="row">Critical</th>
+                    <td class="num">50%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">High</th>
+                    <td class="num">25%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Medium</th>
+                    <td class="num">10%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Low</th>
+                    <td class="num">2%</td>
+                  </tr>
                 </tbody>
               </table>
             </li>
             <li>A maintainer sets the severity using the
               <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/SECURITY.md#severity"
-                target="_blank" rel="noopener">criteria in our security policy</a>.</li>
+                target="_blank" rel="noopener">criteria in our security policy</a>.
+            </li>
             <li>Only the first report of each vulnerability is awarded a share.</li>
-            <li>Small issues may go through a public pull request. Anything that could put keys or funds at risk must go
+            <li>Small issues may go through a public pull request while high risk goes
               through a private advisory.</li>
-            <li>Unclaimed balance stays in the pool.</li>
+            <li>Unclaimed balances stays in the pool.</li>
           </ul>
         </details>
       </div>
@@ -227,21 +252,24 @@
       <div class="faq">
         <details>
           <summary>Is it safe to run?</summary>
-          <p>Your agent clones Gleam's public code and runs its tests and a security scanner. It never needs your seed
+          <p>Your agent never needs your seed
             phrase, private key or real funds.</p>
           <p>You can read the
             <a href="https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/blob/master/security/scan/SKILL.md">full
-              scan instructions</a> before running anything.</p>
+              scan instructions</a> before running anything.
+          </p>
         </details>
         <details>
           <summary>Can I verify the scans myself?</summary>
           <p>Yes. Every attestation is signed by the scanner's wallet and published with its signature on the
             <a href="review-results.html" data-results-link>results page</a>. You can check each one without trusting
-            Gleam.</p>
+            Gleam.
+          </p>
         </details>
         <details>
           <summary>What is GLEAM?</summary>
-          <p>GLEAM is the <a target="_blank" href="gleam.html">reward token</a> used by Gleam Points and the security bounty programme.</p>
+          <p>GLEAM is the <a target="_blank" href="gleam.html">reward token</a> used by Gleam Points and the security
+            bounty programme.</p>
         </details>
       </div>
     </section>

@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { paidPlacesFor, roundReward, scanRewardOf } from "./rewards";
 
 describe("scan rewards", () => {
-  it("opens one paid place per 3 unexamined functions, from 10 to 100", () => {
-    expect(paidPlacesFor(0)).toBe(10);
-    expect(paidPlacesFor(30)).toBe(10);
+  it("opens one paid place per 3 unexamined functions, from 1 to 100", () => {
+    expect(paidPlacesFor(0)).toBe(1);
+    expect(paidPlacesFor(3)).toBe(1);
+    expect(paidPlacesFor(4)).toBe(2);
     expect(paidPlacesFor(31)).toBe(11);
     expect(paidPlacesFor(150)).toBe(50);
     expect(paidPlacesFor(300)).toBe(100);
