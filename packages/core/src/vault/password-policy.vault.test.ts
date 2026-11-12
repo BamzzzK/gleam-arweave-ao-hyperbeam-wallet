@@ -23,6 +23,10 @@ describe("validatePassword", () => {
     expect(result.valid).toBe(false);
   });
 
+  it.each(["LOGINPASSWORD", "loginpassword", "LoginPassword"])("rejects the common password %s in any case", (password) => {
+    expect(validatePassword(password)).toMatchObject({ valid: false, reason: expect.stringMatching(/too common/i) });
+  });
+
   it("accepts a sufficiently long, non-common password", () => {
     const result = validatePassword("Tr0ub4dor&Skyfoxx!");
     expect(result).toEqual({ valid: true });

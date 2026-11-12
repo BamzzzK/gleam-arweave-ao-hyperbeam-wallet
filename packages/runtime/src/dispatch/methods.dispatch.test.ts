@@ -99,6 +99,21 @@ describe("dispatch/methods: page params", () => {
     },
   );
 
+  it.each(["12abc", "abc12", "\n12", "12\n"])("refuses the transferAoTokens amount %j, whose digits are not the whole string", (amount) => {
+    expect(() =>
+      parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient: PROCESS_ID, amount }),
+    ).toThrow("transferAoTokens: amount must be a positive whole number");
+  });
+
+  it.each([`x${PROCESS_ID}`, `${PROCESS_ID}x`, PROCESS_ID.slice(1), `\n${PROCESS_ID}`, `${PROCESS_ID}\n`])(
+    "refuses the transferAoTokens recipient %j, which isn't exactly 43 characters",
+    (recipient) => {
+      expect(() =>
+        parseParams(PAGE_METHODS.transferAoTokens.params, { token: PROCESS_ID, recipient, amount: "1" }),
+      ).toThrow("transferAoTokens: recipient must be an Arweave address");
+    },
+  );
+
   it("refuses a transferAoTokens token that isn't a process id", () => {
     expect(() =>
       parseParams(PAGE_METHODS.transferAoTokens.params, { token: "ao-process-id", recipient: PROCESS_ID, amount: "1" }),

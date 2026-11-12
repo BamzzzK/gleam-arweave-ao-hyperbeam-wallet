@@ -18,6 +18,8 @@ export default {
     "packages/runtime/src/dispatch/**/*.ts",
     "!**/*.test.ts",
     "!**/index.ts",
+    // A word list: its mutants are string literals, and the policy logic is in password-policy.ts.
+    "!packages/core/src/vault/common-passwords.ts",
   ],
   // pnpm links each package's dependencies inside the package, which a
   // sandbox copy leaves behind, so mutants are written in place.
@@ -32,5 +34,5 @@ export default {
   dryRunTimeoutMinutes: 30,
   reporters: ["clear-text", "html", "progress"],
   htmlReporter: { fileName: "reports/mutation/index.html" },
-  thresholds: { high: 90, low: 80, break: 70 },
+  thresholds: { high: 90, low: 80, break: 85 },
 };
