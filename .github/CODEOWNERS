@@ -72,6 +72,7 @@
 # 3 Trust boundary between pages and the wallet
 /apps/extension/entrypoints/background/                                    @skyf0xx
 /packages/runtime/src/create-runtime.ts                                    @skyf0xx
+/packages/runtime/src/handlers/provider.ts                                 @skyf0xx
 /packages/runtime/src/dispatch/site.ts                                     @skyf0xx
 /packages/core/src/models/site-origin.ts                                   @skyf0xx
 /apps/extension/entrypoints/content/                                       @skyf0xx

@@ -28,6 +28,16 @@ describe("dispatch/methods: tiers", () => {
     expect(source).toMatch(/spec\.approval\s*\?\s*\{ requestApproval: \(request\) => approval\.requestApproval\(request\) \}/);
   });
 
+  // The page handlers live in handlers/provider.ts, which may import approval.ts only
+  // for types (.dependency-cruiser.cjs). This checks the instance isn't passed in.
+  it("hands the page handlers two grant functions, never the approval handler", () => {
+    const source = readFileSync(join(import.meta.dirname, "../create-runtime.ts"), "utf8");
+    const call = /createProviderHandlers\(\{([\s\S]*?)\n {2}\}\);/.exec(source)?.[1] ?? "";
+    expect(call).toContain("findActiveGrant: (origin) => approval.findActiveGrant(origin)");
+    expect(call).toContain("revokeGrant: (req) => approval.revokeGrant(req)");
+    expect(call.replace(/approval\.(findActiveGrant|revokeGrant)\(/g, "")).not.toMatch(/\bapproval\b/);
+  });
+
   it("lets only connect and disconnect run without a grant", () => {
     const ungranted = Object.entries(PAGE_METHODS)
       .filter(([, spec]) => !spec.grant)

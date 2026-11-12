@@ -58,7 +58,7 @@ export interface PageMethodSpec<S extends z.ZodType = z.ZodType> {
   tier: "page";
   /**
    * Can open an approval window. Only these methods' handlers get
-   * `requestApproval` (`create-runtime.ts` `ApprovalCall`), and the
+   * `requestApproval` (`handlers/provider.ts` `ApprovalCall`), and the
    * provider waits the approval timeout for them rather than the read one.
    */
   approval: boolean;
