@@ -1,14 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { nextScanIsFull, paidPlacesFor, roundReward, scanRewards } from "./rewards";
+import { paidPlacesFor, roundReward, scanRewardOf } from "./rewards";
 
 describe("scan rewards", () => {
-  it("pays the full reward to a release's first 20 paid scans", () => {
-    expect(nextScanIsFull(0)).toBe(true);
-    expect(nextScanIsFull(19)).toBe(true);
-    expect(nextScanIsFull(20)).toBe(false);
-    expect(nextScanIsFull(99)).toBe(false);
-  });
-
   it("opens one paid place per 3 unexamined functions, from 10 to 100", () => {
     expect(paidPlacesFor(0)).toBe(10);
     expect(paidPlacesFor(30)).toBe(10);
@@ -18,9 +11,9 @@ describe("scan rewards", () => {
     expect(paidPlacesFor(594)).toBe(100);
   });
 
-  it("truncates 0.1% and 0.02% of the day's issued points", () => {
-    expect(scanRewards(1_243_332n)).toEqual({ fullAtomic: 1243n, tailAtomic: 248n });
-    expect(scanRewards(0n)).toEqual({ fullAtomic: 0n, tailAtomic: 0n });
+  it("truncates 0.1% of the day's issued points", () => {
+    expect(scanRewardOf(1_243_332n)).toBe(1243n);
+    expect(scanRewardOf(0n)).toBe(0n);
   });
 
   it("adds 10% of the base per round after the first", () => {

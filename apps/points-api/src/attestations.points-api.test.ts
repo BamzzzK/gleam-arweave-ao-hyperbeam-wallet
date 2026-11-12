@@ -321,7 +321,7 @@ describe("POST /attestations", () => {
     expect(await count(s.db, "scan_points")).toBe(0);
   });
 
-  it("pays the 20th place the full reward and the 21st the tail reward", async () => {
+  it("pays every paid place the same reward", async () => {
     const s = await setup();
     await s.register(alice);
     await s.register(bob);
@@ -332,7 +332,7 @@ describe("POST /attestations", () => {
     const after = await s.post("/attestations", await attestBody(bob, attestationFor(s, await s.challenge())));
 
     expect(last.json).toMatchObject({ paid: true, points: "10000", paidPlacesLeft: 80, paidScans: 20 });
-    expect(after.json).toMatchObject({ paid: true, points: "2000", paidPlacesLeft: 79, paidScans: 21 });
+    expect(after.json).toMatchObject({ paid: true, points: "10000", paidPlacesLeft: 79, paidScans: 21 });
   });
 
   it("pays the 100th place and not the 101st", async () => {
@@ -1137,7 +1137,7 @@ describe("GET /scan/rewards", () => {
     const s = await setup();
     const { status, json, headers } = await s.get("/scan/rewards");
     expect(status).toBe(200);
-    expect(json).toEqual({ day: null, issuedAtomic: "0", scanRewardAtomic: "0", tailScanRewardAtomic: "0", bountyPoolAtomic: "0", roundStepPercent: 10 });
+    expect(json).toEqual({ day: null, issuedAtomic: "0", scanRewardAtomic: "0", bountyPoolAtomic: "0", roundStepPercent: 10 });
     expect(headers.get("cache-control")).toBe("public, max-age=60");
   });
 
@@ -1155,7 +1155,7 @@ describe("GET /scan/rewards", () => {
     await s.db.query("INSERT INTO snapshot_runs (day, completed_at, wallet_count, failed_count) VALUES ('2026-10-08', now(), 1, 0)");
     await s.db.query("INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic) VALUES ('2026-10-08', $1, 5000000, 0, 0)", [alice.address]);
     const { json } = await s.get("/scan/rewards");
-    expect(json).toMatchObject({ day: "2026-10-07", issuedAtomic: "10000000", scanRewardAtomic: "10000", tailScanRewardAtomic: "2000" });
+    expect(json).toMatchObject({ day: "2026-10-07", issuedAtomic: "10000000", scanRewardAtomic: "10000" });
   });
 
   it("answers exactly what a paid scan submitted now is credited", async () => {
@@ -1167,7 +1167,7 @@ describe("GET /scan/rewards", () => {
       await s.db.query("INSERT INTO points (day, address, holding_atomic, referee_bonus_atomic, referrer_bonus_atomic) VALUES ('2026-10-07', $1, $2, 0, 0)", [address, holding]);
     }
     const rewards = await s.get("/scan/rewards");
-    expect(rewards.json).toMatchObject({ day: "2026-10-07", issuedAtomic: "1243332", scanRewardAtomic: "1243", tailScanRewardAtomic: "248" });
+    expect(rewards.json).toMatchObject({ day: "2026-10-07", issuedAtomic: "1243332", scanRewardAtomic: "1243" });
 
     const { json } = await s.post("/attestations", await attestBody(alice, attestationFor(s, await s.challenge())));
     expect(json).toMatchObject({ ok: true, paid: true, points: rewards.json.scanRewardAtomic });
@@ -1418,12 +1418,12 @@ describe("scan areas and rounds", () => {
       expect(after.json.suggested).toBe("boundary");
     });
 
-    it("pays the tail reward's next round after the first 20 places", async () => {
+    it("offers the next round the full reward with its round step, however many places are taken", async () => {
       const s = await areas();
       await fillPaidPlaces(s.db, "1.0.0", 19);
       const { json: scanned } = await scan(s, alice, "keys");
       expect(scanned).toMatchObject({ points: "10000", paidPlacesLeft: 80 });
-      expect((await s.get(`/scan/next?attestation=${scanned.attestationId}`)).json).toMatchObject({ nextRound: 2, nextRewardAtomic: "2200" });
+      expect((await s.get(`/scan/next?attestation=${scanned.attestationId}`)).json).toMatchObject({ nextRound: 2, nextRewardAtomic: "11000" });
     });
 
     it("offers no area once the wallet has scanned every one", async () => {

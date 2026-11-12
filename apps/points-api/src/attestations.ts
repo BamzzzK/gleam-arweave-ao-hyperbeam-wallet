@@ -10,11 +10,10 @@ import {
   checkAnswers,
   isRelease,
   isScanAreaId,
-  nextScanIsFull,
   parseAttestation,
   roundReward,
   scanArea,
-  scanRewards,
+  scanRewardOf,
   type AttestationAnswer,
   type ChallengeFunction,
   type ParsedAttestation,
@@ -76,7 +75,7 @@ export interface CheckResult {
   /** What the wallet signs. */
   message: string;
   paidPlacesLeft: number;
-  /** Paid scans the release has taken; the next is full-reward while this is under FULL_REWARD_SCANS. */
+  /** Paid scans the release has taken; the places it opened are this plus `paidPlacesLeft`. */
   paidScans: number;
   /** The area the challenge was drawn from. */
   area: ScanAreaId;
@@ -343,7 +342,7 @@ export async function submitAttestation(
     // one up. Each further round pays ROUND_STEP_PERCENT more of the place.
     const round = (await walletRoundsDone(tx, address, attestation.release)) + 1;
     const { left, taken } = await paidPlaces(tx, github, attestation.release);
-    const points = left > 0 ? roundReward(await scanReward(tx, now, taken), round) : 0n;
+    const points = left > 0 ? roundReward(await scanReward(tx, now), round) : 0n;
     const paid = points > 0n;
     const unpaidReason: UnpaidReason | null = paid ? null : left > 0 ? "no_snapshot" : "places_taken";
 
@@ -426,10 +425,8 @@ export interface ScanRewardBasis {
   day: string | null;
   /** Total holding points issued on `day`; 0 when it is null. */
   issuedAtomic: bigint;
-  /** What one of a release's first FULL_REWARD_SCANS paid scans earns if submitted now: 0.1% of `issuedAtomic`, truncated. */
+  /** What a paid scan earns if submitted now: 0.1% of `issuedAtomic`, truncated. */
   rewardAtomic: bigint;
-  /** What a later paid scan earns: 0.02% of `issuedAtomic`, truncated. */
-  tailRewardAtomic: bigint;
 }
 
 /** The snapshot day a scan submitted at `now` is paid from, and what it pays. */
@@ -442,14 +439,12 @@ export async function scanRewardBasis(db: Queryable, now: Date): Promise<ScanRew
     [now.toISOString().slice(0, 10)],
   );
   const issuedAtomic = BigInt(rows[0]!.total);
-  const { fullAtomic, tailAtomic } = scanRewards(issuedAtomic);
-  return { day: rows[0]!.day, issuedAtomic, rewardAtomic: fullAtomic, tailRewardAtomic: tailAtomic };
+  return { day: rows[0]!.day, issuedAtomic, rewardAtomic: scanRewardOf(issuedAtomic) };
 }
 
-/** What the next paid place earns before its round's step, after `paidScans` paid scans: the full reward for the first places, the tail one after. */
-export async function scanReward(tx: Queryable, now: Date, paidScans: number): Promise<bigint> {
-  const basis = await scanRewardBasis(tx, now);
-  return nextScanIsFull(paidScans) ? basis.rewardAtomic : basis.tailRewardAtomic;
+/** What a paid place earns before its round's step. */
+export async function scanReward(tx: Queryable, now: Date): Promise<bigint> {
+  return (await scanRewardBasis(tx, now)).rewardAtomic;
 }
 
 const DEFAULT_PAGE_SIZE = 50;

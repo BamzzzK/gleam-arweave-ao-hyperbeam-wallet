@@ -394,24 +394,17 @@ function isRewards(body) {
     (body.day === null || typeof body.day === "string") &&
     ATOMIC.test(body.issuedAtomic) &&
     ATOMIC.test(body.scanRewardAtomic) &&
-    ATOMIC.test(body.tailScanRewardAtomic) &&
     ATOMIC.test(body.bountyPoolAtomic)
   );
 }
 
-/** The paid places a release opens, at least and at most, and how many of its scans earn the full reward; the same as `@gleam/core/scan`. */
+/** The paid places a release opens, at least and at most; the same as `@gleam/core/scan`. */
 export const MIN_PAID_SCANS_PER_RELEASE = 10;
 export const PAID_SCANS_PER_RELEASE = 100;
-export const FULL_REWARD_SCANS = 20;
 
-/**
- * What the next scan earns, from a `GET /scan/rewards` body and a release's
- * `paidPlacesLeft` and `paidScans`; null when the paid scans are unknown.
- */
-export function nextScanReward(rewards, paidPlacesLeft, paidScans) {
-  if (paidPlacesLeft <= 0) return "0";
-  if (!Number.isInteger(paidScans)) return null;
-  return paidScans < FULL_REWARD_SCANS ? rewards.scanRewardAtomic : rewards.tailScanRewardAtomic;
+/** What the next scan earns, from a `GET /scan/rewards` body and a release's `paidPlacesLeft`. */
+export function nextScanReward(rewards, paidPlacesLeft) {
+  return paidPlacesLeft > 0 ? rewards.scanRewardAtomic : "0";
 }
 
 /** " of N", the paid places a listing's release opened; empty when the server doesn't say. */
@@ -420,7 +413,7 @@ export function placesOf(listing) {
 }
 
 /**
- * Reads `GET /scan/rewards`: what a paid scan earns now (full and tail) and the bounty pool's
+ * Reads `GET /scan/rewards`: what a paid scan earns now and the bounty pool's
  * balance. Settles with `{ ok: true, rewards }` or `{ ok: false, … }`.
  */
 export async function fetchRewards(fetchImpl, { signal } = {}) {

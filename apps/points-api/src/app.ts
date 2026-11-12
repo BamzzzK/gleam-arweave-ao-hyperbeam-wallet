@@ -48,7 +48,6 @@ interface ScanRewards {
   day: string | null;
   issuedAtomic: string;
   scanRewardAtomic: string;
-  tailScanRewardAtomic: string;
   bountyPoolAtomic: string;
   roundStepPercent: number;
 }
@@ -246,7 +245,6 @@ export function createApp(deps: AppDeps): Hono {
           day: basis.day,
           issuedAtomic: basis.issuedAtomic.toString(),
           scanRewardAtomic: basis.rewardAtomic.toString(),
-          tailScanRewardAtomic: basis.tailRewardAtomic.toString(),
           bountyPoolAtomic: pool.toString(),
           roundStepPercent: ROUND_STEP_PERCENT,
         },

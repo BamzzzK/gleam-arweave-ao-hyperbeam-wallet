@@ -69,7 +69,7 @@ export async function scanNext(
   try {
     const nextRound = (await walletRoundsDone(db, row.address, row.release)) + 1;
     const places = await paidPlaces(db, github, row.release);
-    const nextReward = places.left > 0 ? roundReward(await scanReward(db, now, places.taken), nextRound) : 0n;
+    const nextReward = places.left > 0 ? roundReward(await scanReward(db, now), nextRound) : 0n;
 
     let left: AreaSummary[] = [];
     const latest = await github.latestRelease();
