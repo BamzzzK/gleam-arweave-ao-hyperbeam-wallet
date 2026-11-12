@@ -1,10 +1,8 @@
-import { createKeystonePanel } from "@gleam/keystone";
 import type { DeviceSignPanels } from "@gleam/app/src/approval/device-panels.tsx";
-import { cameraDeniedHelp } from "../keystone/camera-help";
+import { LazyKeystonePanel } from "./LazyKeystonePanel";
 import { LedgerPanel } from "./LedgerPanel";
 
-
 export const DEVICE_SIGN_PANELS: DeviceSignPanels = {
-  keystone: createKeystonePanel({ cameraDeniedHelp }),
+  keystone: LazyKeystonePanel,
   ledger: LedgerPanel,
 };

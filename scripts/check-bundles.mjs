@@ -3,7 +3,8 @@
 // Checks the built extension (after `pnpm wxt:build`):
 // - the keyring page, which holds unlocked keys, loads only key code;
 // - the background worker and every other extension page pull in only the
-//   npm packages listed per entry in BUNDLE_PACKAGES;
+//   npm packages listed per entry in BUNDLE_PACKAGES, and their lazy chunks
+//   only those in LAZY_PACKAGES;
 // - provider.js (run in every page's world) and the content script
 //   (injected into every page) stay within their size budgets and pull in
 //   no npm package beyond the ones listed here.
@@ -45,9 +46,10 @@ export const PAGE_SCRIPTS = {
 /**
  * The npm packages each other built entry may contain: the background worker
  * (dispatcher, signing) and every page that renders what a user approves or
- * sees. Adding a package is a reviewed change to this file. A package that no
- * longer appears fails the check too, so a list never holds more than the
- * bundle does.
+ * sees, up front: a chunk it loads through `import()` has its own list in
+ * LAZY_PACKAGES. Adding a package is a reviewed change to this file. A package
+ * that no longer appears fails the check too, so a list never holds more than
+ * the bundle does.
  */
 const POPUP_PACKAGES = [
   "@aklinker1/zero-serialize-error",
@@ -117,10 +119,6 @@ export const BUNDLE_PACKAGES = {
     "@aklinker1/zero-serialize-error",
     "@dicebear/core",
     "@dicebear/styles",
-    "@keystonehq/alias-sampling",
-    "@keystonehq/bc-ur-registry",
-    "@keystonehq/bc-ur-registry-arweave",
-    "@ngraveio/bc-ur",
     "@radix-ui/primitive",
     "@radix-ui/react-compose-refs",
     "@radix-ui/react-context",
@@ -143,88 +141,23 @@ export const BUNDLE_PACKAGES = {
     "@wxt-dev/browser",
     "aria-hidden",
     "arweave",
-    "assert",
-    "available-typed-arrays",
-    "base-x",
-    "base64-js",
     "bignumber.js",
-    "bs58",
-    "bs58check",
-    "buffer",
-    "call-bind",
-    "call-bind-apply-helpers",
-    "call-bound",
-    "cbor-sync",
-    "cipher-base",
     "class-variance-authority",
     "clsx",
-    "core-util-is",
-    "crc",
-    "create-hash",
-    "define-data-property",
-    "define-properties",
-    "dunder-proto",
-    "es-define-property",
-    "es-errors",
-    "es-object-atoms",
-    "events",
-    "for-each",
-    "generator-function",
-    "get-intrinsic",
     "get-nonce",
-    "get-proto",
-    "gopd",
-    "has-property-descriptors",
-    "has-symbols",
-    "has-tostringtag",
-    "hash-base",
-    "hasown",
-    "ieee754",
-    "inherits",
-    "is-arguments",
-    "is-callable",
-    "is-generator-function",
-    "is-nan",
-    "is-regex",
-    "is-typed-array",
-    "isarray",
-    "jsbi",
-    "jsqr",
-    "math-intrinsics",
-    "md5.js",
-    "object-is",
-    "object-keys",
-    "object.assign",
-    "possible-typed-array-names",
-    "process-nextick-args",
     "qr-code-styling",
-    "qrcode-generator",
     "react",
     "react-dom",
     "react-remove-scroll",
     "react-remove-scroll-bar",
     "react-style-singleton",
-    "readable-stream",
-    "ripemd160",
-    "safe-buffer",
-    "safe-regex-test",
     "scheduler",
-    "set-function-length",
-    "sha.js",
-    "stream-browserify",
-    "string_decoder",
     "tailwind-merge",
-    "to-buffer",
     "tslib",
-    "typed-array-buffer",
     "use-callback-ref",
     "use-sidecar",
-    "util",
-    "util-deprecate",
-    "uuid",
     "vaul",
     "vite-plugin-node-polyfills",
-    "which-typed-array",
     "wxt",
     "zod",
   ],
@@ -340,6 +273,90 @@ export const BUNDLE_PACKAGES = {
 };
 
 /**
+ * Chunks an entry loads only through a dynamic `import()`, each named by a
+ * module it holds, with the npm packages it adds beyond what the entry
+ * loads up front. The entry's own list in BUNDLE_PACKAGES covers only that
+ * eager part, so a lazy chunk that becomes eager fails the check.
+ * @type {Record<string, Record<string, string[]>>}
+ */
+export const LAZY_PACKAGES = {
+  "approval.html": {
+    // The Keystone panel, loaded the first time a Keystone wallet signs.
+    "apps/extension/src/hardware/panels/keystone.ts": [
+      "@keystonehq/alias-sampling",
+      "@keystonehq/bc-ur-registry",
+      "@keystonehq/bc-ur-registry-arweave",
+      "@ngraveio/bc-ur",
+      "assert",
+      "available-typed-arrays",
+      "base-x",
+      "base64-js",
+      "bs58",
+      "bs58check",
+      "buffer",
+      "call-bind",
+      "call-bind-apply-helpers",
+      "call-bound",
+      "cbor-sync",
+      "cipher-base",
+      "core-util-is",
+      "crc",
+      "create-hash",
+      "define-data-property",
+      "define-properties",
+      "dunder-proto",
+      "es-define-property",
+      "es-errors",
+      "es-object-atoms",
+      "events",
+      "for-each",
+      "generator-function",
+      "get-intrinsic",
+      "get-proto",
+      "gopd",
+      "has-property-descriptors",
+      "has-symbols",
+      "has-tostringtag",
+      "hash-base",
+      "hasown",
+      "ieee754",
+      "inherits",
+      "is-arguments",
+      "is-callable",
+      "is-generator-function",
+      "is-nan",
+      "is-regex",
+      "is-typed-array",
+      "isarray",
+      "jsbi",
+      "jsqr",
+      "math-intrinsics",
+      "md5.js",
+      "object-is",
+      "object-keys",
+      "object.assign",
+      "possible-typed-array-names",
+      "process-nextick-args",
+      "qrcode-generator",
+      "readable-stream",
+      "ripemd160",
+      "safe-buffer",
+      "safe-regex-test",
+      "set-function-length",
+      "sha.js",
+      "stream-browserify",
+      "string_decoder",
+      "to-buffer",
+      "typed-array-buffer",
+      "util",
+      "util-deprecate",
+      "uuid",
+      "which-typed-array",
+    ],
+  },
+};
+
+/**
  * The npm package a module path belongs to, or null for workspace code.
  * @param {string} modulePath
  * @returns {string | null}
@@ -351,11 +368,12 @@ export function packageOf(modulePath) {
 
 /**
  * Every chunk the entry loads, statically or dynamically, and the
- * modules in them.
+ * modules in them. A dynamic import of a chunk in `lazy` isn't followed.
  * @param {string} entry
  * @param {Map<string, { imports: string[], dynamicImports: string[], modules: string[] }>} chunks
+ * @param {ReadonlySet<string>} [lazy]
  */
-export function closureOf(entry, chunks) {
+export function closureOf(entry, chunks, lazy = new Set()) {
   /** @type {Set<string>} */
   const seen = new Set();
   const queue = [entry];
@@ -368,7 +386,7 @@ export function closureOf(entry, chunks) {
     const chunk = chunks.get(fileName);
     if (!chunk) throw new Error(`no module map for ${fileName}; rebuild with pnpm wxt:build`);
     modules.push(...chunk.modules);
-    queue.push(...chunk.imports, ...chunk.dynamicImports);
+    queue.push(...chunk.imports, ...chunk.dynamicImports.filter((fileName) => !lazy.has(fileName)));
   }
   return { chunks: [...seen], modules };
 }
@@ -389,15 +407,76 @@ export function keyringProblems(modules) {
  * @param {string[]} modules
  */
 export function entryPackageProblems(entry, modules) {
-  const allowed = BUNDLE_PACKAGES[entry];
-  const found = new Set(modules.map(packageOf).filter((name) => name !== null));
+  return listProblems(entry, BUNDLE_PACKAGES[entry], packagesOf(modules));
+}
+
+/**
+ * Problems with one entry's lazy chunks: one that is missing or that the
+ * entry loads up front, and the npm packages each adds, in both directions.
+ * @param {string} entry
+ * @param {string[]} eagerModules the entry's closure, not following its lazy chunks
+ * @param {Map<string, { imports: string[], dynamicImports: string[], modules: string[] }>} chunks
+ */
+export function lazyChunkProblems(entry, eagerModules, chunks) {
+  const eager = new Set(eagerModules);
+  const eagerPackages = packagesOf(eagerModules);
+  /** @type {string[]} */
+  const problems = [];
+  for (const [module, allowed] of Object.entries(LAZY_PACKAGES[entry] ?? {})) {
+    const fileName = chunkHolding(module, chunks);
+    if (fileName === null) {
+      problems.push(`${entry}: no chunk holds ${module}; remove it from LAZY_PACKAGES`);
+    } else if (eager.has(module)) {
+      problems.push(`${entry} loads ${module} up front; it must load only through import()`);
+    } else {
+      const added = [...packagesOf(closureOf(fileName, chunks).modules)].filter((name) => !eagerPackages.has(name));
+      problems.push(...listProblems(`${entry}'s lazy ${module}`, allowed, new Set(added)));
+    }
+  }
+  return problems;
+}
+
+/**
+ * The lazy chunks an entry names, by file, for `closureOf` to stop at.
+ * @param {string} entry
+ * @param {Map<string, { modules: string[] }>} chunks
+ */
+export function lazyChunksOf(entry, chunks) {
+  return new Set(
+    Object.keys(LAZY_PACKAGES[entry] ?? {})
+      .map((module) => chunkHolding(module, chunks))
+      .filter((fileName) => fileName !== null),
+  );
+}
+
+/**
+ * @param {string} module
+ * @param {Map<string, { modules: string[] }>} chunks
+ * @returns {string | null}
+ */
+function chunkHolding(module, chunks) {
+  for (const [fileName, chunk] of chunks) if (chunk.modules.includes(module)) return fileName;
+  return null;
+}
+
+/** @param {string[]} modules */
+function packagesOf(modules) {
+  return new Set(/** @type {string[]} */ (modules.map(packageOf).filter((name) => name !== null)));
+}
+
+/**
+ * @param {string} label
+ * @param {string[]} allowed
+ * @param {Set<string>} found
+ */
+function listProblems(label, allowed, found) {
   /** @type {string[]} */
   const problems = [];
   for (const name of [...found].sort()) {
-    if (!allowed.includes(name)) problems.push(`${entry} contains npm package ${name}, which isn't in its allowlist`);
+    if (!allowed.includes(name)) problems.push(`${label} contains npm package ${name}, which isn't in its allowlist`);
   }
   for (const name of allowed) {
-    if (!found.has(name)) problems.push(`${entry} no longer contains ${name}; remove it from its allowlist`);
+    if (!found.has(name)) problems.push(`${label} no longer contains ${name}; remove it from its allowlist`);
   }
   return problems;
 }
@@ -449,8 +528,9 @@ function main() {
 
   for (const entry of Object.keys(BUNDLE_PACKAGES)) {
     const files = entry.endsWith(".html") ? scriptsOf(join(out, entry)) : [entry];
-    const modules = files.flatMap((file) => closureOf(file, chunks).modules);
-    problems.push(...entryPackageProblems(entry, modules));
+    const lazy = lazyChunksOf(entry, chunks);
+    const modules = files.flatMap((file) => closureOf(file, chunks, lazy).modules);
+    problems.push(...entryPackageProblems(entry, modules), ...lazyChunkProblems(entry, modules, chunks));
   }
 
   for (const fileName of Object.keys(PAGE_SCRIPTS)) {

@@ -1,6 +1,16 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { BUNDLE_PACKAGES, closureOf, entryPackageProblems, keyringProblems, packageOf, pageScriptProblems } from "./check-bundles.mjs";
+import {
+  BUNDLE_PACKAGES,
+  closureOf,
+  entryPackageProblems,
+  keyringProblems,
+  LAZY_PACKAGES,
+  lazyChunkProblems,
+  lazyChunksOf,
+  packageOf,
+  pageScriptProblems,
+} from "./check-bundles.mjs";
 
 const PNPM = "node_modules/.pnpm/x@1.0.0/node_modules";
 
@@ -72,5 +82,52 @@ describe("entry package allowlists", () => {
     expect(entryPackageProblems("passkey.html", modules.slice(1))).toEqual([
       `passkey.html no longer contains ${allowed[0]}; remove it from its allowlist`,
     ]);
+  });
+});
+
+describe("lazy chunks", () => {
+  const PANEL = "apps/extension/src/hardware/panels/keystone.ts";
+  const lazyPackages = LAZY_PACKAGES["approval.html"]![PANEL]!;
+  const lazyModules = [PANEL, ...lazyPackages.map((name) => `${PNPM}/${name}/index.js`)];
+  const chunks = (dynamic: boolean) =>
+    new Map([
+      [
+        "chunks/approval.js",
+        {
+          imports: dynamic ? ["chunks/react.js"] : ["chunks/react.js", "chunks/keystone.js"],
+          dynamicImports: dynamic ? ["chunks/keystone.js"] : [],
+          modules: ["apps/extension/entrypoints/approval/index.tsx"],
+        },
+      ],
+      ["chunks/react.js", { imports: [], dynamicImports: [], modules: [`${PNPM}/react/index.js`] }],
+      ["chunks/keystone.js", { imports: ["chunks/react.js"], dynamicImports: [], modules: lazyModules }],
+    ]);
+
+  it("leaves a listed dynamic import out of the entry and checks only the packages it adds", () => {
+    const map = chunks(true);
+    const lazy = lazyChunksOf("approval.html", map);
+    expect([...lazy]).toEqual(["chunks/keystone.js"]);
+    const { modules } = closureOf("chunks/approval.js", map, lazy);
+    expect(modules).not.toContain(PANEL);
+    expect(lazyChunkProblems("approval.html", modules, map)).toEqual([]);
+  });
+
+  it("flags the lazy chunk when the entry loads it up front", () => {
+    const map = chunks(false);
+    const { modules } = closureOf("chunks/approval.js", map, lazyChunksOf("approval.html", map));
+    expect(lazyChunkProblems("approval.html", modules, map)).toEqual([
+      `approval.html loads ${PANEL} up front; it must load only through import()`,
+    ]);
+  });
+
+  it("flags a package the lazy chunk adds outside its list, and a missing chunk", () => {
+    const map = chunks(true);
+    map.get("chunks/keystone.js")!.modules.push(`${PNPM}/left-pad/index.js`);
+    const { modules } = closureOf("chunks/approval.js", map, lazyChunksOf("approval.html", map));
+    expect(lazyChunkProblems("approval.html", modules, map)).toEqual([
+      `approval.html's lazy ${PANEL} contains npm package left-pad, which isn't in its allowlist`,
+    ]);
+    map.delete("chunks/keystone.js");
+    expect(lazyChunkProblems("approval.html", [], map)).toEqual([`approval.html: no chunk holds ${PANEL}; remove it from LAZY_PACKAGES`]);
   });
 });
