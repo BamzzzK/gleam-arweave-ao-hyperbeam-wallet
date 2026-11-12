@@ -112,6 +112,9 @@
 /packages/core/src/models/grant.ts                                         @skyf0xx
 /packages/core/src/models/permission.ts                                    @skyf0xx
 
+/packages/app/src/screens/browser/src/                                     @skyf0xx
+/packages/app/src/screens/connected-apps/src/                              @skyf0xx
+/packages/app/src/screens/site-wallet/src/                                 @skyf0xx
 # 4 What you see is what you sign
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
@@ -142,6 +145,7 @@
 /packages/app/src/account-avatar.ts                                        @skyf0xx
 /packages/ui/src/components/wallet/AccountAvatar.tsx                       @skyf0xx
 
+/packages/app/src/screens/receive/src/                                     @skyf0xx
 # 5 Other ways in: extension config, dependencies, CI, the release gate
 /packages/app/src/screens/network-peers/                                    @skyf0xx
 /packages/runtime/src/points-invite.ts                                     @skyf0xx
@@ -199,3 +203,6 @@
 /scripts/surface-check.mjs                                                 @skyf0xx
 /apps/extension/build-plugins.ts                                           @skyf0xx
 /scripts/check-bundles.mjs                                                 @skyf0xx
+/apps/extension/entrypoints/popup/                                         @skyf0xx
+/apps/extension/entrypoints/sidepanel/                                     @skyf0xx
+/packages/app/src/App.tsx                                                  @skyf0xx
