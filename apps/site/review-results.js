@@ -1,7 +1,7 @@
 /* global AbortController, URL */
 // review-results.html. Everything from the points API (labels, reports,
 // function names) is untrusted text: nodes are built with textContent, never markup.
-import { areaLabel, coverageSummary, fetchListing, idFromHash, releaseFromSearch, roundLabel, unusedModels } from "./scan-lib.js";
+import { areaLabel, coverageSummary, fetchListing, idFromHash, placesOf, releaseFromSearch, roundLabel, unusedModels } from "./scan-lib.js";
 
 const $ = (selector) => document.querySelector(selector);
 const PAGES_UP_FRONT = 5;
@@ -221,6 +221,7 @@ async function loadRelease() {
   document.title = `Gleam scan results · v${first.listing.release}`;
   $("[data-release-title]").textContent = `Scans of v${first.listing.release}`;
   $("[data-paid-left]").textContent = String(Math.max(0, first.listing.paidPlacesLeft));
+  $("[data-paid-of]").textContent = placesOf(first.listing);
 
   // A link to one entry needs it loaded.
   const wanted = idFromHash(location.hash);

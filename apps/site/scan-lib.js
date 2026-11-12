@@ -316,7 +316,7 @@ export function describeOutcome(outcome) {
       message = `Your attestation is signed and recorded. You earned ${formatPoints(reply.points)} points.`;
     } else if (reply.unpaidReason === "places_taken") {
       state = "full";
-      message = `Your attestation is recorded, but this release's ${PAID_SCANS_PER_RELEASE} paid places are taken, so it earns no points.`;
+      message = "Your attestation is recorded, but this release's paid places are taken, so it earns no points.";
     } else if (reply.unpaidReason === "no_snapshot") {
       state = "unpaid";
       message = "Your attestation is recorded. It earned no points yet, because no daily points count exists to base them on.";
@@ -399,14 +399,24 @@ function isRewards(body) {
   );
 }
 
-/** Paid scans per release and how many of them earn the full reward; the same as `@gleam/core/scan`. */
+/** The paid places a release opens, at least and at most, and how many of its scans earn the full reward; the same as `@gleam/core/scan`. */
+export const MIN_PAID_SCANS_PER_RELEASE = 10;
 export const PAID_SCANS_PER_RELEASE = 100;
 export const FULL_REWARD_SCANS = 20;
 
-/** What the next scan of a release with `paidPlacesLeft` open places earns, from a `GET /scan/rewards` body. */
-export function nextScanReward(rewards, paidPlacesLeft) {
+/**
+ * What the next scan earns, from a `GET /scan/rewards` body and a release's
+ * `paidPlacesLeft` and `paidScans`; null when the paid scans are unknown.
+ */
+export function nextScanReward(rewards, paidPlacesLeft, paidScans) {
   if (paidPlacesLeft <= 0) return "0";
-  return paidPlacesLeft > PAID_SCANS_PER_RELEASE - FULL_REWARD_SCANS ? rewards.scanRewardAtomic : rewards.tailScanRewardAtomic;
+  if (!Number.isInteger(paidScans)) return null;
+  return paidScans < FULL_REWARD_SCANS ? rewards.scanRewardAtomic : rewards.tailScanRewardAtomic;
+}
+
+/** " of N", the paid places a listing's release opened; empty when the server doesn't say. */
+export function placesOf(listing) {
+  return Number.isInteger(listing.paidScans) ? ` of ${listing.paidScans + Math.max(0, listing.paidPlacesLeft)}` : "";
 }
 
 /**

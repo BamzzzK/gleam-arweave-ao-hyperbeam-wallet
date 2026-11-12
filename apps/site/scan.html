@@ -83,7 +83,7 @@
 
     <section class="sc-section sc-section-flush" id="review" aria-labelledby="review-h">
       <h2 id="review-h"><span class="sc-num">1.</span> Scan a release</h2>
-      <p class="sc-intro">The first 100 signed scans of each release are awarded GLEAM.</p>
+      <p class="sc-intro">Each release awards GLEAM to its first signed scans: up to 100, more when more of its code is unexamined.</p>
 
       <div class="copybox">
         <div class="beam copybox-beam" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
@@ -121,7 +121,7 @@
       <dl class="figures" data-review-figures hidden>
         <div>
           <dt>Paid places left</dt>
-          <dd><span data-stat-places>–</span><span class="figures-unit"> of 100</span></dd>
+          <dd><span data-stat-places>–</span><span class="figures-unit" data-stat-places-of></span></dd>
         </div>
         <div>
           <dt>Next scan earns</dt>
@@ -132,16 +132,17 @@
         <details>
           <summary>Scan rules</summary>
           <ul class="sc-prose">
-            <li>Each release has 100 paid scans.</li>
-            <li>Scans 1 to 20 earn 0.1% of the GLEAM points minted the previous day. Scans 21 to 100 earn 0.02%.</li>
+            <li>Each release opens one paid scan for every 3 functions not yet examined, from 10 to 100.</li>
+            <li>A function stays examined across releases until its code changes.</li>
+            <li>A release's first 20 paid scans earn 0.1% of the GLEAM points minted the previous day. Later ones earn
+              0.02%.</li>
             <li>Each release has five areas: Key material, Signing, Trust boundary, Approval preview, and Build and
               release.</li>
             <li>Each wallet can scan each area once per release. Each scan is a round.</li>
             <li>Each further round in the same release earns <span data-round-step>10</span>% more than your first,
               so your third earns <span data-round-third>120</span>%.</li>
-            <li>After 100, scans are still recorded and published, but they earn nothing unless they find a
-              vulnerability.</li>
-            <li>Paid places reset with each new release.</li>
+            <li>Once the paid places are taken, scans are still recorded and published, but they earn nothing unless
+              they find a vulnerability.</li>
           </ul>
         </details>
       </div>
