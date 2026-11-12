@@ -8,7 +8,7 @@ describe("migrate", () => {
   it("applies every migration once and records it", async () => {
     const db = dbFromPglite(new PGlite());
 
-    expect(await migrate(db)).toEqual(["001_init.sql", "002_leave.sql", "003_founding_number.sql", "004_original_founder.sql", "005_invites.sql", "006_scans.sql", "007_bounty_daily_unique.sql", "008_attestation_unpaid_reason.sql", "009_wallet_devices.sql", "010_scan_areas.sql"]);
+    expect(await migrate(db)).toEqual(["001_init.sql", "002_leave.sql", "003_founding_number.sql", "004_original_founder.sql", "005_invites.sql", "006_scans.sql", "007_bounty_daily_unique.sql", "008_attestation_unpaid_reason.sql", "009_wallet_devices.sql", "010_scan_areas.sql", "011_price_cache.sql"]);
     expect(await migrate(db)).toEqual([]);
 
     const { rows } = await db.query<{ table_name: string }>(
@@ -22,6 +22,7 @@ describe("migrate", () => {
       "drop_codes",
       "invite_redemptions",
       "points",
+      "price_cache",
       "scan_points",
       "schema_migrations",
       "snapshot_runs",
