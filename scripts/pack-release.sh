@@ -1,29 +1,40 @@
 #!/usr/bin/env bash
-# Sign a verified Gleam release into a .crx for the Chrome Web Store.
+# Sign a published Gleam release into a .crx for the Chrome Web Store.
 #
 #   scripts/pack-release.sh v1.27.0 --kdbx <path-to-keepassxc-db>
 #   scripts/pack-release.sh v1.27.0 --key <path-to-private-key>
 #
-# Runs verify-release.sh first (downloads the Release, checks its sha256
-# against release-manifest.json, and rebuilds the tag from source to
-# reproduce that hash) and refuses to pack anything verify-release.sh did
-# not pass. Only then unzips the verified build and signs it with
-# `chrome --pack-extension`, producing <tag>.crx in the current directory.
+# Packs the zip release.yml built and attested, never a local build. It
+# checks the tag's signature against .github/allowed_signers, downloads the
+# Release's zip and release-manifest.json, checks the zip's sha256 and the
+# manifest's commit, and runs `gh attestation verify` so the zip is proven to
+# come from release.yml at this repository. Only then does it unlock the key
+# and sign the unpacked zip with `chrome --pack-extension`, producing
+# <tag>.crx in the current directory.
+#
+# It runs no pnpm install and no build: npm code that ran on this machine
+# could be waiting for the key to appear. Reproduce the build with
+# scripts/verify-release.sh beforehand, in another terminal session, not the
+# shell that unlocks the key.
 #
 # The private key never goes through CI. Keep it as the attachment
 # "gleam-cws.pem" on the entry "gleam-cws" in a KeePassXC database and pass
 # --kdbx (or set GLEAM_CWS_KDBX); set GLEAM_CWS_KDBX_YUBIKEY=<slot[:serial]>
 # if the database needs a YubiKey. The key is exported into a private temp
-# dir only for the chrome --pack-extension call and deleted on exit, so it
-# never sits on disk in plaintext where any process running as you could
-# read it. --key <path> (or GLEAM_CWS_KEY) still takes a plaintext PEM.
+# dir only for the chrome --pack-extension call and deleted on exit.
+# --key <path> (or GLEAM_CWS_KEY) still takes a plaintext PEM.
 # Chrome Web Store Verified CRX Uploads rejects any upload not signed with
 # the matching key, so this step has to run on a trusted machine with the
 # key in hand, not in release.yml.
 #
-# Needs the same tools as verify-release.sh, plus a Chrome/Chromium binary
-# (override with CHROME_BIN if it isn't auto-detected), and keepassxc-cli
-# when signing from a KeePassXC database.
+# Needs git, gh, node, curl, unzip, shasum or sha256sum, a Chrome/Chromium
+# binary (override with CHROME_BIN if it isn't auto-detected), and
+# keepassxc-cli when signing from a KeePassXC database.
+#
+# Overrides, for scripts/pack-release.release.test.ts only (refused unless
+# GLEAM_PACK_TEST=1):
+#   GLEAM_RELEASE_BASE_URL  as in verify-release.sh (file:// works)
+#   GLEAM_GH_REPO           default skyf0xx/gleam-arweave-ao-hyperbeam-wallet
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -82,46 +93,74 @@ if [ -z "$chrome_bin" ]; then
 fi
 [ -n "$chrome_bin" ] || { echo "no Chrome/Chromium binary found; set CHROME_BIN" >&2; exit 2; }
 
+for cmd in git gh node curl unzip; do
+  command -v "$cmd" > /dev/null 2>&1 || { echo "$cmd is required but not installed" >&2; exit 2; }
+done
+if command -v sha256sum > /dev/null 2>&1; then
+  sha256() { sha256sum "$1" | cut -d' ' -f1; }
+elif command -v shasum > /dev/null 2>&1; then
+  sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
+else
+  echo "sha256sum or shasum is required" >&2
+  exit 2
+fi
+
+# Both overrides decide what gets signed, so outside the test they are refused
+# rather than trusted from the environment.
+if { [ -n "${GLEAM_RELEASE_BASE_URL:-}" ] || [ -n "${GLEAM_GH_REPO:-}" ]; } && [ "${GLEAM_PACK_TEST:-}" != "1" ]; then
+  echo "GLEAM_RELEASE_BASE_URL and GLEAM_GH_REPO are for scripts/pack-release.release.test.ts only; unset them" >&2
+  exit 2
+fi
+BASE_URL="${GLEAM_RELEASE_BASE_URL:-https://github.com/skyf0xx/gleam-arweave-ao-hyperbeam-wallet/releases/download}"
+GH_REPO="${GLEAM_GH_REPO:-skyf0xx/gleam-arweave-ao-hyperbeam-wallet}"
+
 repo_root="$(cd "$here/.." && pwd)"
 [ "$(git -C "$repo_root" cat-file -t "refs/tags/$tag" 2> /dev/null)" = "tag" ] \
   || { echo "$tag is not an annotated tag" >&2; exit 1; }
 git -C "$repo_root" -c gpg.ssh.allowedSignersFile=.github/allowed_signers tag -v "$tag" \
   || { echo "$tag is not signed by a key in .github/allowed_signers; refusing to pack" >&2; exit 1; }
+tag_commit="$(git -C "$repo_root" rev-parse "refs/tags/$tag^{commit}")"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-echo "== Verifying $tag =="
-if ! "$here/verify-release.sh" "$tag" | tee "$work/verify.log"; then
-  echo "verify-release.sh failed for $tag; refusing to pack" >&2
-  exit 1
-fi
-
-# verify-release.sh rebuilds in the current checkout when it's clean and at
-# the tag, otherwise in its own temp clone — either way it prints which.
-src=""
-if top="$(git rev-parse --show-toplevel 2> /dev/null)" \
-  && [ -z "$(git -C "$top" status --porcelain 2> /dev/null)" ] \
-  && tag_commit_here="$(git -C "$top" rev-parse -q --verify "refs/tags/$tag^{commit}" 2> /dev/null)" \
-  && [ "$tag_commit_here" = "$(git -C "$top" rev-parse HEAD)" ]; then
-  src="$top"
-else
-  die() {
-    echo "$1" >&2
-    exit 1
-  }
-  die "checkout is not clean and at $tag; check out the tag with no local changes and re-run"
-fi
-
-built_zip=("$src"/apps/extension/.output/*-chrome.zip)
-[ "${#built_zip[@]}" -eq 1 ] && [ -f "${built_zip[0]}" ] || {
-  echo "expected one built zip in $src/apps/extension/.output, found ${#built_zip[@]}" >&2
-  exit 1
+echo "== Downloading $tag =="
+dl="$work/release"
+mkdir -p "$dl"
+curl -fsSL --retry 2 -o "$dl/release-manifest.json" "$BASE_URL/$tag/release-manifest.json" \
+  || { echo "could not download release-manifest.json for $tag from $BASE_URL" >&2; exit 1; }
+# Run from $work so node picks up nothing from the checkout.
+manifest_field() {
+  (cd "$work" && node -p 'const v=require(process.argv[1])[process.argv[2]];typeof v==="string"?v:""' "$dl/release-manifest.json" "$1")
 }
+zip_name="$(manifest_field zipName)"
+want_sha="$(manifest_field zipSha256)"
+manifest_commit="$(manifest_field commit)"
+if [[ ! "$zip_name" =~ ^[A-Za-z0-9._-]+\.zip$ ]] || [[ ! "$want_sha" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "release-manifest.json has no valid zipName and zipSha256; refusing to pack" >&2
+  exit 1
+fi
+[ "$manifest_commit" = "$tag_commit" ] \
+  || { echo "manifest commit is ${manifest_commit:-missing}, $tag points to $tag_commit; refusing to pack" >&2; exit 1; }
+zip="$dl/$zip_name"
+curl -fsSL --retry 2 -o "$zip" "$BASE_URL/$tag/$zip_name" \
+  || { echo "could not download $zip_name for $tag from $BASE_URL" >&2; exit 1; }
+got_sha="$(sha256 "$zip")"
+[ "$got_sha" = "$want_sha" ] \
+  || { echo "downloaded $zip_name is $got_sha, manifest says $want_sha; refusing to pack" >&2; exit 1; }
+echo "$zip_name matches the manifest ($want_sha)"
+
+echo "== Verifying the attestation =="
+# The source digest and ref pin the attestation to this tag's commit, so a
+# zip release.yml attested for another tag does not pass.
+gh attestation verify "$zip" --repo "$GH_REPO" \
+  --signer-workflow "$GH_REPO/.github/workflows/release.yml" \
+  --source-digest "$tag_commit" --source-ref "refs/tags/$tag" \
+  || { echo "gh attestation verify failed for $zip_name; refusing to pack" >&2; exit 1; }
 
 unpacked="$work/unpacked"
 mkdir -p "$unpacked"
-unzip -q "${built_zip[0]}" -d "$unpacked"
+unzip -q "$zip" -d "$unpacked" || { echo "could not unzip $zip_name; refusing to pack" >&2; exit 1; }
 
 if [ -n "$kdbx" ]; then
   echo "== Unlocking $kdbx =="

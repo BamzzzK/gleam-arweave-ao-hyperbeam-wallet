@@ -19,9 +19,11 @@
 //      something to casually re-push.
 //   3. Wait for you to confirm the GitHub Release (with its zip and
 //      release-manifest.json) exists for that tag.
-//   4. Run scripts/pack-release.sh, which re-verifies the release against
-//      the manifest and a from-source rebuild, then signs a .crx with your
-//      local key, unlocking the KeePassXC database if you passed --kdbx.
+//   4. Ask you to run scripts/verify-release.sh in another terminal (it
+//      rebuilds from source, running npm code), then run
+//      scripts/pack-release.sh, which checks the Release's zip against the
+//      manifest and its attestation, runs no npm code, and signs a .crx with
+//      your local key, unlocking the KeePassXC database if you passed --kdbx.
 //      The key is never read by CI, only passed to this script.
 //   5. Remind you to upload the .crx by hand; that step stays manual.
 import { execFileSync } from "node:child_process";
@@ -141,6 +143,12 @@ process.stdout.write(`release.yml is now building and attesting v${next} from th
 await pause(`Watch it finish, confirm the GitHub Release for v${next} has its zip and release-manifest.json, then`);
 
 // --- stage 4: pack and sign -------------------------------------------------
+
+// The rebuild runs the whole dependency tree, so it stays out of the
+// process that unlocks the key.
+await pause(
+  `In another terminal session, run scripts/verify-release.sh v${next} and check it passes, then`,
+);
 
 // Readline keeps the terminal in raw mode while open, which would swallow the
 // Enter on keepassxc-cli's password prompt.
