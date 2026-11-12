@@ -120,6 +120,7 @@
 /packages/app/src/transfer-review/                                         @skyf0xx
 /packages/core/src/ao/transfer-message.ts                                  @skyf0xx
 /packages/core/src/ao/l1-transfer.ts                                       @skyf0xx
+/packages/core/src/ao/other-tags.ts                                        @skyf0xx
 /packages/app/src/i18n/                                                    @skyf0xx
 /packages/core/src/models/user-errors.ts                                   @skyf0xx
 /apps/mobile/src/adapters/approval-presenter.ts                            @skyf0xx

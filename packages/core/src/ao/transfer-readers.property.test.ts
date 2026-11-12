@@ -3,6 +3,7 @@ import fc from "fast-check";
 import type { Tag } from "../models/tag";
 import { readL1TokenTransfer } from "./l1-transfer";
 import { readAoTransferMessage } from "./transfer-message";
+import { isHarmlessTag, otherTags } from "./other-tags";
 
 const address = fc.string({ unit: fc.constantFrom(..."ABCabc0123_-"), minLength: 43, maxLength: 43 });
 
@@ -37,6 +38,19 @@ const tags = fc.oneof(randomTags, nearTransfer);
 const valuesNamed = (list: readonly Tag[], tagName: string) =>
   list.filter((tag) => tag.name.toLowerCase() === tagName).map((tag) => tag.value);
 
+/**
+ * Beside a clean reading, every tag but the three it consumed and the
+ * harmless protocol tags is counted, and none of the three ever is.
+ */
+function expectCountsTheRest(list: readonly Tag[], other: Tag[]): void {
+  const harmless = list.filter(isHarmlessTag).length;
+  expect(other.every((tag) => list.includes(tag))).toBe(true);
+  expect(other.length).toBe(list.length - 3 - harmless);
+  expect(other.map((tag) => tag.name.toLowerCase())).not.toEqual(expect.arrayContaining(["action"]));
+  expect(other.map((tag) => tag.name.toLowerCase())).not.toEqual(expect.arrayContaining(["recipient"]));
+  expect(other.map((tag) => tag.name.toLowerCase())).not.toEqual(expect.arrayContaining(["quantity"]));
+}
+
 describe("a transfer reading names exactly what the tags carry", () => {
   it("readAoTransferMessage", () => {
     let transfers = 0;
@@ -51,6 +65,7 @@ describe("a transfer reading names exactly what the tags carry", () => {
         expect(valuesNamed(list, "action")).toEqual(["Transfer"]);
         expect(list.find((tag) => tag.name.toLowerCase() === "recipient")!.name).toBe("Recipient");
         expect(reading.quantity).toMatch(/^(0|[1-9]\d*)$/);
+        expectCountsTheRest(list, otherTags(list, "ao"));
       }),
       { numRuns: 2000 },
     );
@@ -71,6 +86,7 @@ describe("a transfer reading names exactly what the tags carry", () => {
         expect(valuesNamed(list, "assign-to")).toEqual([]);
         expect(quantity || "0").toBe("0");
         expect(dataSize).toBe("0");
+        expectCountsTheRest(list, otherTags(list, "l1"));
       }),
       { numRuns: 2000 },
     );

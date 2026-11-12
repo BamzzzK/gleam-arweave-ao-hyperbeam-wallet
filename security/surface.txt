@@ -124,6 +124,7 @@
 4 packages/app/src/transfer-review/
 4 packages/core/src/ao/transfer-message.ts
 4 packages/core/src/ao/l1-transfer.ts
+4 packages/core/src/ao/other-tags.ts
 4 packages/app/src/i18n/
 4 packages/core/src/models/user-errors.ts
 4 apps/mobile/src/adapters/approval-presenter.ts
