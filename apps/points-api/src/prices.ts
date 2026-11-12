@@ -228,15 +228,22 @@ function geckoDays(range: HistoricalRange): number {
   }
 }
 
-/** CoinPaprika doesn't bucket by range, so the interval is picked to land near CoinGecko's point count. */
+/**
+ * CoinPaprika doesn't bucket by range, so the interval is picked to land
+ * near CoinGecko's point count. Its free plan serves hourly data only for
+ * the last 24 hours and daily data only for the last 365 days, measured to
+ * the second, so each start sits a few minutes inside its window: a start
+ * exactly on the edge is already outside it when the request lands.
+ */
 function paprikaParams(range: HistoricalRange, nowMs: number): { start: string; interval: string } {
   const day = 24 * 60 * 60 * 1000;
-  const iso = (daysBack: number) => new Date(nowMs - daysBack * day).toISOString();
+  const margin = 5 * 60 * 1000;
+  const iso = (daysBack: number) => new Date(nowMs - daysBack * day + margin).toISOString();
   switch (range) {
     case "24H":
       return { start: iso(1), interval: "1h" };
     case "7D":
-      return { start: iso(7), interval: "6h" };
+      return { start: iso(7), interval: "1d" };
     case "1M":
       return { start: iso(30), interval: "1d" };
     case "1Y":

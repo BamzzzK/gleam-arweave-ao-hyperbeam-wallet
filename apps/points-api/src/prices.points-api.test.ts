@@ -159,6 +159,24 @@ describe("GET /prices/history", () => {
     expect(await (await down.app.request("/prices/history?id=arweave&range=1M")).json()).toEqual({ series: [] });
   });
 
+  // The free plan refuses hourly data older than 24 hours and daily data
+  // older than 365 days, and 7D at an hourly interval is refused outright.
+  it.each([
+    ["24H", "1h", 1],
+    ["7D", "1d", 7],
+    ["1Y", "1d", 365],
+    ["ALL", "1d", 365],
+  ] as const)("asks CoinPaprika for %s inside its free-plan window", async (range, interval, maxDays) => {
+    const { app, calls } = await setup((url) => (url.includes("coingecko") ? { status: 429 } : { body: [] }));
+
+    await app.request(`/prices/history?id=arweave&range=${range}`);
+
+    const url = new URL(calls[1]!);
+    const start = Date.parse(url.searchParams.get("start")!);
+    expect(url.searchParams.get("interval")).toBe(interval);
+    expect(1_000_000 - start).toBeLessThan(maxDays * 24 * 60 * 60 * 1000);
+  });
+
   it("caches per id and range", async () => {
     const { app, calls } = await setup(gecko);
 
