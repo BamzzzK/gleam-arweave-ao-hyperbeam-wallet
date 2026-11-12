@@ -77,6 +77,7 @@ import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { safeSiteIconUrl } from "./site-wallet";
+import { dappError } from "../dapp-error";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -824,12 +825,12 @@ function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
 }
 
 function transactionOf(payload: UnsignedPayload | undefined): UnsignedPayload & { kind: "transaction" } {
-  if (payload?.kind !== "transaction") throw new Error("Expected an unsigned transaction to finish.");
+  if (payload?.kind !== "transaction") throw new Error(dappError("Expected an unsigned transaction to finish."));
   return payload;
 }
 
 function dataItemOf(payload: UnsignedPayload | undefined): Uint8Array {
-  if (payload?.kind !== "dataItem") throw new Error("Expected an unsigned data item to finish.");
+  if (payload?.kind !== "dataItem") throw new Error(dappError("Expected an unsigned data item to finish."));
   return payload.raw;
 }
 
@@ -904,7 +905,7 @@ function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPrev
 async function buildScanAttestationPreview(
   input: SigningRequestInput & { walletId: string },
 ): Promise<ScanAttestationApprovalPreview> {
-  if (!input.address) throw new Error("A scan attestation request needs its signing wallet.");
+  if (!input.address) throw new Error(dappError("A scan attestation request needs its signing wallet."));
   const attestation = parsedAttestationOf(input);
   const id = await attestationId(attestation);
   const message = buildAttestMessage(attestation.release, id);
@@ -974,7 +975,7 @@ async function buildDataItemPreviews(
 }
 
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
-  if (input.kind === "scanAttestation") throw new Error("A scan attestation has its own preview.");
+  if (input.kind === "scanAttestation") throw new Error(dappError("A scan attestation has its own preview."));
   const payloadHash = await sha256Hex(input.payload);
   const signedItems =
     input.kind === "signDataItem"
@@ -1124,7 +1125,7 @@ export class ApprovalHandler {
     const fromSite = input.origin !== WALLET_APPROVAL_ORIGIN;
     const size = fromSite ? storedSize(record) : 0;
     if (size > PENDING_BYTES_PER_ORIGIN) {
-      throw new Error("Gleam refused this request because it is too large to hold for approval.");
+      throw new Error(dappError("Gleam refused this request because it is too large to hold for approval."));
     }
     await this.updatePending((pending) => {
       if (!fromSite) return [...pending, record];
@@ -1134,7 +1135,7 @@ export class ApprovalHandler {
         .filter((entry) => entry.request.origin === input.origin)
         .reduce((sum, entry) => sum + storedSize(entry), size);
       if (total > PENDING_BYTES_LIMIT || fromOrigin > PENDING_BYTES_PER_ORIGIN) {
-        throw new Error("Gleam refused this request because too many requests are waiting for approval.");
+        throw new Error(dappError("Gleam refused this request because too many requests are waiting for approval."));
       }
       return [...pending, record];
     });
@@ -1457,7 +1458,7 @@ export class ApprovalHandler {
   async checkScanAttestation(req: { requestId: string }): Promise<AttestationCheck> {
     const entry = await this.findLive(req.requestId, false);
     if (entry.request.kind !== "scanAttestation") {
-      throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
+      throw new Error(dappError(`Approval request "${req.requestId}" isn't a scan attestation.`));
     }
     const wallet = entry.walletId ? await this.keySession.getStoredWallet(entry.walletId) : null;
     return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)), wallet?.address);
@@ -1544,7 +1545,7 @@ export class ApprovalHandler {
   private signingInputOf(entry: PendingApprovalRecord): SigningRequestInput {
     const input = fromStored(entry.signingInput) as SigningRequestInput | null;
     if (!input) {
-      throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no signing input.`));
     }
     return input;
   }
@@ -1588,16 +1589,16 @@ export class ApprovalHandler {
       }
       case "signDataItem": {
         const [dataItem] = input.dataItems ?? [];
-        if (!dataItem) throw new Error("signDataItem requires a data item.");
+        if (!dataItem) throw new Error(dappError("signDataItem requires a data item."));
         return [{ kind: "dataItem", raw: prepareDataItem(owner, dataItem) }];
       }
       case "batchSignDataItem": {
         const items = input.dataItems ?? [];
-        if (items.length === 0) throw new Error("batchSignDataItem requires at least one data item.");
+        if (items.length === 0) throw new Error(dappError("batchSignDataItem requires at least one data item."));
         return prepareDataItems(owner, items).map((raw) => ({ kind: "dataItem", raw }));
       }
       default:
-        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+        throw new Error(dappError(`"${input.kind}" isn't a dApp signing request.`));
     }
   }
 
@@ -1622,7 +1623,7 @@ export class ApprovalHandler {
       case "batchSignDataItem":
         return (await finishDataItems(payloads.map(dataItemOf), signatures, owner)).map(toArrayBuffer);
       default:
-        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+        throw new Error(dappError(`"${input.kind}" isn't a dApp signing request.`));
     }
   }
 
@@ -1647,12 +1648,12 @@ export class ApprovalHandler {
       case "signMessage": {
         const hashAlgorithm = input.hashAlgorithm ?? HARDWARE_MESSAGE_HASH;
         if (hashAlgorithm !== HARDWARE_MESSAGE_HASH) {
-          throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+          throw new Error(dappError(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`));
         }
         return [{ kind: "message", data: new Uint8Array(input.payload) }];
       }
       default:
-        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+        throw new Error(dappError(`A hardware wallet can't sign "${input.kind}" requests.`));
     }
   }
 
@@ -1696,24 +1697,24 @@ export class ApprovalHandler {
       case "signMessage":
         return new Uint8Array(signature!);
       default:
-        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+        throw new Error(dappError(`A hardware wallet can't sign "${input.kind}" requests.`));
     }
   }
 
   private deviceTransfers(): DeviceTransferSubmitter {
     const transfers = this.transfers;
     if (!transfers?.prepareDeviceTransfer || !transfers.finishDeviceTransfer) {
-      throw new Error("Hardware wallet transfers aren't wired. ApprovalHandler was constructed without them.");
+      throw new Error(dappError("Hardware wallet transfers aren't wired. ApprovalHandler was constructed without them."));
     }
     return transfers as DeviceTransferSubmitter;
   }
 
   private transferRequestOf(walletId: string, input: SigningRequestInput): SubmitTransferRequest {
     if (input.recipient == null || input.amount == null) {
-      throw new Error(`A ${input.kind} approval is missing its recipient or amount.`);
+      throw new Error(dappError(`A ${input.kind} approval is missing its recipient or amount.`));
     }
     if (input.kind === "transferAoTokens" && input.token == null) {
-      throw new Error("A transferAoTokens approval is missing its token.");
+      throw new Error(dappError("A transferAoTokens approval is missing its token."));
     }
     return {
       token: input.token ?? null,
@@ -1811,7 +1812,7 @@ export class ApprovalHandler {
 
   private attestationSubmitter(): ScanAttestationSubmitter {
     if (!this.attestations) {
-      throw new Error("Scan attestations aren't wired. ApprovalHandler was constructed without a submitter.");
+      throw new Error(dappError("Scan attestations aren't wired. ApprovalHandler was constructed without a submitter."));
     }
     return this.attestations;
   }
@@ -1844,7 +1845,7 @@ export class ApprovalHandler {
     if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
     await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
     const grant = await this.findActiveGrant(req.origin);
-    if (!grant) throw new Error(`Couldn't save the grant for "${req.origin}".`);
+    if (!grant) throw new Error(dappError(`Couldn't save the grant for "${req.origin}".`));
     return grant;
   }
 
@@ -1893,11 +1894,11 @@ export class ApprovalHandler {
    */
   private async addToken(entry: PendingApprovalRecord): Promise<undefined> {
     if (!this.tokens) {
-      throw new Error("addToken is not wired to a token list. ApprovalHandler was constructed without one.");
+      throw new Error(dappError("addToken is not wired to a token list. ApprovalHandler was constructed without one."));
     }
     const input = fromStored(entry.signingInput) as AddTokenRequestInput | null;
     if (!input || input.kind !== "addToken") {
-      throw new Error(`Approval request "${entry.request.requestId}" has no token to add.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no token to add.`));
     }
     await this.tokens.addWatchedToken({ address: input.address, processId: input.processId });
     return undefined;
@@ -1918,13 +1919,13 @@ export class ApprovalHandler {
 
     const { walletId } = entry;
     if (!walletId) {
-      throw new Error(`Approval request "${entry.request.requestId}" has no wallet to sign with.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no wallet to sign with.`));
     }
     // Encryption needs only the public key, which every wallet kind
     // stores, so it never touches the key cache.
     if (input.kind === "encrypt") {
       if (!input.encryptAlgorithm) {
-        throw new Error("encrypt requires an algorithm.");
+        throw new Error(dappError("encrypt requires an algorithm."));
       }
       const owner = await this.storedOwner(walletId);
       return encrypt(owner, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
@@ -1955,7 +1956,7 @@ export class ApprovalHandler {
 
       case "decrypt": {
         if (!input.encryptAlgorithm) {
-          throw new Error("decrypt requires an algorithm.");
+          throw new Error(dappError("decrypt requires an algorithm."));
         }
         return decrypt(signer, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
@@ -1966,21 +1967,21 @@ export class ApprovalHandler {
 
       // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.
       case "pointsProof":
-        throw new Error("Only a hardware wallet proves ownership through the approval window.");
+        throw new Error(dappError("Only a hardware wallet proves ownership through the approval window."));
 
       case "scanAttestation":
         return this.attestationSubmitter().attest({ walletId, attestation: parsedAttestationOf(input) });
 
       default: {
         const exhaustiveCheck: never = input.kind;
-        throw new Error(`Unhandled signing kind "${String(exhaustiveCheck)}".`);
+        throw new Error(dappError(`Unhandled signing kind "${String(exhaustiveCheck)}".`));
       }
     }
   }
 
   private requireGatewayUrl(input: SigningRequestInput): string {
     if (!input.gatewayUrl) {
-      throw new Error(`"${input.kind}" requires a gateway URL to construct the transaction.`);
+      throw new Error(dappError(`"${input.kind}" requires a gateway URL to construct the transaction.`));
     }
     return input.gatewayUrl;
   }

@@ -48,6 +48,7 @@ import { isSessionExpired, isValidSession, SESSION_KEY, type KeySession } from "
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
 import { ACTIVE_WALLET_ID_KEY, ACTIVITY_LOG_KEY_PREFIX, WALLETS_KEY, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { dappError } from "../dapp-error";
 
 /**
  * Background-side implementation of `ProtocolMap`'s wallet-lifecycle
@@ -681,7 +682,7 @@ export class WalletLifecycleHandler {
   }): Promise<WalletSummary> {
     return this.keySession.withSessionLock(async () => {
       if (!isHardwareWalletMethod(req.method)) {
-        throw new Error(`"${String(req.method)}" isn't a hardware wallet type.`);
+        throw new Error(dappError(`"${String(req.method)}" isn't a hardware wallet type.`));
       }
       if (!isValidDevice(req.device) || req.device.kind !== req.method) {
         throw new Error(userErrorMessage("deviceDetailsMismatch"));
@@ -1187,7 +1188,7 @@ export class WalletLifecycleHandler {
   async setLockSettings(req: LockSettings): Promise<void> {
     return this.keySession.withSessionLock(async () => {
       if (!VALID_AUTO_LOCK_TIMEOUTS.includes(req.autoLockTimeout)) {
-        throw new Error(`Invalid auto-lock timeout "${req.autoLockTimeout}".`);
+        throw new Error(dappError(`Invalid auto-lock timeout "${req.autoLockTimeout}".`));
       }
       await this.storage.set(LOCK_SETTINGS_KEY, req);
 
@@ -1217,7 +1218,7 @@ export class WalletLifecycleHandler {
    */
   async setThemePreference(req: ThemeSettings): Promise<void> {
     if (!VALID_THEME_PREFERENCES.includes(req.theme)) {
-      throw new Error(`Invalid theme preference "${req.theme}".`);
+      throw new Error(dappError(`Invalid theme preference "${req.theme}".`));
     }
     await this.storage.set(THEME_SETTINGS_KEY, req);
   }
@@ -1227,7 +1228,7 @@ export class WalletLifecycleHandler {
   }
 
   async setDisplaySettings(req: DisplaySettings): Promise<void> {
-    if (!isDisplaySettings(req)) throw new Error("Invalid display settings.");
+    if (!isDisplaySettings(req)) throw new Error(dappError("Invalid display settings."));
     await this.storage.set(DISPLAY_SETTINGS_KEY, {
       currency: req.currency,
       header: req.header,

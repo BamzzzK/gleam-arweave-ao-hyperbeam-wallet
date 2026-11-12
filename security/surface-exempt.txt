@@ -124,3 +124,4 @@ apps/extension/src/adapters/runtime.ts Popup-to-background message transport; th
 apps/extension/src/adapters/side-panel.ts Opens the side panel; takes no page input.
 packages/app/src/app-platform/dapp-browser.ts Stub for hosts without a dApp browser; every call throws.
 packages/app/src/app.css Styles only.
+packages/runtime/src/dapp-error.ts Identity function that marks English-by-design error text for the lint.

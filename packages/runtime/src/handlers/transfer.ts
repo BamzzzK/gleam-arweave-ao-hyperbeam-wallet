@@ -38,6 +38,7 @@ import { updateStored } from "../storage-update";
 import type { KeySession } from "./key-session";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { WALLETS_KEY, NETWORK_SETTINGS_KEY, CONTACTS_KEY, ACTIVITY_LOG_KEY_PREFIX } from "../storage-keys";
+import { dappError } from "../dapp-error";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `estimateTransfer`/
@@ -289,7 +290,7 @@ export class TransferHandler {
    */
   private async prepareCollectibleSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
     const collectible = req.collectible;
-    if (!collectible) throw new Error("Not a collectible send.");
+    if (!collectible) throw new Error(userErrorMessage("notCollectibleSend"));
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     refuseCollectibleSend(wallet.address, req.recipient, collectible.id);
@@ -303,7 +304,7 @@ export class TransferHandler {
 
   /** Builds an L1 token transfer and checks the wallet's AR covers its reward, before anything is signed. */
   private async prepareL1TokenSend(req: SubmitTransferRequest, ownerB64Url: string): Promise<ArweaveTransactionJson> {
-    if (req.token === null) throw new Error("Not a token send.");
+    if (req.token === null) throw new Error(userErrorMessage("notTokenSend"));
     const settings = await this.loadNetworkSettings();
     const wallet = await this.loadWallet(req.walletId);
     const [transaction, balance] = await Promise.all([
@@ -344,7 +345,7 @@ export class TransferHandler {
             : null;
     if (refusal) throw new Error(refusal);
     if (method !== null && isHardwareWalletMethod(method)) {
-      if (!this.approvals) throw new Error("Hardware wallet sends aren't wired to the approval window.");
+      if (!this.approvals) throw new Error(dappError("Hardware wallet sends aren't wired to the approval window."));
       return this.approvals.requestTransfer(req);
     }
 
@@ -439,7 +440,7 @@ export class TransferHandler {
       } else if (unsigned.kind === "dataItem") {
         ({ messageId: txId } = await finishAoTransfer(unsigned.raw, signature, expectedOwner));
       } else {
-        throw new Error("A transfer can't finish with a message signature.");
+        throw new Error(dappError("A transfer can't finish with a message signature."));
       }
     } catch (error) {
       console.error(`Device transfer failed (${describeSend(req)}):`, error);

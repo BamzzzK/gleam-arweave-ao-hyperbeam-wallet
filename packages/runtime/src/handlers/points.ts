@@ -35,6 +35,7 @@ import { attestFailure, serverAttestFailure } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
+import { dappError } from "../dapp-error";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -548,7 +549,7 @@ export class PointsHandler {
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
       return false;
     }
-    if (!response.ok) throw new Error(`Points heartbeat failed (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(dappError(`Points heartbeat failed (HTTP ${response.status}).`));
 
     await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
       registered: true,

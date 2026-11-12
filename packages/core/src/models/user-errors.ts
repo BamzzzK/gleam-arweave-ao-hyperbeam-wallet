@@ -92,6 +92,8 @@ export const USER_ERRORS = {
   tokenBadId: "That isn't a process id. A process id is 43 letters, digits, - and _; copy it from the token's page or explorer.",
   tokenIsOwnAddress: "That's your wallet address, not a token's process id.",
   tokenIsCollectible: "That's a collectible, not a token. Collectibles you hold show up in the Collectibles tab on their own.",
+  notTokenSend: "Not a token send.",
+  notCollectibleSend: "Not a collectible send.",
   tokenNoIdentity: "That process doesn't describe itself as a token (it has no name or ticker). Check the id.",
   tokenNoInfo: "The process didn't answer Info like a token.",
   tokenNotIndexed:

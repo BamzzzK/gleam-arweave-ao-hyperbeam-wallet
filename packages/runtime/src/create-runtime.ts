@@ -76,6 +76,7 @@ import { signSiteAttestation, siteAttestStatus } from "./points-attest";
 import type { Platform } from "./platform";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { NETWORK_SETTINGS_KEY } from "./storage-keys";
+import { dappError } from "./dapp-error";
 
 /**
  * What a shell's transport and lifecycle events reach the wallet through.
@@ -115,7 +116,7 @@ function requireWebOrigin(origin: unknown): string {
       // Falls through to the error below.
     }
   }
-  throw new Error("Expected a web origin such as https://example.com.");
+  throw new Error(dappError("Expected a web origin such as https://example.com."));
 }
 
 /**
@@ -191,7 +192,7 @@ const INSECURE_ORIGIN_ERROR = "Gleam only works with secure (https) sites.";
  */
 function requireWalletId<T extends { walletId?: string }>(draft: T): T & { walletId: string } {
   if (!draft.walletId) {
-    throw new Error("This action requires a wallet id.");
+    throw new Error(dappError("This action requires a wallet id."));
   }
   return draft as T & { walletId: string };
 }
@@ -607,7 +608,7 @@ export function createRuntime(platform: Platform): Runtime {
         isHardwareWalletMethod(wallet.method) &&
         (hashAlgorithm ?? HARDWARE_MESSAGE_HASH) !== HARDWARE_MESSAGE_HASH
       ) {
-        throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+        throw new Error(dappError(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`));
       }
       return requestApproval({ kind: "signMessage", origin, walletId: activeWalletId(), payload: data, hashAlgorithm });
     },
@@ -616,7 +617,7 @@ export function createRuntime(platform: Platform): Runtime {
       // Verification uses only public material, so it needs no approval.
       const publicKey = givenKey ?? wallet?.publicKey;
       if (typeof publicKey !== "string" || publicKey.length === 0) {
-        throw new Error("verifyMessage needs a publicKey when no wallet is active.");
+        throw new Error(dappError("verifyMessage needs a publicKey when no wallet is active."));
       }
       return verifyMessage(publicKey, data.buffer, signature.buffer, hashAlgorithm);
     },
@@ -767,7 +768,7 @@ export function createRuntime(platform: Platform): Runtime {
       throw new Error(REFUSED_PROVIDER_METHODS[method as keyof typeof REFUSED_PROVIDER_METHODS]);
     }
     if (!Object.hasOwn(PAGE_METHODS, method)) {
-      throw new Error(`Provider method "${method}" is not reachable from a web page.`);
+      throw new Error(dappError(`Provider method "${method}" is not reachable from a web page.`));
     }
     const providerMethod = method as ProviderMethod;
     // Checked on every call, not only at connect, so a plain-http origin
@@ -793,11 +794,11 @@ export function createRuntime(platform: Platform): Runtime {
 
     const grant = await approval.findActiveGrant(origin);
     if (!grant) {
-      throw new Error(`"${origin}" is not connected. Call connect() first.`);
+      throw new Error(dappError(`"${origin}" is not connected. Call connect() first.`));
     }
     const missing = missingPermissions(method, grant.permissions);
     if (missing.length > 0) {
-      throw new Error(`Missing permission(s) for "${method}": ${missing.join(", ")}`);
+      throw new Error(dappError(`Missing permission(s) for "${method}": ${missing.join(", ")}`));
     }
 
     const state = await lifecycle.getState();
@@ -1027,7 +1028,7 @@ export function createRuntime(platform: Platform): Runtime {
     getSiteWalletMode: (_data, { origin }) => siteWallet.mode(origin),
     reportOtherWallet: (data, { origin, tabId }) => {
       if (typeof tabId !== "number") {
-        throw new Error("reportOtherWallet is only accepted from a web page's content script.");
+        throw new Error(dappError("reportOtherWallet is only accepted from a web page's content script."));
       }
       return siteWallet.report(tabId, origin, data);
     },
@@ -1049,11 +1050,11 @@ export function createRuntime(platform: Platform): Runtime {
     const handle = MESSAGE_HANDLERS[type] as (data: unknown, caller?: ContentScriptCaller) => unknown;
     if (spec.tier === "extension") {
       if (caller?.tier !== "extension") {
-        throw new Error(`"${type}" can only be called from the Gleam extension.`);
+        throw new Error(dappError(`"${type}" can only be called from the Gleam extension.`));
       }
       return handle(data);
     }
-    if (caller?.tier !== "contentScript") throw new Error(`${type} is only accepted from a web page's content script.`);
+    if (caller?.tier !== "contentScript") throw new Error(dappError(`${type} is only accepted from a web page's content script.`));
     return handle(parseParams(spec.params, data), caller);
   }
 

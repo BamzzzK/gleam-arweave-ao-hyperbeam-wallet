@@ -67,6 +67,7 @@ import type {
 } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { WALLETS_KEY, ACTIVE_WALLET_ID_KEY, NETWORK_SETTINGS_KEY, ACTIVITY_LOG_KEY_PREFIX, WATCHED_PROCESS_IDS_KEY_PREFIX } from "../storage-keys";
+import { dappError } from "../dapp-error";
 
 /**
  * Background-side implementation of `ProtocolMap`'s read methods
@@ -1090,7 +1091,7 @@ export class ReadsHandler {
     currency?: DisplayCurrency;
   }): Promise<PortfolioHistory> {
     if (!PORTFOLIO_HISTORY_RANGES.includes(req.range)) {
-      throw new Error(`Unrecognized portfolio history range "${String(req.range)}".`);
+      throw new Error(dappError(`Unrecognized portfolio history range "${String(req.range)}".`));
     }
 
     const periodLabel = periodLabelForRange(req.range);

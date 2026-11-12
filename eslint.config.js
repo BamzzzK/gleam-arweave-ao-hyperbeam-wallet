@@ -249,6 +249,17 @@ const NO_RAW_KEY = [
     message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
   },
 ];
+// An error text a person can reach is translated at display, so a handler
+// names its code (`userErrorMessage`) or marks the English as deliberate
+// (`dappError`); a bare literal would reach a zh-CN popup untranslated.
+const NO_LITERAL_ERROR_THROW = [
+  {
+    selector:
+      "ThrowStatement > NewExpression[callee.name='Error'] > :matches(Literal[value=/./], TemplateLiteral).arguments:first-child",
+    message:
+      "Throw `new Error(userErrorMessage(code))` for text a person can reach, or `new Error(dappError(...))` for English by design.",
+  },
+];
 const NO_DYNAMIC_SIGNER_IMPORT = [
   {
     selector: "CallExpression[callee.name='require'], ImportExpression",
@@ -416,6 +427,21 @@ export default tseslint.config(
     // The one place a key is read and written, one update per key at a time.
     ignores: ["**/*.test.ts", "packages/runtime/src/storage-update.ts"],
     rules: { "gleam/no-storage-read-modify-write": "error" },
+  },
+  {
+    // Later than the two blocks that set `no-restricted-syntax` for all
+    // files, so it repeats their lists; key-session and wallet-lifecycle
+    // are the ones the raw-key list skips.
+    files: ["packages/runtime/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "packages/runtime/src/handlers/key-session.ts", "packages/runtime/src/handlers/wallet-lifecycle.ts"],
+    rules: { "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_RAW_KEY, ...NO_LITERAL_ERROR_THROW] },
+  },
+  {
+    files: [
+      "packages/runtime/src/handlers/key-session.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
+    ],
+    rules: { "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_LITERAL_ERROR_THROW] },
   },
   {
     // The app fence. A later block replaces a rule's options wholesale, so

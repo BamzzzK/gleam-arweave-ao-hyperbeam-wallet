@@ -1,5 +1,6 @@
 import { base64UrlToBytes, normalizeEncryptAlgorithm, type EncryptAlgorithm } from "@gleam/core";
 import { decodeTaggedBinary, encodeTaggedBinary } from "@gleam/messaging/src/page-protocol.ts";
+import { dappError } from "../dapp-error";
 
 /**
  * Decodes what `window.arweaveWallet` sends for each provider method. The
@@ -19,7 +20,7 @@ export function decodeProviderParams(params: unknown): ProviderArgs {
   const decoded = decodeTaggedBinary(params);
   if (decoded === null || decoded === undefined) return {};
   if (typeof decoded !== "object" || Array.isArray(decoded)) {
-    throw new Error("Provider call parameters must be an object.");
+    throw new Error(dappError("Provider call parameters must be an object."));
   }
   return decoded as ProviderArgs;
 }
@@ -56,16 +57,16 @@ export function readBytes(
     try {
       return base64UrlToBytes(value);
     } catch {
-      throw new Error(`"${name}" is not valid base64url.`);
+      throw new Error(dappError(`"${name}" is not valid base64url.`));
     }
   }
-  throw new Error(`"${name}" must be an ArrayBuffer or Uint8Array.`);
+  throw new Error(dappError(`"${name}" must be an ArrayBuffer or Uint8Array.`));
 }
 
 function readOptions(options: unknown, method: string): Record<string, unknown> | undefined {
   if (options === undefined || options === null) return undefined;
   if (typeof options !== "object" || Array.isArray(options)) {
-    throw new Error(`${method} options must be an object.`);
+    throw new Error(dappError(`${method} options must be an object.`));
   }
   return options as Record<string, unknown>;
 }
@@ -74,7 +75,7 @@ export function readHashAlgorithm(options: unknown, method: string): HashAlgorit
   const hashAlgorithm = readOptions(options, method)?.hashAlgorithm;
   if (hashAlgorithm === undefined) return undefined;
   if (!HASH_ALGORITHMS.includes(hashAlgorithm as HashAlgorithm)) {
-    throw new Error(`${method} does not support hashAlgorithm "${String(hashAlgorithm)}". Use SHA-256, SHA-384 or SHA-512.`);
+    throw new Error(dappError(`${method} does not support hashAlgorithm "${String(hashAlgorithm)}". Use SHA-256, SHA-384 or SHA-512.`));
   }
   return hashAlgorithm as HashAlgorithm;
 }
@@ -90,17 +91,19 @@ export function readHashAlgorithm(options: unknown, method: string): HashAlgorit
 export function readEncryptAlgorithm(options: unknown, method: "encrypt" | "decrypt"): EncryptAlgorithm {
   const algorithm = readOptions(options, method);
   if (!algorithm) {
-    throw new Error(`${method} requires an algorithm, for example { name: "RSA-OAEP" }.`);
+    throw new Error(dappError(`${method} requires an algorithm, for example { name: "RSA-OAEP" }.`));
   }
   if (typeof algorithm.name !== "string" && typeof algorithm.algorithm === "string") {
     throw new Error(
-      `${method} does not support the deprecated { algorithm, hash, salt } options. Pass WebCrypto params such as { name: "RSA-OAEP" }.`,
+      dappError(
+        `${method} does not support the deprecated { algorithm, hash, salt } options. Pass WebCrypto params such as { name: "RSA-OAEP" }.`,
+      ),
     );
   }
   try {
     return normalizeEncryptAlgorithm(algorithm);
   } catch (error) {
-    throw new Error(`${method}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(dappError(`${method}: ${error instanceof Error ? error.message : String(error)}`));
   }
 }
 
@@ -120,7 +123,7 @@ const ATOMIC_AMOUNT_PATTERN = /^\d+$/;
 /** An AO process id, which has the same shape as an Arweave address. */
 export function readProcessId(value: unknown, method: string): string {
   if (typeof value !== "string" || !ADDRESS_PATTERN.test(value)) {
-    throw new Error(`${method}: id must be an AO process id (43 base64url characters).`);
+    throw new Error(dappError(`${method}: id must be an AO process id (43 base64url characters).`));
   }
   return value;
 }
@@ -129,33 +132,33 @@ function decodeBase64Url(value: string, what: string, method: string): Uint8Arra
   try {
     return base64UrlToBytes(value);
   } catch {
-    throw new Error(`${method}: ${what} is not valid base64url.`);
+    throw new Error(dappError(`${method}: ${what} is not valid base64url.`));
   }
 }
 
 function decodeTagText(value: unknown, method: string): string {
   if (typeof value !== "string") {
-    throw new Error(`${method}: every tag needs a string name and value.`);
+    throw new Error(dappError(`${method}: every tag needs a string name and value.`));
   }
   const bytes = decodeBase64Url(value, "a tag", method);
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
-    throw new Error(`${method}: tags must be UTF-8 text.`);
+    throw new Error(dappError(`${method}: tags must be UTF-8 text.`));
   }
 }
 
 /** arweave-js's `Transaction` defaults unset fields to `""`, so an empty string means "not set". */
 function readOptionalString(value: unknown, field: string, method: string, subject = "transaction"): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value !== "string") throw new Error(`${method}: ${subject} ${field} must be a string.`);
+  if (typeof value !== "string") throw new Error(dappError(`${method}: ${subject} ${field} must be a string.`));
   return value;
 }
 
 function readAtomicAmount(value: unknown, field: string, method: string): string | undefined {
   const amount = readOptionalString(value, field, method);
   if (amount !== undefined && !ATOMIC_AMOUNT_PATTERN.test(amount)) {
-    throw new Error(`${method}: transaction ${field} must be a whole number of Winston.`);
+    throw new Error(dappError(`${method}: transaction ${field} must be a whole number of Winston.`));
   }
   return amount;
 }
@@ -167,7 +170,7 @@ function readAtomicAmount(value: unknown, field: string, method: string): string
  */
 export function readTransaction(value: unknown, method: "sign" | "dispatch"): ProviderTransaction {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${method} requires a transaction.`);
+    throw new Error(dappError(`${method} requires a transaction.`));
   }
   const transaction = value as Record<string, unknown>;
 
@@ -181,11 +184,11 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
   }
 
   if (transaction.tags !== undefined && !Array.isArray(transaction.tags)) {
-    throw new Error(`${method}: transaction tags must be an array.`);
+    throw new Error(dappError(`${method}: transaction tags must be an array.`));
   }
   const tags = ((transaction.tags as unknown[] | undefined) ?? []).map((tag) => {
     if (tag === null || typeof tag !== "object") {
-      throw new Error(`${method}: every tag needs a string name and value.`);
+      throw new Error(dappError(`${method}: every tag needs a string name and value.`));
     }
     const { name, value: tagValue } = tag as { name?: unknown; value?: unknown };
     return { name: decodeTagText(name, method), value: decodeTagText(tagValue, method) };
@@ -193,7 +196,7 @@ export function readTransaction(value: unknown, method: "sign" | "dispatch"): Pr
 
   const target = readOptionalString(transaction.target, "target", method);
   if (target !== undefined && !ADDRESS_PATTERN.test(target)) {
-    throw new Error(`${method}: transaction target must be an Arweave address.`);
+    throw new Error(dappError(`${method}: transaction target must be an Arweave address.`));
   }
 
   // A reward of "0" is what a default-constructed arweave-js Transaction
@@ -234,34 +237,34 @@ const ANCHOR_BYTES = 32;
  */
 export function readDataItem(value: unknown, method: "signDataItem" | "batchSignDataItem"): ProviderDataItem {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${method} requires a data item object.`);
+    throw new Error(dappError(`${method} requires a data item object.`));
   }
   const item = value as Record<string, unknown>;
 
   if (item.data === undefined || item.data === null) {
-    throw new Error(`${method}: the data item needs data.`);
+    throw new Error(dappError(`${method}: the data item needs data.`));
   }
   const data = typeof item.data === "string" ? new TextEncoder().encode(item.data) : readBytes(item.data, "data");
 
   if (item.tags !== undefined && item.tags !== null && !Array.isArray(item.tags)) {
-    throw new Error(`${method}: data item tags must be an array.`);
+    throw new Error(dappError(`${method}: data item tags must be an array.`));
   }
   const tags = ((item.tags as unknown[] | null | undefined) ?? []).map((tag) => {
     const { name, value: tagValue } = (tag ?? {}) as { name?: unknown; value?: unknown };
     if (typeof name !== "string" || typeof tagValue !== "string") {
-      throw new Error(`${method}: every tag needs a string name and value.`);
+      throw new Error(dappError(`${method}: every tag needs a string name and value.`));
     }
     return { name, value: tagValue };
   });
 
   const target = readOptionalString(item.target, "target", method, "data item");
   if (target !== undefined && !ADDRESS_PATTERN.test(target)) {
-    throw new Error(`${method}: data item target must be an Arweave address.`);
+    throw new Error(dappError(`${method}: data item target must be an Arweave address.`));
   }
 
   const anchor = readOptionalString(item.anchor, "anchor", method, "data item");
   if (anchor !== undefined && new TextEncoder().encode(anchor).byteLength !== ANCHOR_BYTES) {
-    throw new Error(`${method}: data item anchor must be ${ANCHOR_BYTES} bytes.`);
+    throw new Error(dappError(`${method}: data item anchor must be ${ANCHOR_BYTES} bytes.`));
   }
 
   return { data, tags, target, anchor };
@@ -269,7 +272,7 @@ export function readDataItem(value: unknown, method: "signDataItem" | "batchSign
 
 export function readDataItems(value: unknown): ProviderDataItem[] {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new Error("batchSignDataItem requires a non-empty array of data items.");
+    throw new Error(dappError("batchSignDataItem requires a non-empty array of data items."));
   }
   return value.map((item) => readDataItem(item, "batchSignDataItem"));
 }
