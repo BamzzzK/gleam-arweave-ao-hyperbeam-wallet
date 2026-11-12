@@ -414,8 +414,9 @@ These are true of the current release.
     hour per IP and a purge 24 hours after expiry.
   - Rate limits key on the first `X-Forwarded-For` entry, which holds
     only while the API sits behind Railway's edge.
-  - One wallet attests a release once and 100 scans per release are
-    paid, so many registered wallets can still take the paid places.
+  - One wallet scans each area of a release once and a release pays
+    10 to 100 scans, so many registered wallets can still take the paid
+    places.
   - `GET /attestations` publishes each attestation's owner key,
     signature, report and answers, so anyone can verify without trusting
     Gleam.
