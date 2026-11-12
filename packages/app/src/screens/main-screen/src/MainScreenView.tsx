@@ -1188,6 +1188,8 @@ export function MainScreenView({
                   const title =
                       entry.swap
                         ? t("mainScreen.swapOrder", { asset: swapAssetLabel(entry.swap.process, balancesQuery.data?.tokenBalances) })
+                        : entry.type === "upload" && !entry.collectible
+                        ? uploadTitle(t, entry)
                         : activityTitle(
                             t,
                             entry.type,
@@ -1212,15 +1214,16 @@ export function MainScreenView({
                           : relativeTime(t, entry.timestamp);
                   const amountLabel = entry.amount
                     ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
-                    : "—";
+                    : undefined;
                   const token = sendableToken(entry);
                   return (
                   <ActivityRow
                     key={entry.txId}
-                    activityType={entry.type}
+                    activityType={entry.swap ? "swap" : entry.type}
                     title={title}
                     subtitle={subtitle}
                     amountLabel={amountLabel}
+                    outcomeUnknown={Boolean(entry.swap)}
                     amountTone={entry.type === "send" && entry.status !== "failed" ? "negative" : entry.type === "receive" && !entry.unverified ? "positive" : "neutral"}
                     collectible={
                       entry.collectible
@@ -1317,6 +1320,12 @@ function activityTitle(t: TFunction, type: "send" | "receive" | "upload", target
   if (type === "send") return t("mainScreen.activitySentTo", { target });
   if (type === "receive") return t("mainScreen.activityReceivedFrom", { target });
   return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
+}
+
+// The upload's owner is this wallet, so its address says nothing; the content type says what went up.
+function uploadTitle(t: TFunction, entry: ActivityEntry): string {
+  const contentType = entry.tags.find((tag) => tag.name.toLowerCase() === "content-type")?.value.trim();
+  return t("mainScreen.activityTitle", { verb: t("mainScreen.verbUploaded"), target: contentType || truncateAddress(entry.txId, 6) });
 }
 
 function activityVerb(t: TFunction, type: "send" | "receive" | "upload"): string {

@@ -15,13 +15,16 @@ import { CollectibleThumbnail } from "./CollectibleThumbnail";
  * identical by hand; a caller passing a `core` `ActivityType` value
  * satisfies this prop without a cast.
  */
-export type ActivityRowType = "send" | "receive" | "upload";
+export type ActivityRowType = "send" | "receive" | "upload" | "swap";
 
 export interface ActivityRowProps {
   activityType: ActivityRowType;
   title: string;
   subtitle: string;
-  amountLabel: string;
+  /** Absent when the entry moved no amount it can state, such as an upload. */
+  amountLabel?: string;
+  /** The entry's result isn't known from its own transaction (a swap order), shown as a hollow circle where the amount would be. */
+  outcomeUnknown?: boolean;
   amountTone?: "positive" | "negative" | "neutral";
   /** A collectible transfer shows the collectible's thumbnail where the amount would be. */
   collectible?: { name: string; imageUrl?: string };
@@ -36,6 +39,7 @@ const ICON_TONE_CLASSES: Record<ActivityRowType, string> = {
   receive: "text-positive",
   send: "text-foreground",
   upload: "text-muted",
+  swap: "text-foreground",
 };
 
 export function ActivityRow({
@@ -44,6 +48,7 @@ export function ActivityRow({
   subtitle,
   amountLabel,
   amountTone = "neutral",
+  outcomeUnknown = false,
   collectible,
   pending = false,
   onClick,
@@ -78,7 +83,9 @@ export function ActivityRow({
         </div>
         {collectible ? (
           <CollectibleThumbnail name={collectible.name} imageUrl={collectible.imageUrl} className="w-[30px] flex-shrink-0 rounded-md" />
-        ) : (
+        ) : outcomeUnknown ? (
+          <span aria-hidden="true" className="mr-1 h-3 w-3 flex-shrink-0 rounded-full border-[1.5px] border-muted" />
+        ) : amountLabel === undefined ? null : (
           <div className="flex-shrink-0 text-label font-normal tabular-nums text-foreground">
             <span className={amountTone === "positive" ? "text-positive" : amountTone === "negative" ? "text-negative" : undefined}>
               {amountLabel}
@@ -104,6 +111,13 @@ function ActivityIcon({ type }: { type: ActivityRowType }) {
     return (
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M12 5v14M12 19l-6-6M12 19l6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (type === "swap") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M7 4v14M7 18l-3-3M7 18l3-3M17 20V6M17 6l-3 3M17 6l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
