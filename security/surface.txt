@@ -58,14 +58,16 @@
 2 packages/core/src/arweave/transaction.ts
 2 packages/core/src/arweave/transfer.ts
 2 packages/runtime/src/handlers/transfer.ts
+2 packages/runtime/src/handlers/prepared-check.ts
 2 packages/core/src/hardware/
-2 packages/keystone/src/sign-request.ts
-2 packages/keystone/src/decode-account.ts
+2 packages/keystone/src/
 2 packages/core/src/points/ownership.ts
 2 packages/runtime/src/handlers/points.ts
 2 packages/core/src/models/capabilities.ts
 2 apps/extension/src/hardware/keystone/
 2 apps/extension/src/hardware/ledger/
+2 apps/extension/entrypoints/connect/
+2 apps/mobile/src/adapters/keystone.tsx
 2 packages/core/src/ao/collectible-transfer.ts
 2 packages/core/src/arweave/bundler.ts
 2 packages/app/src/screens/send/src/sendFormSchema.ts
@@ -75,6 +77,7 @@
 
 3 apps/extension/entrypoints/background/
 3 packages/runtime/src/create-runtime.ts
+3 packages/runtime/src/handlers/provider.ts
 3 packages/runtime/src/dispatch/site.ts
 3 packages/core/src/models/site-origin.ts
 3 apps/extension/entrypoints/content/
@@ -117,11 +120,11 @@
 4 packages/runtime/src/handlers/approval.ts
 4 apps/extension/entrypoints/approval/
 4 apps/extension/src/hardware/panels/
-4 packages/keystone/src/KeystonePanel.tsx
 4 packages/app/src/approval/
 4 packages/app/src/transfer-review/
 4 packages/core/src/ao/transfer-message.ts
 4 packages/core/src/ao/l1-transfer.ts
+4 packages/core/src/ao/other-tags.ts
 4 packages/app/src/i18n/
 4 packages/core/src/models/user-errors.ts
 4 apps/mobile/src/adapters/approval-presenter.ts
@@ -193,7 +196,7 @@
 5 scripts/well-known.mjs
 5 scripts/release-all.mjs
 5 scripts/pack-release.sh
-5 packages/core/src/points/device-key-store.ts
+5 packages/runtime/src/device-key-store.ts
 5 security/surface-exempt.txt
 5 .dependency-cruiser.cjs
 5 scripts/surface-check.mjs

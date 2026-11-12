@@ -237,6 +237,30 @@ describe("WalletLifecycleHandler: importWallet", () => {
     handler = new WalletLifecycleHandler(storage, keySession, TEST_KDF);
   });
 
+  it("never writes the private exponent or prime to any storage key, on import or unlock", async () => {
+    const written: unknown[] = [];
+    const recording: StoragePort = {
+      ...storage,
+      async set(key, value) {
+        written.push(value);
+        await storage.set(key, value);
+      },
+      async setMany(entries) {
+        written.push(...Object.values(entries));
+        await storage.setMany(entries);
+      },
+    };
+    const jwk = validJWK();
+    const recordingHandler = new WalletLifecycleHandler(recording, keySession, TEST_KDF);
+    await recordingHandler.importWallet({ jwk, name: "Imported", password: GOOD_PASSWORD });
+    await recordingHandler.unlockWallet({ password: GOOD_PASSWORD });
+
+    const everything = JSON.stringify([...written, ...keySessionStore.values()]);
+    expect(everything.length).toBeGreaterThan(0);
+    expect(everything).not.toContain(jwk.d);
+    expect(everything).not.toContain(jwk.p);
+  });
+
   it("rejects a malformed keyfile with a specific reason, not a generic error", async () => {
     await expect(
       handler.importWallet({ jwk: { not: "a jwk" }, name: "Imported", password: GOOD_PASSWORD }),

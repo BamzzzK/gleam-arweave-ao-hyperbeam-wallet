@@ -4,8 +4,14 @@ import { generateJWK, Keyring } from "@gleam/core/signer";
 import { TransferHandler } from "./transfer";
 import { createKeySession } from "./key-session";
 
-const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
-vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
+const { aoFinishMock } = vi.hoisted(() => ({ aoFinishMock: vi.fn() }));
+// Only the MU post is stubbed: the item is built and read back for real.
+vi.mock("@gleam/core/src/ao/transfer.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@gleam/core/src/ao/transfer.ts")>()),
+  finishTransfer: aoFinishMock,
+}));
+
+const AO_RECIPIENT = "r".repeat(43);
 
 /**
  * Real key/value store backing `keySession` below — not an in-process
@@ -95,11 +101,11 @@ beforeEach(() => {
 afterEach(async () => {
   globalThis.fetch = originalFetch;
   vi.restoreAllMocks();
-  aoSubmitMock.mockReset();
+  aoFinishMock.mockReset();
   await clearKeyCache();
 });
 
-const AO_PROCESS_ID = "aoProcess123";
+const AO_PROCESS_ID = "aoProcess123".padEnd(43, "0");
 
 /**
  * Real `Response` objects (not plain-object stand-ins) — `arweave-js`'s
@@ -226,26 +232,26 @@ describe("TransferHandler: submitTransfer", () => {
       peers: [],
       activePeerUrl: "https://hyperbeam.example.com",
     });
-    aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-1" });
+    aoFinishMock.mockResolvedValue({ messageId: "ao-msg-id-1" });
 
     const handler = new TransferHandler(storage, keySession);
     const result = await handler.submitTransfer({
       walletId: WALLET_ID,
-      recipient: "recipientAoAddr",
+      recipient: AO_RECIPIENT,
       token: AO_PROCESS_ID,
       amount: "42",
       fee: null,
     });
 
     expect(result.txId).toBe("ao-msg-id-1");
-    expect(aoSubmitMock).toHaveBeenCalledWith(expect.objectContaining({ address: wallet.address, owner: wallet.publicKey }), AO_PROCESS_ID, "recipientAoAddr", "42");
+    expect(aoFinishMock).toHaveBeenCalledWith(expect.any(Uint8Array), expect.any(Uint8Array), wallet.publicKey);
 
     const log = await storage.get<unknown[]>(`local:activityLog:${wallet.address}`);
     expect(log).toHaveLength(1);
     const [entry] = log as Array<Record<string, unknown>>;
     expect(entry?.txId).toBe("ao-msg-id-1");
     expect(entry?.status).toBe("pending");
-    expect(entry?.address).toBe("recipientAoAddr");
+    expect(entry?.address).toBe(AO_RECIPIENT);
     expect(entry?.amount).toBe("42");
     expect(entry?.token).toBe(AO_PROCESS_ID);
   });
@@ -258,7 +264,28 @@ describe("TransferHandler: submitTransfer", () => {
 
     await expect(handler.submitTransfer(req)).resolves.toEqual({ txId: "ao-msg-id-ledger" });
     expect(requestTransfer).toHaveBeenCalledWith(req);
-    expect(aoSubmitMock).not.toHaveBeenCalled();
+    expect(aoFinishMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to sign a built item that differs from the request", async () => {
+    await storage.set("local:networkSettings", {
+      gatewayUrl: "https://arweave.net",
+      peers: [],
+      activePeerUrl: "https://hyperbeam.example.com",
+    });
+    const handler = new TransferHandler(storage, keySession);
+    const { prepareTransfer } = await vi.importActual<typeof import("@gleam/core/src/ao/transfer.ts")>(
+      "@gleam/core/src/ao/transfer.ts",
+    );
+    vi.spyOn(handler, "prepareDeviceTransfer").mockResolvedValue({
+      kind: "dataItem",
+      raw: prepareTransfer(wallet.publicKey, AO_PROCESS_ID, "x".repeat(43), "42"),
+    });
+
+    await expect(
+      handler.submitTransfer({ walletId: WALLET_ID, recipient: AO_RECIPIENT, token: AO_PROCESS_ID, amount: "42", fee: null }),
+    ).rejects.toThrow(/recipient/);
+    expect(aoFinishMock).not.toHaveBeenCalled();
   });
 
   it("keeps AO amounts as atomic-integer strings end to end, never a float", async () => {
@@ -267,13 +294,13 @@ describe("TransferHandler: submitTransfer", () => {
       peers: [],
       activePeerUrl: "https://hyperbeam.example.com",
     });
-    aoSubmitMock.mockResolvedValue({ messageId: "ao-msg-id-2" });
+    aoFinishMock.mockResolvedValue({ messageId: "ao-msg-id-2" });
     const huge = "90071992547409930000";
 
     const handler = new TransferHandler(storage, keySession);
     await handler.submitTransfer({
       walletId: WALLET_ID,
-      recipient: "recipientAoAddr",
+      recipient: AO_RECIPIENT,
       token: AO_PROCESS_ID,
       amount: huge,
       fee: null,

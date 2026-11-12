@@ -34,9 +34,11 @@ tests check Gleam's ANS-104 bytes against it.
 - `packages/messaging`: the typed `ProtocolMap` wire contracts between
   popup, background, content script and page.
 - `packages/runtime`: `createRuntime(platform)` and its dispatcher
-  (`create-runtime.ts`), the method table (`dispatch/methods.ts`) and
+  (`create-runtime.ts`), the method table (`dispatch/methods.ts`),
   every handler (`handlers/`) such as `wallet-lifecycle`, `reads`,
-  `transfer`, `approval` and `key-session`. It reaches a platform only
+  `transfer`, `approval`, `provider` (the page methods) and
+  `key-session`, and the alarm-driven jobs beside them (`peers.ts`,
+  `points-invite.ts`, `points-attest.ts`). It reaches a platform only
   through `Platform` (`platform.ts`).
 - `packages/ui`: design tokens, primitives and shared components.
 - `packages/app`: every screen (`src/screens/<screen>/`), the router
@@ -93,16 +95,27 @@ tests check Gleam's ANS-104 bytes against it.
   of each method's caller tier, whether it can open an approval, and the
   zod schema its page-supplied params are parsed with; the background
   dispatcher enforces all three before any handler runs. Only a method
-  marked `approval: true` gets `requestApproval` in its handler's call.
+  marked `approval: true` gets `requestApproval` in its handler's call;
+  the page handlers (`handlers/provider.ts`) never receive the approval
+  handler itself.
 - **Signing** decodes the exact bytes it is about to sign and checks them
-  against the approved request (`assertPreparedMatches`,
-  `handlers/approval.ts`) before any signer runs, for keyfile and
-  hardware wallets alike.
+  against the approved request (`handlers/prepared-check.ts`) before any
+  signer runs, for keyfile and hardware wallets alike, and for the
+  wallet's own sends as for a dApp's. There is no one-step
+  build-and-sign function. A preview headline names only what its reader
+  consumed; every other tag is counted beside it
+  (`core/ao/other-tags.ts`), never only under Details. In
+  `app/src/approval/` and `app/src/transfer-review/`, a string from a
+  site, a token process, a tag or a device renders through
+  `UntrustedText` (`gleam/untrusted-text`).
 - **Storage writes.** A value computed from the stored one is written
   with `updateStored(storage, key, next)` (`runtime/src/storage-update.ts`),
-  which runs one update per key at a time; `next` never awaits. A key
-  more than one module uses is declared once, in
-  `runtime/src/storage-keys.ts`.
+  which runs one update per key at a time; `next` never awaits. That
+  holds when the read happened in a helper:
+  `gleam/no-storage-read-modify-write` checks a whole file, and a whole-value write takes a disable with its
+  reason. A key more than one module uses is declared once, in
+  `runtime/src/storage-keys.ts`. Every value read from storage passes a
+  type guard (`isValidWallet`, `isValidGrant`, …) before use.
 - **Security surface.** `security/surface.txt` lists, by tier, the files
   that key, signing and page-boundary code depends on.
   `security/surface-closure.security.test.ts` fails on a file the entry
@@ -112,8 +125,9 @@ tests check Gleam's ANS-104 bytes against it.
 - **Signing keys** are decrypted on unlock and imported, by wallet id,
   as non-extractable WebCrypto keys into the keyring offscreen document
   (`entrypoints/keyring/`), which holds them in memory only.
-  `chrome.storage.session` holds only each unlocked wallet's address and
-  public key. Handlers get a signer through `handlers/key-session.ts`
+  `chrome.storage.session` holds no key material: per unlocked wallet
+  only the address and public key, beside the session record and the
+  pending approvals. Handlers get a signer through `handlers/key-session.ts`
   (`getSigner`). Never write key material to `chrome.storage` or
   IndexedDB, and never re-derive it from a password.
 - **Passkey unlock** wraps the vault password under the passkey's
@@ -125,10 +139,12 @@ tests check Gleam's ANS-104 bytes against it.
 - **AO sends** are ANS-104 items built and signed with plain WebCrypto in
   `core/ao/transfer.ts`, then POSTed to `mu.ao-testnet.xyz`. Don't use
   `@permaweb/aoconnect`: its browser build's signature check breaks raw-JWK
-  signing in Chrome. Outcomes are read from `cu.ao-testnet.xyz/result/…`
+  signing in Chrome (dependency-cruiser refuses the import). Outcomes
+  are read from `cu.ao-testnet.xyz/result/…`
   (`core/ao/result.ts`).
 - **Translations** live in `packages/app/src/i18n/messages/<screen>.ts`,
-  one `defineMessages({ en, "zh-CN", "zh-TW" })` per screen folder, keyed
+  one `defineMessages({ en, es, … })` per screen folder for the eleven
+  languages in `i18n/define.ts`, keyed
   `namespace.name` and read with `useT()` (`t()` outside React). A key
   missing from any language fails `tsc`, and `catalog.i18n.test.ts` checks
   placeholders match. Without a stored choice the language follows the
@@ -138,11 +154,18 @@ tests check Gleam's ANS-104 bytes against it.
   person can reach is declared in `core/models/user-errors.ts` and thrown
   with `userErrorMessage`. Only `message` crosses every transport, so the
   app matches the text back to its code and translates it at display with
-  `errorText` (`app/src/i18n/errors.ts`). dApps get the English. A new
-  one-off string outside the table stays English. Compare raw `.message`,
+  `errorText` (`app/src/i18n/errors.ts`). dApps get the English. In
+  `runtime`, a literal `throw new Error("…")` is a lint error: wrap
+  English-by-design text (dApp-facing, or an invariant no person sees) in
+  `dappError`. A new one-off string outside the table stays English.
+  Compare raw `.message`,
   never `errorText`'s output.
 - **Amounts** are atomic-integer strings (Winston, or the token's smallest
   unit). Never floats.
+- **URLs and bytes.** Trailing slashes come off with
+  `trimTrailingSlashes`, never a regex (CodeQL flags the backtracking).
+  Bytes that may come from another realm are tested with
+  `ArrayBuffer.isView`, not `instanceof`.
 - **Activity** merges the local optimistic log with gateway GraphQL. A
   background alarm settles pending entries every minute.
 - **Tests** sit next to the file they test (`foo.ts` → `foo.*.test.ts`).
@@ -195,7 +218,8 @@ for the branch, and merge it with a merge commit once CI is green
 merges). `master` accepts only signed commits through a PR with passing
 CI, and admins get no bypass. The Security surface check fails a PR
 that touches a `security/surface.txt` path until its description ticks
-the surface box; the next release then needs a fresh audit.
+the surface box (the PR template has it); the next release then needs a
+fresh audit.
 This repo signs commits with an SSH key (`git config --local
 commit.gpgsign true`), so the key has to be loaded in `ssh-agent`.
 

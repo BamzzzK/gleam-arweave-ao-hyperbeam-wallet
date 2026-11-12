@@ -1,5 +1,6 @@
 import type { StoragePort } from "@gleam/core";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
+import { updateStored } from "../storage-update";
 
 /**
  * Background-side implementation of the dApp browser's saved and recent
@@ -34,12 +35,15 @@ function webOrigin(url: string): string {
   return parsed.origin;
 }
 
+function origins(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
 export class BrowserSitesHandler {
   constructor(private readonly storage: StoragePort) {}
 
   private async load(key: string): Promise<string[]> {
-    const raw = await this.storage.get<unknown>(key);
-    return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
+    return origins(await this.storage.get<unknown>(key));
   }
 
   async listBrowserSites(): Promise<BrowserSites> {
@@ -49,22 +53,24 @@ export class BrowserSitesHandler {
 
   async saveBrowserSite(req: { url: string }): Promise<void> {
     const origin = webOrigin(req.url);
-    const saved = await this.load(BROWSER_SAVED_SITES_KEY);
-    await this.storage.set(BROWSER_SAVED_SITES_KEY, [origin, ...saved.filter((entry) => entry !== origin)]);
+    await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => [
+      origin,
+      ...origins(raw).filter((entry) => entry !== origin),
+    ]);
   }
 
   async removeBrowserSite(req: { origin: string }): Promise<void> {
-    const saved = await this.load(BROWSER_SAVED_SITES_KEY);
-    const next = saved.filter((entry) => entry !== req.origin);
-    if (next.length !== saved.length) await this.storage.set(BROWSER_SAVED_SITES_KEY, next);
+    await updateStored(this.storage, BROWSER_SAVED_SITES_KEY, (raw) => {
+      const saved = origins(raw);
+      const next = saved.filter((entry) => entry !== req.origin);
+      return next.length !== saved.length ? next : undefined;
+    });
   }
 
   async recordRecentSite(req: { url: string }): Promise<void> {
     const origin = webOrigin(req.url);
-    const recent = await this.load(BROWSER_RECENT_SITES_KEY);
-    await this.storage.set(
-      BROWSER_RECENT_SITES_KEY,
-      [origin, ...recent.filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
+    await updateStored(this.storage, BROWSER_RECENT_SITES_KEY, (raw) =>
+      [origin, ...origins(raw).filter((entry) => entry !== origin)].slice(0, MAX_RECENT_SITES),
     );
   }
 

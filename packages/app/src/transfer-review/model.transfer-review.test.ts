@@ -67,6 +67,52 @@ describe("transferRequestFromPreview", () => {
     expect(parsed.method).toBeNull();
   });
 
+  it("counts the tags an L1 token transfer's reader did not consume", () => {
+    const parsed = transferRequestFromPreview({
+      ...BASE,
+      kind: "sign",
+      token: P,
+      tags: [
+        { name: "action", value: "transfer" },
+        { name: "recipient", value: R },
+        { name: "quantity", value: "5" },
+        { name: "X-Forward-To", value: P },
+        { name: "Content-Type", value: "text/plain" },
+      ],
+    })!;
+    expect(parsed.transfers[0]!.otherTags).toBe(1);
+  });
+
+  it("counts every non-protocol tag on an AR send", () => {
+    const parsed = transferRequestFromPreview({ ...BASE, tags: [{ name: "Action", value: "Transfer" }] })!;
+    expect(parsed.transfers[0]!.otherTags).toBe(1);
+  });
+
+  it("counts an AO item's tags beyond Action, Recipient and Quantity", () => {
+    const tags = [
+      { name: "Data-Protocol", value: "ao" },
+      { name: "Action", value: "Transfer" },
+      { name: "Recipient", value: R },
+      { name: "Quantity", value: "5" },
+      { name: "Assign-To", value: P },
+    ];
+    const parsed = transferRequestFromPreview({
+      ...BASE,
+      kind: "signDataItem",
+      recipient: null,
+      items: [
+        {
+          decodedData: null,
+          tags,
+          target: P,
+          payloadHash: "h",
+          transfer: { token: P, tokenTicker: null, tokenDenomination: null, amount: "5", recipient: R },
+        },
+      ],
+    })!;
+    expect(parsed.transfers[0]!.otherTags).toBe(1);
+  });
+
   it("is null for a request that moves nothing", () => {
     expect(transferRequestFromPreview({ ...BASE, recipient: null })).toBeNull();
     expect(

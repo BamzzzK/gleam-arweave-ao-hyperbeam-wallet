@@ -211,6 +211,7 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
         <div className="flex flex-col items-center gap-0.5">
           <span className="break-words text-h3 font-semibold text-foreground"><UntrustedText text={name} /></span>
           <span className="text-label text-muted">{t("transferReview.oneItem")}</span>
+          <OtherTags transfer={transfer} />
         </div>
       </div>
     );
@@ -237,8 +238,16 @@ function Hero({ transfer, context }: { transfer: TransferLine; context: Transfer
           {fiat ? <span className="text-body tabular-nums text-muted">{fiat}</span> : null}
         </div>
       )}
+      <OtherTags transfer={transfer} />
     </div>
   );
+}
+
+/** The signed tags the headline didn't read, counted where the amount is; Details lists them. */
+function OtherTags({ transfer }: { transfer: TransferLine }) {
+  const t = useT();
+  if (!transfer.otherTags) return null;
+  return <span className="text-label font-medium text-foreground">{t("transferReview.otherTags", { count: transfer.otherTags })}</span>;
 }
 
 function BatchHero({ request, context }: { request: TransferRequest; context: TransferContext }) {
@@ -272,6 +281,7 @@ function TransferCard({ transfer, context }: { transfer: TransferLine; context: 
         </div>
         {fiat ? <span className="flex-shrink-0 text-label tabular-nums text-muted">{fiat}</span> : null}
       </div>
+      <OtherTags transfer={transfer} />
       <div className="grid grid-cols-[32px_minmax(0,1fr)] items-start gap-x-3">
         <span aria-hidden="true" className="mt-[18px] justify-self-center">
           <AccountAvatar svgMarkup={identity.avatarSvg(transfer.recipient)} label="" size={24} />

@@ -35,6 +35,7 @@ import { attestFailure, serverAttestFailure } from "./attest-errors";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { updateStored } from "../storage-update";
+import { dappError } from "../dapp-error";
 
 /** Per-install Gleam Points state. `registered` flips once any wallet registers. */
 export interface PointsDeviceState {
@@ -128,8 +129,7 @@ export class PointsHandler {
   }
 
   async getMemberships(): Promise<Record<string, PointsMembership>> {
-    const stored = await this.deps.storage.get<Record<string, PointsMembership>>(POINTS_MEMBERSHIPS_KEY);
-    return stored !== null && typeof stored === "object" ? stored : {};
+    return membershipsOf(await this.deps.storage.get<unknown>(POINTS_MEMBERSHIPS_KEY));
   }
 
   /**
@@ -189,6 +189,7 @@ export class PointsHandler {
       ...(current !== null && typeof current === "object" ? current : {}),
       [req.walletId]: membership,
     }));
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
     await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
       registered: true,
       lastHeartbeatAt: this.now(),
@@ -344,12 +345,14 @@ export class PointsHandler {
 
     const { result, kind } = await this.requestRedeem(code);
     const unlock: InviteUnlock = { code, result, at: this.now() };
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- the server's verdict replaces the stored one
     await this.deps.storage.set(POINTS_INVITE_UNLOCK_KEY, unlock);
     // The claim step applies this code when the first wallet joins. A drop
     // code has no referrer, so it never becomes the pending code. A code
     // whose kind is unknown (an older server, or no answer yet) is kept:
     // `join` sends it and the server decides.
     if ((result === "ok" || result === "offline") && kind !== "drop") {
+      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
       await this.deps.storage.set(POINTS_PENDING_INVITE_KEY, code);
     }
     return unlock;
@@ -363,6 +366,7 @@ export class PointsHandler {
    */
   async markUnlockedForVault(): Promise<void> {
     if ((await this.getInviteUnlock())?.result === "ok") return;
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- an "ok" written over "ok" changes nothing
     await this.deps.storage.set<InviteUnlock>(POINTS_INVITE_UNLOCK_KEY, { code: "", result: "ok", at: this.now() });
   }
 
@@ -429,18 +433,15 @@ export class PointsHandler {
       throw new Error(userErrorMessage("pointsLeaveFailed", { reason }));
     }
 
-    const remaining = { ...(await this.getMemberships()) };
-    delete remaining[req.walletId];
-    await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, remaining);
+    const remaining = await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, (raw) =>
+      without(membershipsOf(raw), req.walletId),
+    );
     // A later rejoin is a new join: its prompts and seat count start over.
-    const shareSeen = await this.readShareSeen();
-    delete shareSeen[req.walletId];
-    await this.deps.storage.set(POINTS_SHARE_SEEN_KEY, shareSeen);
-    const seats = await this.readSeats();
-    delete seats[req.walletId];
-    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
-    await this.updateBadge(seats);
-    if (Object.keys(remaining).length === 0) {
+    await updateStored(this.deps.storage, POINTS_SHARE_SEEN_KEY, (raw) => without(shareSeenOf(raw), req.walletId));
+    const seats = await updateStored(this.deps.storage, POINTS_SEATS_SEEN_KEY, (raw) => without(seatsOf(raw), req.walletId));
+    await this.updateBadge(seats ?? {});
+    if (Object.keys(remaining ?? {}).length === 0) {
+      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
     }
   }
@@ -455,7 +456,9 @@ export class PointsHandler {
     const response = await this.postDeviceSigned("me");
     if (response.status === 404) {
       // The server forgot this device (a leave on another install deletes the wallet everywhere), so the local memberships no longer mean anything.
-      await this.deps.storage.set(POINTS_MEMBERSHIPS_KEY, {});
+      // Queued like join's update, so a join in flight can't write the forgotten memberships back.
+      await updateStored(this.deps.storage, POINTS_MEMBERSHIPS_KEY, () => ({}));
+      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value reset, not derived from the read
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
       return null;
     }
@@ -471,10 +474,11 @@ export class PointsHandler {
   }
 
   async markShareSeen(req: { walletId: string; prompt: PointsSharePrompt }): Promise<void> {
-    const seen = await this.readShareSeen();
-    const prompts = seen[req.walletId] ?? [];
-    if (!prompts.includes(req.prompt)) seen[req.walletId] = [...prompts, req.prompt];
-    await this.deps.storage.set(POINTS_SHARE_SEEN_KEY, seen);
+    await updateStored(this.deps.storage, POINTS_SHARE_SEEN_KEY, (raw) => {
+      const seen = shareSeenOf(raw);
+      const prompts = seen[req.walletId] ?? [];
+      return prompts.includes(req.prompt) ? undefined : { ...seen, [req.walletId]: [...prompts, req.prompt] };
+    });
   }
 
   async getSeatsSeen(): Promise<Record<string, number>> {
@@ -482,10 +486,14 @@ export class PointsHandler {
   }
 
   async markSeatsSeen(req: { walletId: string; seats: number }): Promise<void> {
-    const seats = await this.readSeats();
-    seats[req.walletId] = { seen: req.seats, latest: Math.max(seats[req.walletId]?.latest ?? 0, req.seats) };
-    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
-    await this.updateBadge(seats);
+    const seats = await updateStored(this.deps.storage, POINTS_SEATS_SEEN_KEY, (raw) => {
+      const current = seatsOf(raw);
+      return {
+        ...current,
+        [req.walletId]: { seen: req.seats, latest: Math.max(current[req.walletId]?.latest ?? 0, req.seats) },
+      };
+    });
+    await this.updateBadge(seats ?? {});
   }
 
   /**
@@ -506,15 +514,17 @@ export class PointsHandler {
    */
   private async syncSeats(scores: PointsScores): Promise<void> {
     const memberships = await this.getMemberships();
-    const seats = await this.readSeats();
-    for (const [walletId, membership] of Object.entries(memberships)) {
-      const latest = scores.wallets.find((wallet) => wallet.address === membership.address)?.seatsLeft;
-      if (typeof latest !== "number") continue;
-      const previous = seats[walletId];
-      seats[walletId] = { seen: previous === undefined ? latest : Math.min(previous.seen, latest), latest };
-    }
-    await this.deps.storage.set(POINTS_SEATS_SEEN_KEY, seats);
-    await this.updateBadge(seats);
+    const seats = await updateStored(this.deps.storage, POINTS_SEATS_SEEN_KEY, (raw) => {
+      const next = seatsOf(raw);
+      for (const [walletId, membership] of Object.entries(memberships)) {
+        const latest = scores.wallets.find((wallet) => wallet.address === membership.address)?.seatsLeft;
+        if (typeof latest !== "number") continue;
+        const previous = next[walletId];
+        next[walletId] = { seen: previous === undefined ? latest : Math.min(previous.seen, latest), latest };
+      }
+      return next;
+    });
+    await this.updateBadge(seats ?? {});
   }
 
   private async updateBadge(seats: Record<string, PointsSeatsRecord>): Promise<void> {
@@ -522,13 +532,11 @@ export class PointsHandler {
   }
 
   private async readShareSeen(): Promise<Record<string, PointsSharePrompt[]>> {
-    const stored = await this.deps.storage.get<Record<string, PointsSharePrompt[]>>(POINTS_SHARE_SEEN_KEY);
-    return stored !== null && typeof stored === "object" ? { ...stored } : {};
+    return shareSeenOf(await this.deps.storage.get<unknown>(POINTS_SHARE_SEEN_KEY));
   }
 
   private async readSeats(): Promise<Record<string, PointsSeatsRecord>> {
-    const stored = await this.deps.storage.get<Record<string, PointsSeatsRecord>>(POINTS_SEATS_SEEN_KEY);
-    return stored !== null && typeof stored === "object" ? { ...stored } : {};
+    return seatsOf(await this.deps.storage.get<unknown>(POINTS_SEATS_SEEN_KEY));
   }
 
   /**
@@ -545,11 +553,13 @@ export class PointsHandler {
     const response = await this.postDeviceSigned("heartbeat");
 
     if (response.status === 404) {
+      // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
       await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, { registered: false, lastHeartbeatAt: null });
       return false;
     }
-    if (!response.ok) throw new Error(`Points heartbeat failed (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(dappError(`Points heartbeat failed (HTTP ${response.status}).`));
 
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a whole-value write, not derived from the read
     await this.deps.storage.set<PointsDeviceState>(POINTS_DEVICE_STATE_KEY, {
       registered: true,
       lastHeartbeatAt: this.now(),
@@ -613,4 +623,18 @@ async function runHeartbeat(handler: PointsHandler): Promise<void> {
   } catch (error) {
     console.error("Gleam Points seat check failed:", error);
   }
+}
+
+function storedRecord<T>(raw: unknown): Record<string, T> {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw) ? { ...(raw as Record<string, T>) } : {};
+}
+
+const membershipsOf = (raw: unknown) => storedRecord<PointsMembership>(raw);
+const shareSeenOf = (raw: unknown) => storedRecord<PointsSharePrompt[]>(raw);
+const seatsOf = (raw: unknown) => storedRecord<PointsSeatsRecord>(raw);
+
+function without<T>(record: Record<string, T>, walletId: string): Record<string, T> {
+  const next = { ...record };
+  delete next[walletId];
+  return next;
 }

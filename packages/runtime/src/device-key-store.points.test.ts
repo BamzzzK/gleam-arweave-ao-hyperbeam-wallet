@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { deviceKeyThumbprint } from "./identity";
+import { deviceKeyThumbprint } from "@gleam/core/src/points/identity.ts";
 import { loadOrCreateDeviceKey, resetDeviceKeyCacheForTests } from "./device-key-store";
 
 beforeEach(() => {

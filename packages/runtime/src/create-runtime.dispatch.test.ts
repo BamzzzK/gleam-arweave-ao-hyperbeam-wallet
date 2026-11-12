@@ -358,6 +358,14 @@ describe("createRuntime", () => {
       }
     });
 
+    it("refuses a site without a grant before decoding its params", async () => {
+      const { runtime } = await setupWatching();
+      // Params that fail to decode: the grant refusal must come first.
+      await expect(runtime.dispatch("providerCall", { method: "sign", params: "not an object" }, CONTENT_SCRIPT)).rejects.toThrow(
+        /is not connected/,
+      );
+    });
+
     it("refuses \"Use Gleam here\" from the popup", async () => {
       const { runtime, storage } = await setupWatching();
 

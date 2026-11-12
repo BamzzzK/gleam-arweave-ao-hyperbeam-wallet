@@ -55,10 +55,15 @@ const noDynamicImport = {
     };
   },
 };
-// A `storage.set(K, …)` in a function that also reads `storage.get(K)` is
-// a read-modify-write: another write to K between the two is lost. Such a
-// write goes through `updateStored` (`runtime/src/storage-update.ts`),
-// which runs one update per key at a time. Keys match by source text.
+// A `storage.set(K, …)` in a file that also reads `storage.get(K)` is a
+// read-modify-write, whichever function does the read: another write to K
+// between the two is lost. Such a write goes through `updateStored`
+// (`runtime/src/storage-update.ts`), which runs one update per key at a
+// time. A key is named by its constant: `${PREFIX}${id}` by PREFIX,
+// `keyFor(id)` by keyFor, and a local `const key = …` by what it holds. A
+// read through a helper's parameter (`load(key)`) reads every key, and a
+// write through one writes every key. A whole-value write that doesn't
+// depend on the read takes an eslint-disable with the reason.
 const noStorageReadModifyWrite = {
   meta: { type: "problem", schema: [] },
   create(context) {
@@ -69,26 +74,45 @@ const noStorageReadModifyWrite = {
       const name = node.type === "MemberExpression" ? node.property.name : node.type === "Identifier" ? node.name : null;
       return typeof name === "string" && /storage$/i.test(name);
     };
+    const ANY = "*";
+    const keyOf = (node, seen = new Set()) => {
+      if (node.type === "TemplateLiteral") {
+        const first = node.expressions[0];
+        return first && node.quasis[0].value.raw === "" ? keyOf(first, seen) : source.getText(node);
+      }
+      if (node.type === "CallExpression") return source.getText(node.callee);
+      if (node.type === "Identifier") {
+        if (/^[A-Z][A-Z0-9_]*$/.test(node.name) || seen.has(node.name)) return node.name;
+        seen.add(node.name);
+        let scope = source.getScope(node);
+        while (scope) {
+          const variable = scope.set.get(node.name);
+          if (variable) {
+            const def = variable.defs[0];
+            if (def?.type === "Parameter") return ANY;
+            if (def?.type === "Variable" && def.node.init) return keyOf(def.node.init, seen);
+            return node.name;
+          }
+          scope = scope.upper;
+        }
+        return node.name;
+      }
+      return source.getText(node);
+    };
     return {
       CallExpression(node) {
         const callee = node.callee;
         if (callee.type !== "MemberExpression" || callee.property.type !== "Identifier") return;
         if (!isStorage(callee.object) || node.arguments.length === 0) return;
-        const key = source.getText(node.arguments[0]);
-        if (callee.property.name === "get") gets.push({ key, node });
-        else if (callee.property.name === "set") sets.push({ key, node });
+        if (callee.property.name === "get") gets.push(keyOf(node.arguments[0]));
+        else if (callee.property.name === "set") sets.push({ key: keyOf(node.arguments[0]), node });
       },
       "Program:exit"() {
         for (const set of sets) {
-          const scope = source.getAncestors(set.node).findLast((ancestor) => /Function/.test(ancestor.type));
-          if (!scope) continue;
-          const read = gets.some(
-            (get) => get.key === set.key && get.node.range[0] >= scope.range[0] && get.node.range[1] <= scope.range[1],
-          );
-          if (read) {
+          if (gets.includes(set.key) || gets.includes(ANY) || (set.key === ANY && gets.length > 0)) {
             context.report({
               node: set.node,
-              message: `${set.key} is written from a read of itself. Use updateStored (runtime/src/storage-update.ts), which runs one update per key at a time.`,
+              message: `${set.key} is written in a file that reads it. Use updateStored (runtime/src/storage-update.ts), which runs one update per key at a time.`,
             });
           }
         }
@@ -133,8 +157,48 @@ const typeScale = {
     };
   },
 };
+// Strings from a site, a token process, a tag or a device render through
+// `<UntrustedText>` (bidi controls, zero-width characters), never as bare
+// JSX text. Checks JSX children only; an attribute value is a prop for
+// something else to render. The user's own labels are named in OWN_LABELS.
+const UNTRUSTED_ALWAYS = new Set(["ticker", "tokenTicker", "decodedData"]);
+const UNTRUSTED_ON_TAG = new Set(["name", "value", "walletName"]);
+const UNTRUSTED_PATHS = new Set(["appInfo.name", "summary.text"]);
+const OWN_LABELS = new Set(["wallet", "from", "contact"]);
+const untrustedText = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    const nameOf = (node) =>
+      node.type === "Identifier" ? node.name : node.type === "MemberExpression" && !node.computed ? node.property.name : null;
+    const untrusted = (expr) => {
+      const node = expr.type === "ChainExpression" ? expr.expression : expr;
+      if (node.type !== "MemberExpression" || node.computed || node.property.type !== "Identifier") return false;
+      const prop = node.property.name;
+      const object = nameOf(node.object);
+      if (object === null || OWN_LABELS.has(object)) return false;
+      if (UNTRUSTED_PATHS.has(`${object}.${prop}`)) return true;
+      if (UNTRUSTED_ALWAYS.has(prop)) return true;
+      return UNTRUSTED_ON_TAG.has(prop) && /tag/i.test(object);
+    };
+    return {
+      JSXExpressionContainer(node) {
+        if (node.parent.type !== "JSXElement" && node.parent.type !== "JSXFragment") return;
+        if (node.expression.type === "JSXEmptyExpression" || !untrusted(node.expression)) return;
+        const wrapped = context.sourceCode
+          .getAncestors(node)
+          .some((a) => a.type === "JSXElement" && a.openingElement.name.type === "JSXIdentifier" && a.openingElement.name.name === "UntrustedText");
+        if (wrapped) return;
+        context.report({
+          node,
+          message: `${context.sourceCode.getText(node.expression)} comes from a site, token or tag. Render it through <UntrustedText>, never as bare JSX text.`,
+        });
+      },
+    };
+  },
+};
 const gleam = {
   rules: {
+    "untrusted-text": untrustedText,
     "type-scale": typeScale,
     "no-dynamic-import": noDynamicImport,
     "no-computed-import": noComputedImport,
@@ -165,18 +229,10 @@ const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
 }));
-// The one-shot keyfile signers build and sign in one step, with no point
-// between to check the built bytes against the approved request.
-const ONE_SHOT_SIGNING = {
-  regex: "^@gleam/core(/src/vault/signing(\\.ts)?)?$",
-  importNames: ["signTransaction", "dispatchTransaction", "signDataItem", "batchSignDataItem"],
-  message:
-    "Sign a request through prepare → assertPreparedMatches → signPayloadWithSigner → finish (handlers/approval.ts), so the built bytes are checked first.",
-};
 const runtimeFence = (...extraPatterns) => ({
   "no-restricted-imports": [
     "error",
-    { patterns: [...extraPatterns, ONE_SHOT_SIGNING, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
+    { patterns: [...extraPatterns, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
   ],
   "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
 });
@@ -247,6 +303,17 @@ const NO_RAW_KEY = [
   {
     selector: "Identifier[name='getCachedKey']",
     message: "Use `getSigner(walletId)` from key-session.ts; the raw cached key never leaves that module.",
+  },
+];
+// An error text a person can reach is translated at display, so a handler
+// names its code (`userErrorMessage`) or marks the English as deliberate
+// (`dappError`); a bare literal would reach a zh-CN popup untranslated.
+const NO_LITERAL_ERROR_THROW = [
+  {
+    selector:
+      "ThrowStatement > NewExpression[callee.name='Error'] > :matches(Literal[value=/./], TemplateLiteral).arguments:first-child",
+    message:
+      "Throw `new Error(userErrorMessage(code))` for text a person can reach, or `new Error(dappError(...))` for English by design.",
   },
 ];
 const NO_DYNAMIC_SIGNER_IMPORT = [
@@ -394,6 +461,11 @@ export default tseslint.config(
     rules: { "gleam/type-scale": "error" },
   },
   {
+    files: ["packages/app/src/{approval,transfer-review}/**/*.tsx"],
+    ignores: ["**/*.test.tsx"],
+    rules: { "gleam/untrusted-text": "error" },
+  },
+  {
     // The same fence as `no-restricted-globals` below, through a global object.
     files: ["packages/**/*.{ts,tsx}"],
     rules: { "no-restricted-properties": ["error", ...NO_GLOBAL_OBJECT_EXTENSION_API] },
@@ -413,9 +485,31 @@ export default tseslint.config(
   },
   {
     files: ["packages/runtime/src/**/*.ts"],
-    // The one place a key is read and written, one update per key at a time.
-    ignores: ["**/*.test.ts", "packages/runtime/src/storage-update.ts"],
+    // storage-update.ts is the one place a key is read and written, one
+    // update per key at a time. The other two write under withSessionLock,
+    // and key-session.ts overwrites an entry only to zeroize it.
+    ignores: [
+      "**/*.test.ts",
+      "packages/runtime/src/storage-update.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
+      "packages/runtime/src/handlers/key-session.ts",
+    ],
     rules: { "gleam/no-storage-read-modify-write": "error" },
+  },
+  {
+    // Later than the two blocks that set `no-restricted-syntax` for all
+    // files, so it repeats their lists; key-session and wallet-lifecycle
+    // are the ones the raw-key list skips.
+    files: ["packages/runtime/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "packages/runtime/src/handlers/key-session.ts", "packages/runtime/src/handlers/wallet-lifecycle.ts"],
+    rules: { "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_RAW_KEY, ...NO_LITERAL_ERROR_THROW] },
+  },
+  {
+    files: [
+      "packages/runtime/src/handlers/key-session.ts",
+      "packages/runtime/src/handlers/wallet-lifecycle.ts",
+    ],
+    rules: { "no-restricted-syntax": ["error", ...NO_HTML_INJECTION, ...NO_LITERAL_ERROR_THROW] },
   },
   {
     // The app fence. A later block replaces a rule's options wholesale, so

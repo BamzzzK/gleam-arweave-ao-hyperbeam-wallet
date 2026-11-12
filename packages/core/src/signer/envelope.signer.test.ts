@@ -7,6 +7,7 @@ import {
   decryptFromEnvelope,
   encryptToEnvelope,
   envelopeNeedsUpgrade,
+  isValidArgon2idParams,
 } from "./envelope";
 import { base64ToBytes, bytesToBase64 } from "../vault/base64";
 import type { Argon2idParams, VaultEnvelope, VaultEnvelopeV1 } from "../models/wallet";
@@ -186,6 +187,32 @@ describe("envelope encrypt/decrypt round trip", () => {
     await expect(decryptText({ ...envelope, salt: bytesToBase64(new Uint8Array(8)) })).rejects.toThrow(
       /corrupted/,
     );
+  });
+
+  it("tells a 15-byte salt from a 16-byte one", async () => {
+    const envelope = await encrypt("secret bytes");
+    await expect(decryptText({ ...envelope, salt: bytesToBase64(new Uint8Array(15)) })).rejects.toThrow(/corrupted/);
+    // A well-formed salt that isn't the one used fails the GCM tag, not the length check.
+    await expect(decryptText({ ...envelope, salt: bytesToBase64(new Uint8Array(16)) })).rejects.toThrow(
+      /didn't unlock/,
+    );
+  });
+
+  it.each([
+    ["parallelism at its cap", { memoryKiB: 128, iterations: 1, parallelism: 16 }, true],
+    ["parallelism over its cap", { memoryKiB: 136, iterations: 1, parallelism: 17 }, false],
+    ["parallelism of 1", { memoryKiB: 8, iterations: 1, parallelism: 1 }, true],
+    ["parallelism of 0", { memoryKiB: 8, iterations: 1, parallelism: 0 }, false],
+    ["iterations at their cap", { memoryKiB: 64, iterations: 10, parallelism: 1 }, true],
+    ["iterations over their cap", { memoryKiB: 64, iterations: 11, parallelism: 1 }, false],
+    ["iterations of 1", { memoryKiB: 64, iterations: 1, parallelism: 1 }, true],
+    ["iterations of 0", { memoryKiB: 64, iterations: 0, parallelism: 1 }, false],
+    ["memory at its cap", { memoryKiB: 262_144, iterations: 1, parallelism: 1 }, true],
+    ["memory over its cap", { memoryKiB: 262_145, iterations: 1, parallelism: 1 }, false],
+    ["memory at exactly 8 KiB per lane", { memoryKiB: 16, iterations: 1, parallelism: 2 }, true],
+    ["memory one KiB under 8 KiB per lane", { memoryKiB: 15, iterations: 1, parallelism: 2 }, false],
+  ] as const)("Argon2id params with %s", (_label, params, valid) => {
+    expect(isValidArgon2idParams(params)).toBe(valid);
   });
 
   it("rejects a malformed envelope (invalid base64 ciphertext)", async () => {

@@ -7,6 +7,7 @@ import {
   type TokenBalance,
   type TokenPrice,
 } from "@gleam/core";
+import { otherTags } from "@gleam/core/src/ao/other-tags.ts";
 import { DEFAULT_AO_TOKEN, DEFAULT_AR_TOKEN } from "@gleam/ui";
 import { currencyStep, formatCurrencyValue, HIDDEN_AMOUNT } from "@gleam/ui/src/format/currency.ts";
 import { truncateAddress } from "@gleam/ui/src/format/truncate-address.ts";
@@ -30,6 +31,12 @@ export interface TransferLine {
   amount: string;
   recipient: string;
   collectible?: CollectibleRef | null;
+  /**
+   * How many of the signed tags the headline's reader did not consume
+   * (`core/ao/other-tags.ts`). Shown beside the amount, never only under
+   * Details, so a tag the reader doesn't model is seen before approving.
+   */
+  otherTags?: number;
 }
 
 /** What one signed thing says beyond the transfer itself, shown under Details. */
@@ -116,7 +123,12 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
       const part = { tags: item.tags, decodedData: item.decodedData, payloadHash: item.payloadHash };
       if (item.transfer) {
         const { token, tokenTicker, tokenDenomination, amount, recipient } = item.transfer;
-        transfers.push({ ...line(token, tokenTicker, tokenDenomination, amount, recipient), part, index });
+        transfers.push({
+          ...line(token, tokenTicker, tokenDenomination, amount, recipient),
+          otherTags: otherTags(item.tags, "ao").length,
+          part,
+          index,
+        });
       } else {
         others.push({
           ...part,
@@ -147,10 +159,14 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
     preview.collectible,
   );
   const walletSend = preview.kind === "transfer";
+  // A token or collectible headline is `readL1TokenTransfer`'s reading;
+  // an AR one reads only the target and quantity.
+  const reader = preview.collectible || preview.token !== null ? "l1" : "plain";
   return {
     transfers: [
       {
         ...transfer,
+        otherTags: otherTags(preview.tags, reader).length,
         part: {
           tags: preview.tags,
           decodedData: preview.decodedData,

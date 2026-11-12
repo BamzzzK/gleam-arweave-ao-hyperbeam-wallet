@@ -8,10 +8,16 @@ import {
   createSignedDataItem,
   finishTransfer,
   prepareTransfer,
-  submitTransfer,
 } from "./transfer";
-import { dataItemSignatureData } from "../arweave/data-item";
+import { dataItemSignatureData, signDataItemWithSigner } from "../arweave/data-item";
+import type { Signer } from "../vault/signer";
 import { signRsaPss } from "../arweave/rsa-pss";
+
+// The keyfile path run step by step, as the transfer handler runs it.
+async function submitTransfer(signer: Signer, processId: string, recipient: string, amount: string) {
+  const unsigned = prepareTransfer(signer.owner, processId, recipient, amount);
+  return finishTransfer(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
+}
 
 const PROCESS_ID = "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc";
 const RECIPIENT = "vh-NTHVvlKZqRxc8LyyTNok65yQ55a_PJ1zWLb9G2JI";

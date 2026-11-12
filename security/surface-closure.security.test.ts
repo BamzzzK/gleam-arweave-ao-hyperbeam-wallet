@@ -21,6 +21,10 @@ const ROOTS = [
   "packages/runtime/src/dispatch/methods.ts",
   "packages/app/src/approval/ApprovalRoot.tsx",
   "packages/provider/src/index.ts",
+  "apps/extension/entrypoints/content/index.ts",
+  "apps/extension/entrypoints/approval/index.tsx",
+  "apps/extension/entrypoints/passkey/index.tsx",
+  "apps/extension/entrypoints/connect/index.tsx",
 ];
 
 interface Exemption {

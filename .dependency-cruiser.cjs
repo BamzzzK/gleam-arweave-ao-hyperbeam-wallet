@@ -114,6 +114,21 @@ module.exports = {
       to: { path: "^packages/core/src/signer/", pathNot: "^packages/core/src/signer/zeroize\\.ts$" },
     },
     {
+      name: "no-aoconnect",
+      comment: "AO messages are built and signed with plain WebCrypto (core/ao/transfer.ts); aoconnect's browser build breaks raw-JWK signing in Chrome.",
+      severity: "error",
+      from: {},
+      to: { path: "(^|/)@permaweb/aoconnect(/|$)" },
+    },
+    {
+      name: "page-handlers-never-hold-approval",
+      comment:
+        "handlers/provider.ts gets grants as two functions, never the approval handler, so a page method opens a window only through the requestApproval its call carries.",
+      severity: "error",
+      from: { path: "^packages/runtime/src/handlers/provider\\.ts$" },
+      to: { path: "^packages/runtime/src/handlers/approval\\.ts$", dependencyTypesNot: ["type-only"] },
+    },
+    {
       name: "app-never-reaches-signer",
       comment: "Nothing the popup, side panel or phone UI loads may lead to core/signer, through any chain of imports.",
       severity: "error",

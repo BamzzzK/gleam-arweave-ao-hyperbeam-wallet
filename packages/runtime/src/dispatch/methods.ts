@@ -20,6 +20,7 @@ import {
   readTransaction,
   type ProviderTransaction,
 } from "../handlers/provider-params";
+import { dappError } from "../dapp-error";
 
 /**
  * Every method the background answers, with who may call it, whether it
@@ -57,7 +58,7 @@ export interface PageMethodSpec<S extends z.ZodType = z.ZodType> {
   tier: "page";
   /**
    * Can open an approval window. Only these methods' handlers get
-   * `requestApproval` (`create-runtime.ts` `ApprovalCall`), and the
+   * `requestApproval` (`handlers/provider.ts` `ApprovalCall`), and the
    * provider waits the approval timeout for them rather than the read one.
    */
   approval: boolean;
@@ -90,7 +91,7 @@ function reader<T>(read: (value: unknown) => T) {
  */
 function refusePointsMessage(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
   if (isPointsMessage(data)) {
-    throw new Error("Gleam refused this request because Gleam Points messages can only be signed from Gleam itself.");
+    throw new Error(dappError("Gleam refused this request because Gleam Points messages can only be signed from Gleam itself."));
   }
   return data;
 }
@@ -102,7 +103,7 @@ function refusePointsMessage(data: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuf
  */
 function refusePointsProofTag(transaction: ProviderTransaction): ProviderTransaction {
   if (hasPointsProofTag(transaction.tags)) {
-    throw new Error("Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself.");
+    throw new Error(dappError("Gleam refused this transaction because a Gleam-Points tag can only be signed from Gleam itself."));
   }
   return transaction;
 }

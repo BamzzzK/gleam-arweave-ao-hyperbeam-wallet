@@ -18,7 +18,6 @@ import {
   prepareDataItems,
   prepareDispatch,
   prepareSignTransaction,
-  readDataItemFields,
   HARDWARE_MESSAGE_HASH,
   signMessage as vaultSignMessage,
   signPayloadWithSigner,
@@ -35,7 +34,6 @@ import {
   type ConnectApprovalPreview,
   type DataItemInput,
   type DeviceSigningPayload,
-  type DeviceSigningSummary,
   type EncryptAlgorithm,
   type Grant,
   type HardwareDevice,
@@ -68,8 +66,6 @@ import {
 import type { SiteAttestResponse } from "@gleam/messaging/src/site-protocol.ts";
 import type { AttestationCheck } from "@gleam/messaging/src/protocol.ts";
 import type { ApprovalShown } from "@gleam/messaging/src/protocol.ts";
-import { collectibleTransferTags, readCollectibleTransfer } from "@gleam/core/src/ao/collectible-transfer.ts";
-import { l1TransferTags, readL1TokenTransfer } from "@gleam/core/src/ao/l1-transfer.ts";
 import { readAoTransferMessage } from "@gleam/core/src/ao/transfer-message.ts";
 import type { KeySession } from "./key-session";
 import { attestFailure } from "./attest-errors";
@@ -77,6 +73,17 @@ import type { OwnershipProof } from "./points";
 import type { SubmitTransferRequest } from "./transfer";
 import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 import { safeSiteIconUrl } from "./site-wallet";
+import { dappError } from "../dapp-error";
+import {
+  assertTransferMatches,
+  checkDataItem,
+  checkTransaction,
+  dataItemOf,
+  mismatch,
+  summarize,
+  transactionOf,
+  UNSAFE_TEXT,
+} from "./prepared-check";
 
 /**
  * Background-side implementation of `ProtocolMap`'s `getApproval`/
@@ -577,129 +584,9 @@ const TIMED_OUT = userErrorMessage("approvalTimedOut");
 const RESOLVING_RECHECK_MS = 5_000;
 
 const textDecoder = new TextDecoder();
-const strictTextDecoder = new TextDecoder("utf-8", { fatal: true });
-
-/** How much of a message the device step shows; the dApp's preview already showed it in full. */
-const MESSAGE_TEXT_LIMIT = 500;
-
-// Control characters other than tab/newline, and bidi overrides, can make
-// shown text differ from the signed bytes, so such a message shows its size.
-const UNSAFE_TEXT = /[\p{Cc}\u202A-\u202E\u2066-\u2069]/u;
-
-function messageText(data: Uint8Array): string | null {
-  let text: string;
-  try {
-    text = strictTextDecoder.decode(data);
-  } catch {
-    return null;
-  }
-  if (text.length === 0 || UNSAFE_TEXT.test(text.replace(/[\t\n]/g, ""))) return null;
-  return text.length > MESSAGE_TEXT_LIMIT ? `${text.slice(0, MESSAGE_TEXT_LIMIT)}…` : text;
-}
-
-function decodeTransactionTag(tag: { name: string; value: string }): { name: string; value: string } {
-  return { name: textDecoder.decode(base64UrlToBytes(tag.name)), value: textDecoder.decode(base64UrlToBytes(tag.value)) };
-}
 
 function previewCollectibleId(preview: ApprovalRequest["preview"]): string | null {
   return "collectible" in preview ? (preview.collectible?.id ?? null) : null;
-}
-
-/**
- * `collectibleId` is the collectible the approved preview named, if any. A
- * transfer of 1 is shown as a collectible only for that asset: for a
- * fungible token it is 1 atomic unit, and the device step must read it the
- * way the first review did.
- */
-function summarize(payload: UnsignedPayload, collectibleId?: string | null): DeviceSigningSummary {
-  if (payload.kind === "message") {
-    return { kind: "message", text: messageText(payload.data), size: payload.data.byteLength };
-  }
-  if (payload.kind === "transaction") {
-    const { target, quantity, reward, data_size } = payload.transaction;
-    const tags = payload.transaction.tags.map(decodeTransactionTag);
-    const collectible = readCollectibleTransfer({ target, quantity, data_size, tags });
-    if (collectible && collectible.assetId === collectibleId) {
-      return { kind: "collectibleTransfer", asset: collectible.assetId, recipient: collectible.recipient, fee: reward };
-    }
-    const tokenTransfer = readL1TokenTransfer({ target, quantity, data_size, tags });
-    if (tokenTransfer?.kind === "transfer") {
-      return {
-        kind: "l1TokenTransfer",
-        process: tokenTransfer.processId,
-        recipient: tokenTransfer.recipient,
-        quantity: tokenTransfer.quantity,
-        fee: reward,
-      };
-    }
-    return {
-      kind: "transaction",
-      recipient: target || null,
-      quantity,
-      fee: reward,
-      dataSize: data_size,
-      ...(tokenTransfer ? { unreadableTokenTransfer: true } : {}),
-    };
-  }
-  const { target, tags, data } = readDataItemFields(payload.raw);
-  const transfer = readAoTransferMessage({ target, tags });
-  if (transfer?.kind === "transfer") {
-    return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
-  }
-  return {
-    kind: "dataItem",
-    target: target || null,
-    dataSize: data.byteLength,
-    ...(transfer ? { unreadableTokenTransfer: true } : {}),
-  };
-}
-
-function sameTags(actual: Array<{ name: string; value: string }>, expected: Array<{ name: string; value: string }>): boolean {
-  return (
-    actual.length === expected.length &&
-    actual.every((tag, index) => tag.name === expected[index]!.name && tag.value === expected[index]!.value)
-  );
-}
-
-function normalizedQuantity(quantity: string | undefined): string {
-  const trimmed = quantity?.trim() ?? "";
-  return trimmed === "" ? "0" : trimmed;
-}
-
-function mismatch(field: string): never {
-  throw new Error(userErrorMessage("approvalMismatch", { field }));
-}
-
-interface ExpectedTransaction {
-  target: string;
-  quantity: string;
-  tags: Array<{ name: string; value: string }>;
-  data: Uint8Array;
-  reward?: string;
-}
-
-function checkTransaction(payload: UnsignedPayload | undefined, expected: ExpectedTransaction): void {
-  const transaction = transactionOf(payload).transaction;
-  if (transaction.target !== expected.target) mismatch("recipient");
-  if (normalizedQuantity(transaction.quantity) !== normalizedQuantity(expected.quantity)) mismatch("amount");
-  if (!sameTags(transaction.tags.map(decodeTransactionTag), expected.tags)) mismatch("tags");
-  if (transaction.data !== bytesToBase64Url(expected.data)) mismatch("data");
-  if (expected.reward !== undefined && transaction.reward !== expected.reward) mismatch("fee");
-}
-
-interface ExpectedDataItem {
-  target: string;
-  tags: Array<{ name: string; value: string }>;
-  data: Uint8Array;
-  anchor?: string;
-}
-
-function checkDataItem(payload: UnsignedPayload | undefined, expected: ExpectedDataItem): void {
-  const fields = readDataItemFields(dataItemOf(payload));
-  if (fields.target !== expected.target) mismatch("target");
-  if (!sameTags(fields.tags, expected.tags)) mismatch("tags");
-  if (bytesToBase64Url(fields.data) !== bytesToBase64Url(expected.data)) mismatch("data");
-  if (expected.anchor !== undefined && fields.anchor !== expected.anchor) mismatch("anchor");
 }
 
 function plainTags(tags: SigningRequestInput["tags"]): Array<{ name: string; value: string }> {
@@ -744,46 +631,18 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
       return;
     }
     case "transferAoTokens":
-    case "transfer": {
-      const [payload] = payloads;
-      if (input.collectible) {
-        checkTransaction(payload, {
-          target: input.collectible.id,
-          quantity: "0",
-          tags: collectibleTransferTags(input.recipient ?? ""),
-          data: new Uint8Array(),
-          reward: input.fee ?? "",
-        });
-        return;
-      }
-      if (input.token == null) {
-        checkTransaction(payload, {
-          target: input.recipient ?? "",
-          quantity: input.amount ?? "",
-          tags: [],
-          data: new Uint8Array(),
-          reward: input.fee ?? "",
-        });
-        return;
-      }
-      if (payload?.kind === "transaction") {
-        // An arweave-scheduler token takes its transfer as an L1 transaction.
-        checkTransaction(payload, {
-          target: input.token,
-          quantity: "0",
-          tags: l1TransferTags(input.recipient ?? "", input.amount ?? ""),
-          data: new Uint8Array(),
-          reward: input.fee ?? "",
-        });
-        return;
-      }
-      const summary = summarize(payload!);
-      if (summary.kind !== "aoTransfer") mismatch("AO transfer");
-      if (summary.process !== input.token) mismatch("token");
-      if (summary.recipient !== input.recipient) mismatch("recipient");
-      if (summary.quantity !== input.amount) mismatch("amount");
+    case "transfer":
+      assertTransferMatches(
+        {
+          recipient: input.recipient ?? "",
+          amount: input.amount ?? "",
+          token: input.token ?? null,
+          fee: input.fee ?? "",
+          collectible: input.collectible,
+        },
+        payloads[0],
+      );
       return;
-    }
     case "signMessage": {
       const [payload] = payloads;
       if (payloads.length !== 1 || payload?.kind !== "message") mismatch("message");
@@ -800,8 +659,14 @@ function assertPreparedMatches(input: SigningRequestInput, payloads: UnsignedPay
         reward: "0",
       });
       return;
-    default:
+    case "encrypt":
+    case "decrypt":
+      // Nothing is signed, so there are no prepared bytes to read back.
       return;
+    default: {
+      const unchecked: never = input.kind;
+      throw new Error(dappError(`No prepared-bytes check for ${String(unchecked)}.`));
+    }
   }
 }
 
@@ -821,16 +686,6 @@ function toWirePayload(payload: UnsignedPayload): DeviceSigningPayload {
     case "message":
       return { kind: "message", data: bytesToBase64Url(payload.data) };
   }
-}
-
-function transactionOf(payload: UnsignedPayload | undefined): UnsignedPayload & { kind: "transaction" } {
-  if (payload?.kind !== "transaction") throw new Error("Expected an unsigned transaction to finish.");
-  return payload;
-}
-
-function dataItemOf(payload: UnsignedPayload | undefined): Uint8Array {
-  if (payload?.kind !== "dataItem") throw new Error("Expected an unsigned data item to finish.");
-  return payload.raw;
 }
 
 function validGrants(raw: unknown): Grant[] {
@@ -904,7 +759,7 @@ function buildAddTokenPreview(input: AddTokenRequestInput): AddTokenApprovalPrev
 async function buildScanAttestationPreview(
   input: SigningRequestInput & { walletId: string },
 ): Promise<ScanAttestationApprovalPreview> {
-  if (!input.address) throw new Error("A scan attestation request needs its signing wallet.");
+  if (!input.address) throw new Error(dappError("A scan attestation request needs its signing wallet."));
   const attestation = parsedAttestationOf(input);
   const id = await attestationId(attestation);
   const message = buildAttestMessage(attestation.release, id);
@@ -974,7 +829,7 @@ async function buildDataItemPreviews(
 }
 
 async function buildSigningPreview(input: SigningRequestInput): Promise<SigningApprovalPreview> {
-  if (input.kind === "scanAttestation") throw new Error("A scan attestation has its own preview.");
+  if (input.kind === "scanAttestation") throw new Error(dappError("A scan attestation has its own preview."));
   const payloadHash = await sha256Hex(input.payload);
   const signedItems =
     input.kind === "signDataItem"
@@ -1124,7 +979,7 @@ export class ApprovalHandler {
     const fromSite = input.origin !== WALLET_APPROVAL_ORIGIN;
     const size = fromSite ? storedSize(record) : 0;
     if (size > PENDING_BYTES_PER_ORIGIN) {
-      throw new Error("Gleam refused this request because it is too large to hold for approval.");
+      throw new Error(dappError("Gleam refused this request because it is too large to hold for approval."));
     }
     await this.updatePending((pending) => {
       if (!fromSite) return [...pending, record];
@@ -1134,7 +989,7 @@ export class ApprovalHandler {
         .filter((entry) => entry.request.origin === input.origin)
         .reduce((sum, entry) => sum + storedSize(entry), size);
       if (total > PENDING_BYTES_LIMIT || fromOrigin > PENDING_BYTES_PER_ORIGIN) {
-        throw new Error("Gleam refused this request because too many requests are waiting for approval.");
+        throw new Error(dappError("Gleam refused this request because too many requests are waiting for approval."));
       }
       return [...pending, record];
     });
@@ -1457,7 +1312,7 @@ export class ApprovalHandler {
   async checkScanAttestation(req: { requestId: string }): Promise<AttestationCheck> {
     const entry = await this.findLive(req.requestId, false);
     if (entry.request.kind !== "scanAttestation") {
-      throw new Error(`Approval request "${req.requestId}" isn't a scan attestation.`);
+      throw new Error(dappError(`Approval request "${req.requestId}" isn't a scan attestation.`));
     }
     const wallet = entry.walletId ? await this.keySession.getStoredWallet(entry.walletId) : null;
     return this.attestationSubmitter().check(parsedAttestationOf(this.signingInputOf(entry)), wallet?.address);
@@ -1544,7 +1399,7 @@ export class ApprovalHandler {
   private signingInputOf(entry: PendingApprovalRecord): SigningRequestInput {
     const input = fromStored(entry.signingInput) as SigningRequestInput | null;
     if (!input) {
-      throw new Error(`Approval request "${entry.request.requestId}" has no signing input.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no signing input.`));
     }
     return input;
   }
@@ -1588,16 +1443,16 @@ export class ApprovalHandler {
       }
       case "signDataItem": {
         const [dataItem] = input.dataItems ?? [];
-        if (!dataItem) throw new Error("signDataItem requires a data item.");
+        if (!dataItem) throw new Error(dappError("signDataItem requires a data item."));
         return [{ kind: "dataItem", raw: prepareDataItem(owner, dataItem) }];
       }
       case "batchSignDataItem": {
         const items = input.dataItems ?? [];
-        if (items.length === 0) throw new Error("batchSignDataItem requires at least one data item.");
+        if (items.length === 0) throw new Error(dappError("batchSignDataItem requires at least one data item."));
         return prepareDataItems(owner, items).map((raw) => ({ kind: "dataItem", raw }));
       }
       default:
-        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+        throw new Error(dappError(`"${input.kind}" isn't a dApp signing request.`));
     }
   }
 
@@ -1622,7 +1477,7 @@ export class ApprovalHandler {
       case "batchSignDataItem":
         return (await finishDataItems(payloads.map(dataItemOf), signatures, owner)).map(toArrayBuffer);
       default:
-        throw new Error(`"${input.kind}" isn't a dApp signing request.`);
+        throw new Error(dappError(`"${input.kind}" isn't a dApp signing request.`));
     }
   }
 
@@ -1647,12 +1502,12 @@ export class ApprovalHandler {
       case "signMessage": {
         const hashAlgorithm = input.hashAlgorithm ?? HARDWARE_MESSAGE_HASH;
         if (hashAlgorithm !== HARDWARE_MESSAGE_HASH) {
-          throw new Error(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`);
+          throw new Error(dappError(`A hardware wallet signs messages with ${HARDWARE_MESSAGE_HASH} only, not ${hashAlgorithm}.`));
         }
         return [{ kind: "message", data: new Uint8Array(input.payload) }];
       }
       default:
-        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+        throw new Error(dappError(`A hardware wallet can't sign "${input.kind}" requests.`));
     }
   }
 
@@ -1696,24 +1551,24 @@ export class ApprovalHandler {
       case "signMessage":
         return new Uint8Array(signature!);
       default:
-        throw new Error(`A hardware wallet can't sign "${input.kind}" requests.`);
+        throw new Error(dappError(`A hardware wallet can't sign "${input.kind}" requests.`));
     }
   }
 
   private deviceTransfers(): DeviceTransferSubmitter {
     const transfers = this.transfers;
     if (!transfers?.prepareDeviceTransfer || !transfers.finishDeviceTransfer) {
-      throw new Error("Hardware wallet transfers aren't wired. ApprovalHandler was constructed without them.");
+      throw new Error(dappError("Hardware wallet transfers aren't wired. ApprovalHandler was constructed without them."));
     }
     return transfers as DeviceTransferSubmitter;
   }
 
   private transferRequestOf(walletId: string, input: SigningRequestInput): SubmitTransferRequest {
     if (input.recipient == null || input.amount == null) {
-      throw new Error(`A ${input.kind} approval is missing its recipient or amount.`);
+      throw new Error(dappError(`A ${input.kind} approval is missing its recipient or amount.`));
     }
     if (input.kind === "transferAoTokens" && input.token == null) {
-      throw new Error("A transferAoTokens approval is missing its token.");
+      throw new Error(dappError("A transferAoTokens approval is missing its token."));
     }
     return {
       token: input.token ?? null,
@@ -1811,7 +1666,7 @@ export class ApprovalHandler {
 
   private attestationSubmitter(): ScanAttestationSubmitter {
     if (!this.attestations) {
-      throw new Error("Scan attestations aren't wired. ApprovalHandler was constructed without a submitter.");
+      throw new Error(dappError("Scan attestations aren't wired. ApprovalHandler was constructed without a submitter."));
     }
     return this.attestations;
   }
@@ -1844,7 +1699,7 @@ export class ApprovalHandler {
     if (!permissions.includes("ACCESS_ADDRESS")) permissions.unshift("ACCESS_ADDRESS");
     await this.mergeGrant(req.origin, null, permissions, { icon: safeSiteIconUrl(req.favIconUrl), name: null });
     const grant = await this.findActiveGrant(req.origin);
-    if (!grant) throw new Error(`Couldn't save the grant for "${req.origin}".`);
+    if (!grant) throw new Error(dappError(`Couldn't save the grant for "${req.origin}".`));
     return grant;
   }
 
@@ -1893,11 +1748,11 @@ export class ApprovalHandler {
    */
   private async addToken(entry: PendingApprovalRecord): Promise<undefined> {
     if (!this.tokens) {
-      throw new Error("addToken is not wired to a token list. ApprovalHandler was constructed without one.");
+      throw new Error(dappError("addToken is not wired to a token list. ApprovalHandler was constructed without one."));
     }
     const input = fromStored(entry.signingInput) as AddTokenRequestInput | null;
     if (!input || input.kind !== "addToken") {
-      throw new Error(`Approval request "${entry.request.requestId}" has no token to add.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no token to add.`));
     }
     await this.tokens.addWatchedToken({ address: input.address, processId: input.processId });
     return undefined;
@@ -1918,13 +1773,13 @@ export class ApprovalHandler {
 
     const { walletId } = entry;
     if (!walletId) {
-      throw new Error(`Approval request "${entry.request.requestId}" has no wallet to sign with.`);
+      throw new Error(dappError(`Approval request "${entry.request.requestId}" has no wallet to sign with.`));
     }
     // Encryption needs only the public key, which every wallet kind
     // stores, so it never touches the key cache.
     if (input.kind === "encrypt") {
       if (!input.encryptAlgorithm) {
-        throw new Error("encrypt requires an algorithm.");
+        throw new Error(dappError("encrypt requires an algorithm."));
       }
       const owner = await this.storedOwner(walletId);
       return encrypt(owner, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
@@ -1955,7 +1810,7 @@ export class ApprovalHandler {
 
       case "decrypt": {
         if (!input.encryptAlgorithm) {
-          throw new Error("decrypt requires an algorithm.");
+          throw new Error(dappError("decrypt requires an algorithm."));
         }
         return decrypt(signer, input.payload as Uint8Array<ArrayBuffer>, input.encryptAlgorithm);
       }
@@ -1966,21 +1821,21 @@ export class ApprovalHandler {
 
       // A keyfile proves ownership with signMessage in PointsHandler and never reaches here.
       case "pointsProof":
-        throw new Error("Only a hardware wallet proves ownership through the approval window.");
+        throw new Error(dappError("Only a hardware wallet proves ownership through the approval window."));
 
       case "scanAttestation":
         return this.attestationSubmitter().attest({ walletId, attestation: parsedAttestationOf(input) });
 
       default: {
         const exhaustiveCheck: never = input.kind;
-        throw new Error(`Unhandled signing kind "${String(exhaustiveCheck)}".`);
+        throw new Error(dappError(`Unhandled signing kind "${String(exhaustiveCheck)}".`));
       }
     }
   }
 
   private requireGatewayUrl(input: SigningRequestInput): string {
     if (!input.gatewayUrl) {
-      throw new Error(`"${input.kind}" requires a gateway URL to construct the transaction.`);
+      throw new Error(dappError(`"${input.kind}" requires a gateway URL to construct the transaction.`));
     }
     return input.gatewayUrl;
   }

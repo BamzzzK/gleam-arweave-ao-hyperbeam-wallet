@@ -101,6 +101,30 @@ describe("dependabot-automerge.yml", () => {
   });
 });
 
+describe("dependabot.yml build-toolchain group", () => {
+  const config = readFileSync(join(import.meta.dirname, "../.github/dependabot.yml"), "utf8");
+  const block = /build-toolchain:\n\s+patterns:\n((?:\s+- .+\n)+)/.exec(config);
+  const patterns = [...(block?.[1] ?? "").matchAll(/- "?([^"\n]+)"?/g)].map((match) => match[1]!);
+  const matches = (name: string) =>
+    patterns.some((pattern) => (pattern.endsWith("/*") ? name.startsWith(pattern.slice(0, -1)) : name === pattern));
+
+  // Dev dependencies of the packages that build or ship code run in the
+  // release build or end up in the bundle, so they must never auto-merge.
+  // Only type packages and tools outside `wxt zip`/`mobile:build` are left out.
+  const OUTSIDE_THE_BUILD = new Set(["typescript", "web-ext", "@capacitor/cli"]);
+  const SHIPPING = ["apps/extension", "apps/mobile", "packages/app", "packages/ui"];
+
+  it.each(SHIPPING)("covers every build-time dev dependency of %s", (dir) => {
+    const manifest = JSON.parse(readFileSync(join(import.meta.dirname, "..", dir, "package.json"), "utf8")) as {
+      devDependencies?: Record<string, string>;
+    };
+    const names = Object.keys(manifest.devDependencies ?? {}).filter(
+      (name) => !name.startsWith("@types/") && !OUTSIDE_THE_BUILD.has(name),
+    );
+    expect(names.filter((name) => !matches(name))).toEqual([]);
+  });
+});
+
 describe("every workflow job", () => {
   const files = readdirSync(WORKFLOWS).filter((name) => name.endsWith(".yml"));
 

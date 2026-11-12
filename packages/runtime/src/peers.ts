@@ -67,7 +67,8 @@ export async function saveNetworkSettings(storage: StoragePort, next: NetworkSet
   if (removed.length > 0) {
     await updateStored(storage, DISMISSED_PEERS_KEY, (raw) => [...new Set([...dismissedPeersOf(raw), ...removed])]);
   }
-  await storage.set(NETWORK_SETTINGS_KEY, next);
+  // A whole-value write, queued behind the other updates of this key.
+  await updateStored(storage, NETWORK_SETTINGS_KEY, () => next);
 }
 
 async function readStoredPeerUrls(storage: StoragePort): Promise<string[]> {
@@ -109,6 +110,7 @@ export async function refreshDiscoveredPeersIfDue(
     if (existing && now() - existing.at < DISCOVERY_INTERVAL_MS) return;
     const urls = await discoverHyperBeamPeers({ gatewayUrl: await gatewayUrl(), fetchImpl });
     if (urls.length === 0 && existing && existing.urls.length > 0) return;
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a cache fill from the network
     await storage.set<DiscoveredPeers>(DISCOVERED_PEERS_KEY, { at: now(), urls });
   } catch (error) {
     console.error("HyperBEAM peer discovery failed:", error);
