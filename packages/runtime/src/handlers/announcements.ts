@@ -1,5 +1,6 @@
 import type { Announcement, StoragePort } from "@gleam/core";
 import { SITE_URL } from "@gleam/core/src/models/site-origin.ts";
+import { updateStored } from "../storage-update";
 
 export const ANNOUNCEMENTS_URL = new URL("announcements.json", SITE_URL).toString();
 /** Ids of announcements the user has dismissed, as `string[]`. */
@@ -129,13 +130,17 @@ export class AnnouncementsHandler {
   }
 
   async getDismissed(): Promise<string[]> {
-    const stored = await this.deps.storage.get<unknown>(ANNOUNCEMENTS_DISMISSED_KEY);
-    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+    return dismissedIds(await this.deps.storage.get<unknown>(ANNOUNCEMENTS_DISMISSED_KEY));
   }
 
   async dismiss(req: { id: string }): Promise<void> {
-    const dismissed = await this.getDismissed();
-    if (dismissed.includes(req.id)) return;
-    await this.deps.storage.set(ANNOUNCEMENTS_DISMISSED_KEY, [...dismissed, req.id]);
+    await updateStored(this.deps.storage, ANNOUNCEMENTS_DISMISSED_KEY, (stored) => {
+      const dismissed = dismissedIds(stored);
+      return dismissed.includes(req.id) ? undefined : [...dismissed, req.id];
+    });
   }
+}
+
+function dismissedIds(stored: unknown): string[] {
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
 }

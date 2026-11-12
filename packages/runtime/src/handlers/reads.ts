@@ -355,9 +355,7 @@ export class ReadsHandler {
   }
 
   async loadWatchedProcessIds(address: string): Promise<string[]> {
-    const raw = await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((id): id is string => typeof id === "string");
+    return processIdList(await this.storage.get<unknown>(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${address}`));
   }
 
   /**
@@ -386,7 +384,8 @@ export class ReadsHandler {
         const collectibles = await withPeerFailover(peerFailoverOrder(settings), (peerUrl) =>
           discoverCollectibles({ address: req.address, gatewayUrl: settings.gatewayUrl, peerUrl }),
         );
-        await this.storage.set<CollectiblesCache>(key, { savedAt: Date.now(), collectibles });
+        // Queued behind forgetCollectible, which updates the same cache.
+        await updateStored<CollectiblesCache>(this.storage, key, () => ({ savedAt: Date.now(), collectibles }));
         return collectibles;
       } catch (error) {
         if (cached) return cached.collectibles;
@@ -417,9 +416,7 @@ export class ReadsHandler {
   }
 
   private async loadHiddenProcessIds(address: string): Promise<string[]> {
-    const raw = await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`);
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((id): id is string => typeof id === "string");
+    return processIdList(await this.storage.get<unknown>(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${address}`));
   }
 
   /**
@@ -557,6 +554,8 @@ export class ReadsHandler {
       await Promise.all(
         found
           .filter((metadata) => metadata.transport === "l1" && metadata.denomination !== null)
+          // A cache fill from the network, which never changes once complete.
+          // eslint-disable-next-line gleam/no-storage-read-modify-write
           .map((metadata) => this.storage.set(`${TOKEN_METADATA_KEY_PREFIX}${metadata.processId}`, metadata)),
       );
       return [...new Set([...found.map((metadata) => metadata.processId), ...(cached?.processIds ?? [])])];
@@ -575,12 +574,15 @@ export class ReadsHandler {
             gatewayUrl: settings.gatewayUrl,
             onL1Tokens: async (tokens) => {
               const processIds = await keep(tokens);
-              // Not stamped as fresh: the Credit-Notice scan hasn't reported yet.
+              // Not stamped as fresh: the Credit-Notice scan hasn't reported yet. A cache
+              // fill; discoveryInFlight runs one discovery per wallet at a time.
+              // eslint-disable-next-line gleam/no-storage-read-modify-write
               await this.storage.set<DiscoveredTokensCache>(key, { savedAt: cached?.savedAt ?? 0, processIds });
               publishEarly(processIds);
             },
           });
           const processIds = await keep(found);
+          // eslint-disable-next-line gleam/no-storage-read-modify-write -- as above
           await this.storage.set<DiscoveredTokensCache>(key, { savedAt: Date.now(), processIds });
           return processIds;
         } catch (error) {
@@ -637,18 +639,15 @@ export class ReadsHandler {
     const processId = resolved.processId;
 
     if (processId !== DEFAULT_AO_PROCESS_ID) {
-      const existing = await this.loadWatchedProcessIds(req.address);
-      if (!existing.includes(processId)) {
-        await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, [...existing, processId]);
-      }
+      await updateStored(this.storage, `${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
+        const existing = processIdList(raw);
+        return existing.includes(processId) ? undefined : [...existing, processId];
+      });
     }
-    const hidden = await this.loadHiddenProcessIds(req.address);
-    if (hidden.includes(processId)) {
-      await this.storage.set(
-        `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`,
-        hidden.filter((id) => id !== processId),
-      );
-    }
+    await updateStored(this.storage, `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
+      const hidden = processIdList(raw);
+      return hidden.includes(processId) ? hidden.filter((id) => id !== processId) : undefined;
+    });
     return resolved;
   }
 
@@ -665,15 +664,15 @@ export class ReadsHandler {
    */
   async removeWatchedToken(req: { address: string; processId: string }): Promise<void> {
     if (req.processId === DEFAULT_AO_PROCESS_ID) return;
-    const existing = await this.loadWatchedProcessIds(req.address);
-    const next = existing.filter((id) => id !== req.processId);
-    if (next.length !== existing.length) {
-      await this.storage.set(`${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, next);
-    }
-    const hidden = await this.loadHiddenProcessIds(req.address);
-    if (!hidden.includes(req.processId)) {
-      await this.storage.set(`${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, [...hidden, req.processId]);
-    }
+    await updateStored(this.storage, `${WATCHED_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
+      const existing = processIdList(raw);
+      const next = existing.filter((id) => id !== req.processId);
+      return next.length !== existing.length ? next : undefined;
+    });
+    await updateStored(this.storage, `${HIDDEN_PROCESS_IDS_KEY_PREFIX}${req.address}`, (raw) => {
+      const hidden = processIdList(raw);
+      return hidden.includes(req.processId) ? undefined : [...hidden, req.processId];
+    });
   }
 
   async getBalance(req: { address: string }): Promise<Winston> {
@@ -1336,4 +1335,8 @@ async function runActivityPromotionTick(handler: ReadsHandler): Promise<void> {
       }
     }),
   );
+}
+
+function processIdList(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
 }

@@ -94,6 +94,7 @@ export class PasskeyHandler {
       ...wrapped,
       createdAt: Date.now(),
     };
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a new enrollment replaces the old one
     await this.storage.set(PASSKEY_KEY, enrollment);
   }
 

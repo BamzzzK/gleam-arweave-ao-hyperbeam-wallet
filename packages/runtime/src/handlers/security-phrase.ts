@@ -19,6 +19,7 @@ export class SecurityPhraseHandler {
   async set(req: SecurityPhrase): Promise<void> {
     const phrase = readSecurityPhrase(req);
     if (!phrase) throw new Error(userErrorMessage("securityPhraseInvalid"));
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- the new phrase replaces the old one
     await this.storage.set(SECURITY_PHRASE_KEY, phrase);
   }
 }

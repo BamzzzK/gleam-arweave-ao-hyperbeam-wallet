@@ -6,6 +6,7 @@ import {
   type PermissionType,
   type StoragePort,
 } from "@gleam/core";
+import { updateStored } from "../storage-update";
 
 /**
  * One `SeenOtherWallet` per tab, so tabs reporting at once never overwrite
@@ -70,6 +71,16 @@ export function safeSiteIconUrl(raw: unknown): string | null {
   }
 }
 
+function originList(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function seenOf(raw: unknown): SeenOtherWallet | null {
+  return raw !== null && typeof raw === "object" && typeof (raw as SeenOtherWallet).origin === "string"
+    ? (raw as SeenOtherWallet)
+    : null;
+}
+
 function knownPermissions(raw: unknown): PermissionType[] {
   if (!Array.isArray(raw)) return [];
   const known = raw.filter((entry): entry is PermissionType => (PERMISSION_TYPES as readonly unknown[]).includes(entry));
@@ -92,13 +103,11 @@ export class SiteWalletHandler {
   }
 
   private async loadSeen(tabId: number): Promise<SeenOtherWallet | null> {
-    const raw = await this.deps.storage.get<SeenOtherWallet>(otherWalletKey(tabId));
-    return raw !== null && typeof raw === "object" && typeof raw.origin === "string" ? raw : null;
+    return seenOf(await this.deps.storage.get<unknown>(otherWalletKey(tabId)));
   }
 
   private async loadOrigins(key: string): Promise<string[]> {
-    const raw = await this.deps.storage.get<unknown>(key);
-    return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === "string") : [];
+    return originList(await this.deps.storage.get<unknown>(key));
   }
 
   private async usesGleam(origin: string): Promise<{ usesGleam: boolean; grant: Grant | null }> {
@@ -111,8 +120,10 @@ export class SiteWalletHandler {
   }
 
   async setUseGleam(origin: string, useGleam: boolean): Promise<void> {
-    const sites = (await this.loadOrigins(GLEAM_SITES_KEY)).filter((site) => site !== origin);
-    await this.deps.storage.set(GLEAM_SITES_KEY, useGleam ? [...sites, origin] : sites);
+    await updateStored(this.deps.storage, GLEAM_SITES_KEY, (raw) => {
+      const sites = originList(raw).filter((site) => site !== origin);
+      return useGleam ? [...sites, origin] : sites;
+    });
   }
 
   /**
@@ -133,20 +144,23 @@ export class SiteWalletHandler {
     req: { walletName: unknown; used: unknown; permissions?: unknown },
   ): Promise<void> {
     if (typeof req.walletName !== "string" || typeof req.used !== "boolean") return;
-    const previous = await this.loadSeen(tabId);
-    const sameSite = previous?.origin === origin;
+    const { walletName, used } = req;
     const permissions = knownPermissions(req.permissions);
-    const seen: SeenOtherWallet = {
-      origin,
-      walletName: displayWalletName(req.walletName),
-      usedAt: req.used ? this.now() : sameSite ? previous.usedAt : null,
-      permissions: permissions.length > 0 ? permissions : sameSite ? knownPermissions(previous.permissions) : [],
-    };
-    await this.deps.storage.set(otherWalletKey(tabId), seen);
+    const now = this.now();
+    await updateStored<SeenOtherWallet>(this.deps.storage, otherWalletKey(tabId), (raw) => {
+      const previous = seenOf(raw);
+      const sameSite = previous?.origin === origin;
+      return {
+        origin,
+        walletName: displayWalletName(walletName),
+        usedAt: used ? now : sameSite ? previous.usedAt : null,
+        permissions: permissions.length > 0 ? permissions : sameSite ? knownPermissions(previous.permissions) : [],
+      };
+    });
   }
 
   async forgetTab(tabId: number): Promise<void> {
-    await this.deps.storage.remove(otherWalletKey(tabId));
+    await updateStored(this.deps.storage, otherWalletKey(tabId), () => null);
   }
 
   async activeSite(tab: SiteTab | undefined): Promise<ActiveSite | null> {
@@ -166,8 +180,9 @@ export class SiteWalletHandler {
   }
 
   async dismiss(origin: string): Promise<void> {
-    const dismissed = await this.loadOrigins(SUGGESTIONS_DISMISSED_KEY);
-    if (dismissed.includes(origin)) return;
-    await this.deps.storage.set(SUGGESTIONS_DISMISSED_KEY, [...dismissed, origin]);
+    await updateStored(this.deps.storage, SUGGESTIONS_DISMISSED_KEY, (raw) => {
+      const dismissed = originList(raw);
+      return dismissed.includes(origin) ? undefined : [...dismissed, origin];
+    });
   }
 }

@@ -52,6 +52,7 @@ export class ReviewPromptHandler {
   }
 
   async finish(): Promise<void> {
+    // eslint-disable-next-line gleam/no-storage-read-modify-write -- a flag, not derived from the read
     await this.deps.storage.set(REVIEW_PROMPT_DONE_KEY, true);
   }
 }

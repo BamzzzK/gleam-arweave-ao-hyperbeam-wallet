@@ -263,7 +263,6 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     const entry = await storage.get<unknown>(key);
     if (entry !== null) {
       // Overwritten only to wipe it before the remove below.
-      // eslint-disable-next-line gleam/no-storage-read-modify-write
       await storage.set(key, zeroStrings(entry));
     }
     await storage.remove(key);

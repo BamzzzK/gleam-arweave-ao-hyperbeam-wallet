@@ -24,6 +24,15 @@ function createFakeStorage(): StoragePort {
 }
 
 describe("BrowserSitesHandler", () => {
+  it("keeps both sites when two saves run at once", async () => {
+    const handler = new BrowserSitesHandler(createFakeStorage());
+    await Promise.all([
+      handler.saveBrowserSite({ url: "https://a.example" }),
+      handler.saveBrowserSite({ url: "https://b.example" }),
+    ]);
+    expect((await handler.listBrowserSites()).saved.sort()).toEqual(["https://a.example", "https://b.example"]);
+  });
+
   it("starts empty", async () => {
     expect(await new BrowserSitesHandler(createFakeStorage()).listBrowserSites()).toEqual({ saved: [], recent: [] });
   });

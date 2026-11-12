@@ -129,6 +129,14 @@ describe("AnnouncementsHandler", () => {
     expect(storage.store.get(ANNOUNCEMENTS_DISMISSED_KEY)).toEqual(["a", "b"]);
   });
 
+  it("keeps both ids when two dismissals run at once", async () => {
+    const handler = new AnnouncementsHandler({ storage: createFakeStorage(), target: () => TARGET });
+
+    await Promise.all([handler.dismiss({ id: "a" }), handler.dismiss({ id: "b" })]);
+
+    expect((await handler.getDismissed()).sort()).toEqual(["a", "b"]);
+  });
+
   it("ignores a corrupt stored value", async () => {
     const handler = new AnnouncementsHandler({ target: () => TARGET, storage: createFakeStorage({ [ANNOUNCEMENTS_DISMISSED_KEY]: "oops" }) });
     expect(await handler.getDismissed()).toEqual([]);
