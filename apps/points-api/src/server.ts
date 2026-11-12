@@ -6,6 +6,7 @@ import { readConfig } from "./config";
 import { dbFromPool } from "./db";
 import { createGithubClient } from "./github";
 import { migrate } from "./migrate";
+import { createPgPriceStore } from "./price-store";
 import { createPriceService } from "./prices";
 import { startSnapshotScheduler } from "./scheduler";
 
@@ -27,7 +28,7 @@ const app = createApp({
   db,
   pointsPhase: config.pointsPhase,
   github: createGithubClient({ repo: config.githubRepo, token: config.githubToken }),
-  prices: createPriceService({ coinGeckoApiKey: config.coinGeckoApiKey }),
+  prices: createPriceService({ coinGeckoApiKey: config.coinGeckoApiKey, store: createPgPriceStore(db) }),
 });
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {
