@@ -164,6 +164,15 @@ describe("queryActivityTransactions", () => {
     expect(entry).toMatchObject({ txId: "up", type: "upload", address: ADDRESS, amount: null });
   });
 
+  it("carries an upload's data size in bytes", async () => {
+    const node = edge({ id: "up", ownerAddress: ADDRESS, recipient: "", winston: "0", timestamp: 1 });
+    const fetchImpl = fakeSidedFetch([{ ...node, node: { ...node.node, data: { size: "12400" } } }], []);
+
+    const [entry] = await queryActivityTransactions(ADDRESS, "https://arweave.net", 10, fetchImpl);
+
+    expect(entry).toMatchObject({ type: "upload", dataSize: "12400" });
+  });
+
   it("reads a collectible send as a send to the recipient in its tags, with the asset as its collectible", async () => {
     const recipient = "rEcIpIeNt_AdDrEsS-0123456789abcdefghijklmno";
     const fetchImpl = fakeSidedFetch(

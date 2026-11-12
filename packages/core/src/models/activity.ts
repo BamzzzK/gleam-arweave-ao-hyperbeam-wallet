@@ -20,6 +20,8 @@ export interface ActivityEntry {
    * denomination.
    */
   amount: string | null;
+  /** An upload's data size in bytes, as a decimal integer string, when the gateway reported it. */
+  dataSize?: string;
   tags: Array<{ name: string; value: string }>;
   timestamp: number;
   /**
