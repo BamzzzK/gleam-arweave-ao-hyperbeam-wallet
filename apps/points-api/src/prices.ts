@@ -1,5 +1,6 @@
 import { isFiatCurrency, type FiatCurrency } from "@gleam/core/src/models/display.ts";
 import { DEFAULT_TOKEN_REGISTRY, type HistoricalPricePoint, type HistoricalRange } from "@gleam/core/src/pricing/index.ts";
+import type { PriceStore } from "./price-store";
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 const COINPAPRIKA_BASE_URL = "https://api.coinpaprika.com/v1";
@@ -73,6 +74,8 @@ export interface PriceServiceOptions {
   coinGeckoApiKey?: string;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /** Keeps the last good answers across restarts; without one they live in memory only. */
+  store?: PriceStore;
 }
 
 const SPOT_IDS = [...PAPRIKA_ID_BY_GECKO_ID.keys()];
@@ -91,6 +94,17 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
   const lastGood = new Map<string, { value: unknown; at: number }>();
   const inFlight = new Map<string, Promise<unknown>>();
   let coinGeckoPausedUntil = 0;
+  const store = options.store;
+
+  // A store that can't be read leaves the cache empty, as on a first boot.
+  const restored: Promise<void> = (store?.load() ?? Promise.resolve([]))
+    .then((rows) => {
+      for (const row of rows) {
+        lastGood.set(row.key, { value: row.value, at: row.fetchedAt });
+        entries.set(row.key, { value: row.value, expiresAt: row.expiresAt });
+      }
+    })
+    .catch((error: unknown) => console.warn("Couldn't restore the price cache:", error));
 
   // Concurrent misses for one key share a single upstream round trip. An
   // empty answer is retried sooner, and is replaced by the last good one
@@ -101,6 +115,16 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
     isEmpty: (value: T) => boolean,
     load: () => Promise<T>,
     fillFromStale: (fresh: T, stale: T) => T = (_fresh, stale) => stale,
+  ): Promise<T> {
+    return restored.then(() => lookup(key, ttlMs, isEmpty, load, fillFromStale));
+  }
+
+  function lookup<T>(
+    key: string,
+    ttlMs: number,
+    isEmpty: (value: T) => boolean,
+    load: () => Promise<T>,
+    fillFromStale: (fresh: T, stale: T) => T,
   ): Promise<T> {
     const hit = entries.get(key);
     if (hit && now() < hit.expiresAt) return Promise.resolve(hit.value as T);
@@ -116,6 +140,9 @@ export function createPriceService(options: PriceServiceOptions = {}): PriceServ
           if (good && now() - good.at < MAX_STALE_MS) value = fillFromStale(fresh, good.value as T);
         } else {
           lastGood.set(key, { value: fresh, at: now() });
+          store
+            ?.save({ key, value: fresh, fetchedAt: now(), expiresAt: now() + ttlMs })
+            .catch((error: unknown) => console.warn(`Couldn't save the price cache entry ${key}:`, error));
         }
         entries.set(key, { value, expiresAt: now() + (isEmpty(fresh) ? FAILURE_TTL_MS : ttlMs) });
         return value;
