@@ -38,6 +38,7 @@ import { forgetQueryCache, sweepQueryCache } from "./query-cache/sweep";
 import { sitePageUrl } from "@gleam/core";
 import { errorText } from "./i18n/errors";
 import { applyDocumentTheme, ThemeContext } from "./theme";
+import { releasePointerFocusOnBlur } from "./pointer-focus";
 
 /**
  * The one shared shell mounted from the popup and the side panel (the
@@ -156,6 +157,7 @@ function AppContent({ layout, runtime: runtimeProp }: AppProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const subscribeNotices = platform.notices?.subscribe;
   useEffect(() => subscribeNotices?.(setNotice), [subscribeNotices]);
+  useEffect(() => releasePointerFocusOnBlur(), []);
   useEffect(() => {
     if (notice === null) return;
     const timer = setTimeout(() => setNotice(null), NOTICE_MS);
