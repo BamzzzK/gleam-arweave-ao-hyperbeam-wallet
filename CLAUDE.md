@@ -182,9 +182,10 @@ tests check Gleam's ANS-104 bytes against it.
   `x.com` (`handlers/announcements.ts`), or the entry is dropped.
 - **Comments** explain the non-obvious *why*. Don't narrate the change
   that produced the code.
-- **Copy.** Never change user-facing copy (the app, the site, store
-  listings) without asking the developer first. Propose the wording and
-  wait for approval, even when a code change makes the current text wrong.
+- **UX and copy.** Never change UX or user-facing copy (the app, the
+  site, store listings) unless the developer asked for that change or
+  confirmed it. When a code change makes either one wrong, propose the
+  fix and wait.
 
 ## Build and check
 
