@@ -143,7 +143,6 @@ function renderPool(rewards) {
 function renderRoundStep(rewards) {
   const step = roundStepPercent(rewards);
   $("[data-round-step]").textContent = String(step);
-  $("[data-round-third]").textContent = String(100 + 2 * step);
 }
 
 /** Where nobody has looked yet: each area's functions examined and scans, in tier order. */

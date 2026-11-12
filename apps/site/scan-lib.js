@@ -399,7 +399,7 @@ function isRewards(body) {
 }
 
 /** The paid places a release opens, at least and at most; the same as `@gleam/core/scan`. */
-export const MIN_PAID_SCANS_PER_RELEASE = 10;
+export const MIN_PAID_SCANS_PER_RELEASE = 1;
 export const PAID_SCANS_PER_RELEASE = 100;
 
 /** What the next scan earns, from a `GET /scan/rewards` body and a release's `paidPlacesLeft`. */

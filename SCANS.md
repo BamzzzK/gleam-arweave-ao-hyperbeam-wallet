@@ -249,10 +249,10 @@ rise as the community grows.
 
 **Paid places.** A release opens one paid place for every 3 of its
 functions that aren't examined (Coverage carries across releases),
-rounded up, at least 10 and at most 100 (`paidPlacesFor`). The number
+rounded up, at least 1 and at most 100 (`paidPlacesFor`). The number
 is fixed the first time the release is asked for, normally by its first
 challenge, so it doesn't fall as scans examine functions. A patch
-release that changes little opens 10, so it still gets fresh reviews;
+release with nothing unexamined opens 1;
 releases scanned before this rule opened 100.
 
 **Scans.** Each paid scan earns **0.1% of the previous day's total
