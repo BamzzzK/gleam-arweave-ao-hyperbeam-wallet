@@ -53,13 +53,14 @@
 /packages/core/src/arweave/transfer.ts                                     @skyf0xx
 /packages/runtime/src/handlers/transfer.ts                                 @skyf0xx
 /packages/core/src/hardware/                                               @skyf0xx
-/packages/keystone/src/sign-request.ts                                     @skyf0xx
-/packages/keystone/src/decode-account.ts                                   @skyf0xx
+/packages/keystone/src/                                                 @skyf0xx
 /packages/core/src/points/ownership.ts                                     @skyf0xx
 /packages/runtime/src/handlers/points.ts                                   @skyf0xx
 /packages/core/src/models/capabilities.ts                           @skyf0xx
 /apps/extension/src/hardware/keystone/                              @skyf0xx
 /apps/extension/src/hardware/ledger/                                @skyf0xx
+/apps/extension/entrypoints/connect/                                @skyf0xx
+/apps/mobile/src/adapters/keystone.tsx                              @skyf0xx
 /packages/core/src/ao/collectible-transfer.ts                              @skyf0xx
 /packages/core/src/arweave/bundler.ts                                      @skyf0xx
 /packages/app/src/screens/send/src/sendFormSchema.ts                       @skyf0xx
@@ -113,7 +114,6 @@
 /packages/runtime/src/handlers/approval.ts                                 @skyf0xx
 /apps/extension/entrypoints/approval/                                      @skyf0xx
 /apps/extension/src/hardware/panels/                                       @skyf0xx
-/packages/keystone/src/KeystonePanel.tsx                                   @skyf0xx
 /packages/app/src/approval/                                                @skyf0xx
 /packages/app/src/transfer-review/                                         @skyf0xx
 /packages/core/src/ao/transfer-message.ts                                  @skyf0xx

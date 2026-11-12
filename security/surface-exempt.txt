@@ -120,3 +120,7 @@ packages/ui/src/index.ts Barrel, labels, fiat formatting and token defaults; dis
 packages/ui/src/labels.tsx Barrel, labels, fiat formatting and token defaults; display only.
 packages/ui/src/tokens/default-token-icons.ts Barrel, labels, fiat formatting and token defaults; display only.
 packages/ui/src/tokens/default-tokens.ts Barrel, labels, fiat formatting and token defaults; display only.
+apps/extension/src/adapters/runtime.ts Popup-to-background message transport; the dispatcher checks the caller tier and params, not this adapter.
+apps/extension/src/adapters/side-panel.ts Opens the side panel; takes no page input.
+packages/app/src/app-platform/dapp-browser.ts Stub for hosts without a dApp browser; every call throws.
+packages/app/src/app.css Styles only.
