@@ -460,11 +460,10 @@ export function createRuntime(platform: Platform): Runtime {
       params: unknown,
       call: (GrantedCall | { origin: string }) & Partial<ApprovalCall>,
     ) => Promise<unknown>;
-    const decoded = decodeProviderParams(rawParams);
     const approvals: Partial<ApprovalCall> = spec.approval
       ? { requestApproval: (request) => approval.requestApproval(request) }
       : {};
-    if (!spec.grant) return handle(parseParams(spec.params, decoded), { origin, ...approvals });
+    if (!spec.grant) return handle(parseParams(spec.params, decodeProviderParams(rawParams)), { origin, ...approvals });
 
     const grant = await approval.findActiveGrant(origin);
     if (!grant) {
@@ -485,7 +484,9 @@ export function createRuntime(platform: Platform): Runtime {
     const refusal = wallet ? providerMethodRefusal(wallet.method, method) : null;
     if (refusal) throw new Error(refusal);
 
-    const params = parseParams(spec.params, decoded);
+    // Decoded only now: a page without a grant could otherwise keep the
+    // worker busy decoding a large payload it is about to be refused.
+    const params = parseParams(spec.params, decodeProviderParams(rawParams));
     return handle(params, {
       ...approvals,
       origin,
