@@ -1,6 +1,6 @@
-import type { DeviceKey, DeviceKeyPort } from "../ports/device-key";
-import { deviceKeyThumbprint, type DevicePublicJwk } from "./identity";
-import { userErrorMessage } from "../models/user-errors";
+import type { DeviceKey, DeviceKeyPort } from "@gleam/core/src/ports/device-key.ts";
+import { deviceKeyThumbprint, type DevicePublicJwk } from "@gleam/core/src/points/identity.ts";
+import { userErrorMessage } from "@gleam/core/src/models/user-errors.ts";
 
 const DB_NAME = "gleam-points";
 const STORE = "device";

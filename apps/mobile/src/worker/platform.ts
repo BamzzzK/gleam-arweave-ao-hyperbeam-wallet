@@ -1,4 +1,4 @@
-import { deviceKeyPort } from "@gleam/core/src/points/device-key-store.ts";
+import { deviceKeyPort } from "@gleam/runtime/src/device-key-store.ts";
 import type { Platform } from "@gleam/runtime";
 import { createWorkerApprovalPresenter } from "../adapters/approval-presenter";
 import { createWorkerTabs } from "../adapters/dapp-tabs";

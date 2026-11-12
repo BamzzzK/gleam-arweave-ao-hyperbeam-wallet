@@ -190,7 +190,7 @@
 /scripts/well-known.mjs                                            @skyf0xx
 /scripts/release-all.mjs                                           @skyf0xx
 /scripts/pack-release.sh                                            @skyf0xx
-/packages/core/src/points/device-key-store.ts                              @skyf0xx
+/packages/runtime/src/device-key-store.ts                                @skyf0xx
 /security/surface-exempt.txt                                               @skyf0xx
 /.dependency-cruiser.cjs                                                   @skyf0xx
 /scripts/surface-check.mjs                                                 @skyf0xx
