@@ -125,3 +125,49 @@ apps/extension/src/adapters/side-panel.ts Opens the side panel; takes no page in
 packages/app/src/app-platform/dapp-browser.ts Stub for hosts without a dApp browser; every call throws.
 packages/app/src/app.css Styles only.
 packages/runtime/src/dapp-error.ts Identity function that marks English-by-design error text for the lint.
+packages/app/src/screens/browser/index.tsx Barrel: re-exports only.
+packages/app/src/screens/collectibles/index.tsx Barrel: re-exports only.
+packages/app/src/screens/connected-apps/index.tsx Barrel: re-exports only.
+packages/app/src/screens/display-currency/index.tsx Barrel: re-exports only.
+packages/app/src/screens/home-screen/index.tsx Barrel: re-exports only.
+packages/app/src/screens/language/index.tsx Barrel: re-exports only.
+packages/app/src/screens/lock-settings/index.tsx Barrel: re-exports only.
+packages/app/src/screens/main-screen/index.tsx Barrel: re-exports only.
+packages/app/src/screens/points/index.tsx Barrel: re-exports only.
+packages/app/src/screens/site-wallet/index.tsx Barrel: re-exports only.
+packages/app/src/screens/manage-tokens/index.tsx Barrel: re-exports only.
+packages/app/src/screens/receive/index.tsx Barrel: re-exports only.
+packages/app/src/screens/send/index.tsx Barrel: re-exports only.
+packages/app/src/screens/settings-home/index.tsx Barrel: re-exports only.
+packages/app/src/screens/wallet-detail/index.tsx Barrel: re-exports only.
+packages/app/src/screens/wallet-switcher/index.tsx Barrel: re-exports only.
+packages/app/src/screens/collectibles/src/CollectibleDetailView.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/collectibles/src/CollectiblesGrid.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/collectibles/src/groupCollectibles.ts Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/display-currency/src/DisplayCurrencyView.tsx Display preferences and share text.
+packages/app/src/screens/home-screen/src/HomeScreenView.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/language/src/LanguageView.tsx Display preferences and share text.
+packages/app/src/screens/main-screen/src/MainScreenView.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/main-screen/src/ActivityDetailSheet.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/main-screen/src/MainScreenNotice.tsx Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/main-screen/src/useNotice.ts Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/notice.ts Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/main-screen/src/usePortfolioHistory.ts Wallet, balance and activity display outside the approval preview.
+packages/app/src/screens/activity/src/useCollectibles.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/PointsTokenRow.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/PointsView.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/RecentEarnings.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/recentDays.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/SharePrompt.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/useCountUp.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/useFlash.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/points/src/useScanStats.ts A screen outside the key, signing and approval paths.
+packages/app/src/screens/manage-tokens/src/ManageTokensView.tsx A screen outside the key, signing and approval paths.
+packages/app/src/screens/send/src/SendCollectibleView.tsx The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/activity/src/useSendCollectible.ts The send form; transfer-review (listed) shows what is sent and the background checks it.
+packages/app/src/screens/settings-home/src/AppearanceView.tsx Display preferences and share text.
+packages/app/src/screens/settings-home/src/SettingsHomeView.tsx Display preferences and share text.
+packages/app/src/screens/settings-home/src/AboutBuild.tsx Display preferences and share text.
+packages/app/src/screens/settings-home/src/useTheme.ts Display preferences and share text.
+packages/app/src/screens/wallet-switcher/src/WalletSwitcherView.tsx A screen outside the key, signing and approval paths.
+packages/app/src/theme.tsx Styles only.
