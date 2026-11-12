@@ -1371,6 +1371,32 @@ describe("MainScreenView Tokens/Activity tabs (main-screen-tabs)", () => {
     expect(screen.queryByText("—")).toBeNull();
   });
 
+  it("shows an upload as its content type and data size", async () => {
+    const activity: ActivityPage = {
+      entries: [
+        {
+          txId: "tx-upload",
+          type: "upload",
+          address: WALLET.address,
+          amount: null,
+          dataSize: "12400",
+          status: "confirmed",
+          tags: [{ name: "Content-Type", value: "image/png" }],
+          timestamp: Date.now() - 1000,
+        },
+      ],
+      cursor: null,
+    };
+    renderMainScreen({ runtime: fakeRuntime({ send: sendWith({ activity }) }) });
+
+    await waitFor(() => expect(screen.getByText("Wallet One")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: "Activity" }));
+
+    await waitFor(() => expect(screen.getByText("Uploaded · image/png")).toBeTruthy());
+    expect(screen.getByText("12.4 kB")).toBeTruthy();
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
   it("still labels a native AR activity entry AR", async () => {
     const activity: ActivityPage = {
       entries: [

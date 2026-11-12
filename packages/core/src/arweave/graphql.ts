@@ -17,6 +17,7 @@ interface GraphQLTransactionNode {
   recipient: string | null;
   quantity: { winston: string };
   tags: GraphQLTag[];
+  data?: { size: string } | null;
   block: { timestamp: number } | null;
 }
 
@@ -103,6 +104,7 @@ const TRANSACTION_FIELDS = `
       recipient
       quantity { winston }
       tags { name value }
+      data { size }
       block { timestamp }
     }
   }
@@ -195,6 +197,7 @@ function toActivityEntry(node: GraphQLTransactionNode, address: string): Activit
     status: node.block ? "confirmed" : "pending",
     address: isUpload ? address : sent ? (node.recipient ?? "") : node.owner.address,
     amount: isUpload ? null : node.quantity.winston,
+    ...(isUpload && node.data?.size && /^\d+$/.test(node.data.size) ? { dataSize: node.data.size } : {}),
     tags: node.tags.map((tag) => ({ name: tag.name, value: tag.value })),
     timestamp: node.block ? node.block.timestamp * 1000 : 0,
   };

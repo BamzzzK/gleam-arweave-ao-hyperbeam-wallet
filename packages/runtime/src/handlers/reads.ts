@@ -250,7 +250,8 @@ function isValidActivityEntry(value: unknown): value is ActivityEntry {
     (candidate.amount === null || typeof candidate.amount === "string") &&
     Array.isArray(candidate.tags) &&
     typeof candidate.timestamp === "number" &&
-    (candidate.error === undefined || candidate.error === null || typeof candidate.error === "string")
+    (candidate.error === undefined || candidate.error === null || typeof candidate.error === "string") &&
+    (candidate.dataSize === undefined || typeof candidate.dataSize === "string")
   );
 }
 

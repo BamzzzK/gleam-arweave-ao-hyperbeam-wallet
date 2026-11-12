@@ -1214,7 +1214,9 @@ export function MainScreenView({
                           : relativeTime(t, entry.timestamp);
                   const amountLabel = entry.amount
                     ? `${entry.type === "receive" ? "+" : "-"}${formatActivityAmount(entry, balancesQuery.data?.tokenBalances)}`
-                    : undefined;
+                    : entry.dataSize
+                      ? formatDataSize(entry.dataSize, locale)
+                      : undefined;
                   const token = sendableToken(entry);
                   return (
                   <ActivityRow
@@ -1320,6 +1322,23 @@ function activityTitle(t: TFunction, type: "send" | "receive" | "upload", target
   if (type === "send") return t("mainScreen.activitySentTo", { target });
   if (type === "receive") return t("mainScreen.activityReceivedFrom", { target });
   return t("mainScreen.activityTitle", { verb: activityVerb(t, type), target });
+}
+
+const DATA_SIZE_UNITS = ["byte", "kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
+
+function formatDataSize(bytes: string, locale: string): string {
+  let value = Number(bytes);
+  let unit = 0;
+  while (value >= 1000 && unit < DATA_SIZE_UNITS.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit: DATA_SIZE_UNITS[unit],
+    unitDisplay: "short",
+    maximumFractionDigits: unit === 0 ? 0 : 1,
+  }).format(value);
 }
 
 // The upload's owner is this wallet, so its address says nothing; the content type says what went up.
