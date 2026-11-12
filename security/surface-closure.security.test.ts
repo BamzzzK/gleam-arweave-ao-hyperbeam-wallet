@@ -25,6 +25,8 @@ const ROOTS = [
   "apps/extension/entrypoints/approval/index.tsx",
   "apps/extension/entrypoints/passkey/index.tsx",
   "apps/extension/entrypoints/connect/index.tsx",
+  "apps/extension/entrypoints/popup/index.tsx",
+  "apps/extension/entrypoints/sidepanel/index.tsx",
 ];
 
 interface Exemption {
