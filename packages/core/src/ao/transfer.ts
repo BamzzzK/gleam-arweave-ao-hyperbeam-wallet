@@ -1,5 +1,4 @@
-import type { Signer } from "../vault/signer";
-import { applyDataItemSignature, buildUnsignedDataItem, signDataItemWithSigner } from "../arweave/data-item";
+import { applyDataItemSignature, buildUnsignedDataItem } from "../arweave/data-item";
 import { userErrorMessage } from "../models/user-errors";
 
 export { createSignedDataItem } from "../arweave/data-item";
@@ -45,30 +44,6 @@ type Bytes = Uint8Array<ArrayBuffer>;
 
 const encoder = new TextEncoder();
 
-/**
- * Builds, signs, and posts an AO `Transfer` message to `processId` via the
- * legacynet Messenger Unit. `amount` is an atomic-integer string in the
- * token's own smallest unit (matching `TokenBalance.quantity`'s shape) —
- * never a floating-point number. `processId` must be a valid 43-character
- * base64url Arweave id (32 raw bytes) — it becomes the data item's
- * `target`.
- *
- * What "submitted" means here: the MU has accepted and scheduled the
- * signed data item — not that the token process has executed the
- * `Transfer` handler yet, nor that the recipient's balance has updated.
- * Callers writing an optimistic activity entry from this result should
- * treat status as "message accepted by the MU", not "transfer confirmed".
- */
-export async function submitTransfer(
-  signer: Signer,
-  processId: string,
-  recipient: string,
-  amount: string,
-): Promise<SubmittedAoTransfer> {
-  const unsigned = prepareTransfer(signer.owner, processId, recipient, amount);
-  return finishTransfer(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
-}
-
 /** The unsigned `Transfer` data item `ownerB64Url` will sign. */
 export function prepareTransfer(ownerB64Url: string, processId: string, recipient: string, amount: string): Bytes {
   if (!/^[A-Za-z0-9_-]{43}$/.test(processId)) {
@@ -101,7 +76,13 @@ export function prepareTransfer(ownerB64Url: string, processId: string, recipien
   });
 }
 
-/** Applies `expectedOwner`'s signature to a `prepareTransfer` item and posts it to the MU. */
+/**
+ * Applies `expectedOwner`'s signature to a `prepareTransfer` item and posts
+ * it to the legacynet Messenger Unit. "Submitted" means the MU accepted and
+ * scheduled the signed item, not that the token process has run its
+ * `Transfer` handler or that the recipient's balance has changed, so an
+ * activity entry written from this result stays pending.
+ */
 export async function finishTransfer(
   unsigned: Uint8Array,
   signature: Uint8Array,

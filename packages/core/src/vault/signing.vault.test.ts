@@ -3,10 +3,6 @@ import { signerFromJwk, generateJWK } from "../signer/keys";
 import Arweave from "arweave";
 import { DataItem } from "@dha-team/arbundles/web";
 import {
-  signTransaction,
-  dispatchTransaction,
-  signDataItem,
-  batchSignDataItem,
   prepareSignTransaction,
   finishSignTransaction,
   prepareDispatch,
@@ -21,10 +17,42 @@ import {
   type UnsignedPayload,
 } from "./signing";
 import { signRsaPss } from "../arweave/rsa-pss";
-import { transactionSignatureData } from "../arweave/transaction";
-import { dataItemSignatureData } from "../arweave/data-item";
+import { signTransactionWithSigner, transactionSignatureData } from "../arweave/transaction";
+import { dataItemSignatureData, signDataItemWithSigner } from "../arweave/data-item";
 import { bytesToBase64 } from "./base64";
 import type { JWKInterface } from "../models/wallet";
+import type { Signer } from "./signer";
+import type { DataItemInput, SignTransactionInput } from "../models";
+
+// The keyfile path run step by step, as the approval handler runs it
+// around its prepared-bytes check.
+async function signTransaction(gatewayUrl: string, signer: Signer, input: SignTransactionInput) {
+  const unsigned = await prepareSignTransaction(gatewayUrl, signer.owner, input);
+  return finishSignTransaction(unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
+}
+
+async function dispatchTransaction(
+  gatewayUrl: string,
+  bundlerUrl: string,
+  signer: Signer,
+  input: SignTransactionInput,
+  options: { viaBundler: boolean },
+) {
+  const unsigned = await prepareDispatch(gatewayUrl, signer.owner, input, options);
+  return finishDispatch(gatewayUrl, bundlerUrl, unsigned, await signPayloadWithSigner(unsigned, signer), signer.owner);
+}
+
+async function signDataItem(signer: Signer, input: DataItemInput) {
+  const unsigned = prepareDataItem(signer.owner, input);
+  return finishDataItem(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
+}
+
+async function batchSignDataItem(signer: Signer, inputs: DataItemInput[]) {
+  const unsigned = prepareDataItems(signer.owner, inputs);
+  const signatures = [];
+  for (const item of unsigned) signatures.push(await signDataItemWithSigner(item, signer));
+  return finishDataItems(unsigned, signatures, signer.owner);
+}
 
 /**
  * Checks the signature over arbundles' own parse and deep hash. Not

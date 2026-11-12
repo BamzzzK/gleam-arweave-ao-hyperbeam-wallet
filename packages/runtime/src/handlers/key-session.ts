@@ -212,7 +212,6 @@ export interface KeySession {
    * a signer obtained earlier fails with `KeyringLockedError`.
    */
   getSigner(walletId: string): Promise<Signer | null>;
-  hasCachedKey(walletId: string): Promise<boolean>;
   /**
    * Drops one wallet's key, e.g. `deleteWallet` removing a wallet that was
    * unlocked. Zeroizes the session entry's strings before removing it
@@ -384,10 +383,6 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     return entry ? signerFromKeyStore(sessionKeys, walletId, entry) : null;
   }
 
-  async function hasCachedKey(walletId: string): Promise<boolean> {
-    return (await getUnlockedKey(walletId)) !== null;
-  }
-
   async function removeCachedKey(walletId: string): Promise<void> {
     try {
       await zeroizeAndRemoveEntry(walletId);
@@ -421,7 +416,6 @@ export function createKeySession({ sessionKeys, storage }: KeySessionDeps): KeyS
     enforceAutoLock,
     reconcileKeyring,
     getSigner,
-    hasCachedKey,
     removeCachedKey,
     clearKeyCache,
     isKeyStored,

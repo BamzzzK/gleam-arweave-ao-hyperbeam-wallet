@@ -12,11 +12,14 @@ import { APPROVAL_GATED_METHODS, encodeTaggedBinary } from "@gleam/messaging/src
 /**
  * This file's `transferAoTokens` integration test drives the real
  * dispatcher -> ApprovalHandler -> TransferHandler -> `core/ao/transfer.ts`
- * chain end-to-end, and that last hop would otherwise sign and post to the
- * real Messenger Unit.
+ * chain end-to-end. Only `finishTransfer` is stubbed: it would post the
+ * signed item to the real Messenger Unit.
  */
-const { aoSubmitMock } = vi.hoisted(() => ({ aoSubmitMock: vi.fn() }));
-vi.mock("@gleam/core/src/ao/transfer.ts", () => ({ submitTransfer: aoSubmitMock }));
+const { aoFinishMock } = vi.hoisted(() => ({ aoFinishMock: vi.fn() }));
+vi.mock("@gleam/core/src/ao/transfer.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@gleam/core/src/ao/transfer.ts")>()),
+  finishTransfer: aoFinishMock,
+}));
 
 type Sender = { url?: string; origin?: string; frameId?: number; tab?: { id?: number; url?: string } };
 type Handler = (message: { data: unknown; sender?: Sender }) => unknown;
@@ -739,7 +742,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
    * preview carries `token` for the connected origin's request.
    */
   it("transferAoTokens routes through connect -> approval window -> signing, never auto-approved", async () => {
-    aoSubmitMock.mockResolvedValue({ messageId: "ao-message-id-123" });
+    aoFinishMock.mockResolvedValue({ messageId: "ao-message-id-123" });
 
     await setItem("local:wallets", [
       { id: "wallet-1", address: "addr-1", name: "Main", method: "jwk", publicKey: "pub", createdAt: 0, updatedAt: 0, encryptedKeyfile: null },
@@ -822,7 +825,7 @@ describe("background.ts: providerCall privilege-tier choke point", () => {
     await resolveApproval({ data: { requestId: request.requestId, approved: true } });
 
     await expect(resultPromise).resolves.toEqual({ id: "ao-message-id-123" });
-    expect(aoSubmitMock).toHaveBeenCalledTimes(1);
+    expect(aoFinishMock).toHaveBeenCalledTimes(1);
   });
 
   it("transferAoTokens still opens the approval window when the denomination read fails", async () => {

@@ -229,18 +229,10 @@ const RUNTIME_GLOBALS = ["chrome", "browser"].map((name) => ({
   name,
   message: "packages/runtime never touches extension globals. Add a port to `Platform` and let the shell implement it.",
 }));
-// The one-shot keyfile signers build and sign in one step, with no point
-// between to check the built bytes against the approved request.
-const ONE_SHOT_SIGNING = {
-  regex: "^@gleam/core(/src/vault/signing(\\.ts)?)?$",
-  importNames: ["signTransaction", "dispatchTransaction", "signDataItem", "batchSignDataItem"],
-  message:
-    "Sign a request through prepare → assertPreparedMatches → signPayloadWithSigner → finish (handlers/approval.ts), so the built bytes are checked first.",
-};
 const runtimeFence = (...extraPatterns) => ({
   "no-restricted-imports": [
     "error",
-    { patterns: [...extraPatterns, ONE_SHOT_SIGNING, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
+    { patterns: [...extraPatterns, { regex: RUNTIME_IMPORT, message: RUNTIME_IMPORT_MESSAGE }] },
   ],
   "no-restricted-globals": ["error", ...RUNTIME_GLOBALS],
 });

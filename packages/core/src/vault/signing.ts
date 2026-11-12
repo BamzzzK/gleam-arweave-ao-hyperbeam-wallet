@@ -37,9 +37,8 @@ import { userErrorMessage } from "../models/user-errors";
  * share one pipeline: `prepare*` builds the unsigned payload from the
  * owner alone, the key signs its deep hash (`signPayloadWithSigner` here, or
  * a device), and `finish*` applies the signature, checks it, and
- * submits. The keyfile entry points (`signTransaction`,
- * `dispatchTransaction`, `signDataItem`, `batchSignDataItem`) are those
- * three steps run back to back.
+ * submits. There is no one-step keyfile signer: a caller checks the
+ * prepared payload against what was approved before it signs.
  */
 
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -165,16 +164,6 @@ export async function finishSignTransaction(
   };
 }
 
-/** Signs the dApp's transaction with a keyfile without posting it. */
-export async function signTransaction(
-  gatewayUrl: string,
-  signer: Signer,
-  input: SignTransactionInput,
-): Promise<SignedTransaction> {
-  const unsigned = await prepareSignTransaction(gatewayUrl, signer.owner, input);
-  return finishSignTransaction(unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
-}
-
 export interface DispatchOptions {
   /** `capabilitiesFor(method).dispatchViaBundler`. When false, every dispatch goes to the gateway on L1. */
   viaBundler: boolean;
@@ -260,18 +249,6 @@ export async function finishDispatch(
   return { id: signed.id, type: "BASE" };
 }
 
-/** Signs a transaction with a keyfile and submits it; see `prepareDispatch` for where it goes. */
-export async function dispatchTransaction(
-  gatewayUrl: string,
-  bundlerUrl: string,
-  signer: Signer,
-  input: SignTransactionInput,
-  options: DispatchOptions,
-): Promise<DispatchResult> {
-  const unsigned = await prepareDispatch(gatewayUrl, signer.owner, input, options);
-  return finishDispatch(gatewayUrl, bundlerUrl, unsigned, await signPayloadWithSigner(unsigned, signer), signer.owner);
-}
-
 /** The unsigned item for a dApp's `signDataItem`. `input.data` is standard base64 and tags are plain text. */
 export function prepareDataItem(ownerB64Url: string, input: DataItemInput): Bytes {
   return buildUnsignedDataItem(ownerB64Url, {
@@ -285,12 +262,6 @@ export function prepareDataItem(ownerB64Url: string, input: DataItemInput): Byte
 /** Applies the signature to a `prepareDataItem` result and returns the raw signed item. */
 export async function finishDataItem(unsigned: Uint8Array, signature: Uint8Array, expectedOwner: string): Promise<Bytes> {
   return (await applyDataItemSignature(unsigned, signature, expectedOwner)).raw;
-}
-
-/** Signs one ANS-104 data item with a keyfile and returns its raw bytes. */
-export async function signDataItem(signer: Signer, input: DataItemInput): Promise<Bytes> {
-  const unsigned = prepareDataItem(signer.owner, input);
-  return finishDataItem(unsigned, await signDataItemWithSigner(unsigned, signer), signer.owner);
 }
 
 export function prepareDataItems(ownerB64Url: string, inputs: DataItemInput[]): Bytes[] {
@@ -311,14 +282,4 @@ export async function finishDataItems(
     results.push(await finishDataItem(item, signatures[index]!, expectedOwner));
   }
   return results;
-}
-
-/** Signs each item in order with the same keyfile. */
-export async function batchSignDataItem(signer: Signer, inputs: DataItemInput[]): Promise<Bytes[]> {
-  const unsigned = prepareDataItems(signer.owner, inputs);
-  const signatures: Bytes[] = [];
-  for (const item of unsigned) {
-    signatures.push(await signDataItemWithSigner(item, signer));
-  }
-  return finishDataItems(unsigned, signatures, signer.owner);
 }

@@ -3,22 +3,17 @@ import {
   applyTransactionSignature,
   buildUnsignedTransaction,
   broadcastTransaction,
-  signTransactionWithSigner,
   type ArweaveTransactionJson,
 } from "./transaction";
-import type { Signer } from "../vault/signer";
 import type { Winston } from "../models/balance";
 import type { Tag } from "../models/tag";
 import { userErrorMessage } from "../models/user-errors";
 
 /**
- * This module's public functions accept an unlocked wallet's `Signer`
- * rather than a password or wallet id — they never
- * decrypt anything themselves, and never use `core/vault`'s envelope, since key
- * material is never persisted anywhere (see `wallet-lifecycle.ts`). This
- * keeps `core/arweave` agnostic about how the caller obtained signing
- * material. A hardware wallet uses `prepareTransfer`/`finishTransfer`
- * with a signature from the device instead.
+ * Builds an AR transfer from the owner's public key (`prepareTransfer`)
+ * and posts it once signed (`finishTransfer`). Keyfile and hardware
+ * wallets sign between the two, after the caller has checked the built
+ * transaction against what was approved, so nothing here holds a key.
  *
  * No `fetchImpl` injection point here (unlike `balance.ts`/`graphql.ts`):
  * `arweave-js`'s internal `Api` class always calls the ambient `fetch`
@@ -99,16 +94,4 @@ export async function finishTransfer(
     );
   }
   return { txId: id };
-}
-
-/** Builds, signs with the keyfile, and posts an AR value-transfer transaction. */
-export async function submitTransfer(
-  gatewayUrl: string,
-  signer: Signer,
-  recipient: string,
-  amount: Winston,
-  reward: Winston,
-): Promise<SubmittedTransfer> {
-  const unsigned = await prepareTransfer(gatewayUrl, signer.owner, recipient, amount, reward);
-  return finishTransfer(gatewayUrl, unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
 }

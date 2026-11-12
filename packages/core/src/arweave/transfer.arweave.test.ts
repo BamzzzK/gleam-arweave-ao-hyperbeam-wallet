@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { signerFromJwk } from "../signer/keys";
 import Arweave from "arweave";
-import { estimateFee, finishTransfer, prepareTransfer, submitTransfer } from "./transfer";
+import { estimateFee, finishTransfer, prepareTransfer } from "./transfer";
+import { signTransactionWithSigner } from "./transaction";
+import type { Signer } from "../vault/signer";
+
+// The keyfile path run step by step, as the transfer handler runs it.
+async function submitTransfer(gatewayUrl: string, signer: Signer, recipient: string, amount: string, reward: string) {
+  const unsigned = await prepareTransfer(gatewayUrl, signer.owner, recipient, amount, reward);
+  return finishTransfer(gatewayUrl, unsigned, await signTransactionWithSigner(unsigned, signer), signer.owner);
+}
 
 const jwk = await Arweave.init({}).wallets.generate();
 

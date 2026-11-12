@@ -43,7 +43,6 @@ const {
   clearKeyCache,
   enforceAutoLock,
   getSigner,
-  hasCachedKey,
   isKeyStored,
   reconcileKeyring,
   removeCachedKey,
@@ -123,13 +122,12 @@ describe("key-session", () => {
 
   it("returns null for a wallet that was never cached", async () => {
     expect(await getSigner("missing-wallet")).toBeNull();
-    expect(await hasCachedKey("missing-wallet")).toBe(false);
   });
 
-  it("hasCachedKey reflects whether a key is present", async () => {
-    expect(await hasCachedKey("wallet-a")).toBe(false);
+  it("returns a signer once the key is cached", async () => {
+    expect(await getSigner("wallet-a")).toBeNull();
     await cacheKey("wallet-a", jwkA, "address-a");
-    expect(await hasCachedKey("wallet-a")).toBe(true);
+    expect(await getSigner("wallet-a")).not.toBeNull();
   });
 
   it("treats a wallet whose keyring key is gone as locked", async () => {
