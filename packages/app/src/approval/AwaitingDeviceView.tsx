@@ -240,6 +240,7 @@ function SummaryRows({ summary, token }: { summary: DeviceSigningSummary; token:
       ) : null}
       {summary.target !== null ? <AddressRow label={t("approval.target")} address={summary.target} /> : null}
       <Row label={t("approval.data")} value={t("approval.bytes", { size: summary.dataSize })} />
+      {summary.anchor ? <Row label={t("approval.anchor")} value={<UntrustedText text={summary.anchor} />} /> : null}
     </>
   );
 }
