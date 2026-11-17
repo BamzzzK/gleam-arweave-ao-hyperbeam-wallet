@@ -49,6 +49,8 @@ export interface SignedPart {
   dataTruncated?: true;
   /** Which data item this is; none for the request's own payload. */
   dataIndex?: number;
+  /** The data item's ANS-104 anchor, signed with it; `null` when it carries none, absent for a transaction. */
+  anchor?: string | null;
   /** `null` where nothing of the request's own is signed yet (a wallet send). */
   payloadHash: string | null;
 }
@@ -132,6 +134,7 @@ export function transferRequestFromPreview(preview: SigningApprovalPreview): Tra
         dataSize: item.dataSize,
         ...(item.dataTruncated ? { dataTruncated: true as const } : {}),
         dataIndex: index,
+        anchor: item.anchor ?? null,
         payloadHash: item.payloadHash,
       };
       if (item.transfer) {
@@ -241,13 +244,13 @@ export function transferRequestFromDevice(
         ...(collectibleRef
           ? line(summary.process, null, 0, COLLECTIBLE_TRANSFER_QUANTITY, summary.recipient, collectibleRef)
           : line(summary.process, known?.ticker ?? null, known?.denomination ?? null, summary.quantity, summary.recipient)),
-        part: empty,
+        part: { ...empty, ...(summary.kind === "aoTransfer" && summary.anchor ? { anchor: summary.anchor } : {}) },
         index,
       });
       if (summary.kind === "l1TokenTransfer") addFee(summary.fee);
     } else if (summary.kind === "collectibleTransfer") {
       const ref = collectible?.id === summary.asset ? collectible : { id: summary.asset };
-      transfers.push({ ...line(summary.asset, null, 0, "1", summary.recipient, ref), part: empty, index });
+      transfers.push({ ...line(summary.asset, null, 0, "1", summary.recipient, ref), part: { ...empty, ...(summary.anchor ? { anchor: summary.anchor } : {}) }, index });
       addFee(summary.fee);
     } else {
       return null;

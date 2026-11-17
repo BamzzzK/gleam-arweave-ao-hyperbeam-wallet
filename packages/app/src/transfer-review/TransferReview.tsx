@@ -530,6 +530,14 @@ function TransferDetails({ transfer, part, showTags }: { transfer: TransferLine;
         </div>
       ) : null}
       {part.payloadHash !== null ? <PayloadHash value={part.payloadHash} /> : null}
+      {part.anchor ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-label text-muted">{t("approval.anchor")}</span>
+          <span dir="ltr" className="break-all font-mono text-caption leading-relaxed text-foreground">
+            <UntrustedText text={part.anchor} />
+          </span>
+        </div>
+      ) : null}
     </>
   );
 }

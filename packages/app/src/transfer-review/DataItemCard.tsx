@@ -1,5 +1,6 @@
 import { useT } from "../i18n";
 import { SignedDataText } from "../approval/SignedDataText";
+import { UntrustedText } from "../approval/UntrustedText";
 import { TagTiers } from "./TagTiers";
 import type { OtherItem } from "./model";
 
@@ -56,6 +57,15 @@ export function DataItemCard({
         <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.payloadHash")}</span>
         <span className="break-all font-mono text-caption text-foreground">{item.payloadHash}</span>
       </div>
+
+      {item.anchor ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-caption font-semibold uppercase tracking-wide text-muted">{t("approval.anchor")}</span>
+          <span className="break-all font-mono text-caption text-foreground">
+            <UntrustedText text={item.anchor} />
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

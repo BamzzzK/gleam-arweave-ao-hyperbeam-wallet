@@ -234,6 +234,20 @@ describe("transferRequestFromDevice", () => {
     )!;
     expect(other.transfers[0]!.collectible).toBeUndefined();
   });
+
+  it("carries an anchored transfer's anchor into its part, and none without one", () => {
+    const anchor = "a".repeat(32);
+    const parsed = transferRequestFromDevice(
+      [
+        { kind: "aoTransfer", process: P, recipient: R, quantity: "5", anchor },
+        { kind: "collectibleTransfer", asset: P, recipient: R, fee: "0", anchor },
+        { kind: "aoTransfer", process: "z".repeat(43), recipient: R, quantity: "3" },
+      ],
+      undefined,
+      null,
+    )!;
+    expect(parsed.transfers.map((transfer) => transfer.part.anchor)).toEqual([anchor, anchor, undefined]);
+  });
 });
 
 describe("balanceAfterParts", () => {
