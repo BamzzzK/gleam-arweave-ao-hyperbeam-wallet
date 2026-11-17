@@ -200,4 +200,55 @@ describe("tagged binary codec", () => {
     expect(encodeTaggedBinary(null)).toBe(null);
     expect(decodeTaggedBinary({ __gleamType: "Uint8Array" })).toEqual({ __gleamType: "Uint8Array" });
   });
+
+  it("still decodes a large tagged binary under the byte limit", () => {
+    const decoded = decodeTaggedBinary({ __gleamType: "Uint8Array", data: new Array(2_000_000).fill(7) }) as Uint8Array;
+    expect(decoded.byteLength).toBe(2_000_000);
+    expect(decoded[0]).toBe(7);
+  });
+
+  it("refuses tagged binary data over the byte limit instead of allocating it all", () => {
+    const oversized = { __gleamType: "Uint8Array", data: new Array(17 * 1024 * 1024).fill(0) };
+    expect(() => decodeTaggedBinary(oversized)).toThrow(/too much binary data/);
+  });
+
+  it("counts tagged binary bytes across the whole value, not per value", () => {
+    const twoHalves = [
+      { __gleamType: "Uint8Array", data: new Array(9 * 1024 * 1024).fill(0) },
+      { __gleamType: "Uint8Array", data: new Array(9 * 1024 * 1024).fill(0) },
+    ];
+    expect(() => decodeTaggedBinary(twoHalves)).toThrow(/too much binary data/);
+  });
+
+  it("refuses nesting past the depth limit with a plain error, not a stack overflow", () => {
+    let deep: unknown = 1;
+    for (let i = 0; i < 10_000; i++) deep = [deep];
+    expect(() => decodeTaggedBinary(deep)).toThrow(/nested too deeply/);
+    expect(() => decodeTaggedBinary(deep)).not.toThrow(RangeError);
+  });
+
+  it("refuses a structure holding too many plain values", () => {
+    const wide = new Array(1_000_001).fill(0);
+    expect(() => decodeTaggedBinary(wide)).toThrow(/too many values/);
+  });
+
+  it("refuses a single plain string over the string limit", () => {
+    const huge = "x".repeat(17 * 1024 * 1024);
+    expect(() => decodeTaggedBinary(huge)).toThrow(/too much string data/);
+  });
+
+  it("counts plain string bytes across the whole value, not per string", () => {
+    const twoHalves = ["x".repeat(9 * 1024 * 1024), "x".repeat(9 * 1024 * 1024)];
+    expect(() => decodeTaggedBinary(twoHalves)).toThrow(/too much string data/);
+  });
+
+  it("counts record keys toward the string limit", () => {
+    const keyed = { ["k".repeat(9 * 1024 * 1024)]: 0, ["j".repeat(9 * 1024 * 1024)]: 0 };
+    expect(() => decodeTaggedBinary(keyed)).toThrow(/too much string data/);
+  });
+
+  it("still decodes plain strings under the string limit", () => {
+    expect(decodeTaggedBinary("hello")).toBe("hello");
+    expect(decodeTaggedBinary({ note: "x".repeat(1000) })).toEqual({ note: "x".repeat(1000) });
+  });
 });
