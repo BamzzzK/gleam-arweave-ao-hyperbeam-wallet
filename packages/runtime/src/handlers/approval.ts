@@ -837,6 +837,7 @@ async function buildDataItemPreviews(
         dataSize: bytes.byteLength,
         tags,
         target: item.target ?? null,
+        anchor: item.anchor ? item.anchor : null,
         payloadHash: await sha256Hex(bytes),
         transfer:
           transfer?.kind === "transfer"

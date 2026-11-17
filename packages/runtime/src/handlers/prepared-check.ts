@@ -84,18 +84,19 @@ export function summarize(payload: UnsignedPayload, collectibleId?: string | nul
       ...(tokenTransfer ? { unreadableTokenTransfer: true } : {}),
     };
   }
-  const { target, tags, data } = readDataItemFields(payload.raw);
+  const { target, anchor, tags, data } = readDataItemFields(payload.raw);
   const transfer = readAoTransferMessage({ target, tags });
   if (transfer?.kind === "transfer") {
     if (transfer.quantity === COLLECTIBLE_TRANSFER_QUANTITY && transfer.processId === collectibleId) {
-      return { kind: "collectibleTransfer", asset: transfer.processId, recipient: transfer.recipient, fee: "0" };
+      return { kind: "collectibleTransfer", asset: transfer.processId, recipient: transfer.recipient, fee: "0", ...(anchor ? { anchor } : {}) };
     }
-    return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity };
+    return { kind: "aoTransfer", process: transfer.processId, recipient: transfer.recipient, quantity: transfer.quantity, ...(anchor ? { anchor } : {}) };
   }
   return {
     kind: "dataItem",
     target: target || null,
     dataSize: data.byteLength,
+    ...(anchor ? { anchor } : {}),
     ...(transfer ? { unreadableTokenTransfer: true } : {}),
   };
 }

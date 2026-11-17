@@ -333,6 +333,47 @@ describe("ApprovalHandler: hardware wallet requests wait for the device", () => 
     ]);
   });
 
+  it("summarizes an anchored data item with its anchor, and an unanchored one without", async () => {
+    const anchor = "a".repeat(32);
+    const { view } = await approveOnDevice({
+      kind: "batchSignDataItem",
+      payload: new TextEncoder().encode(" "),
+      dataItems: [
+        { data: btoa(" "), tags: [{ name: "Action", value: "Eval" }], target: PROCESS_ID, anchor },
+        { data: btoa(" "), tags: [{ name: "Action", value: "Eval" }], target: PROCESS_ID },
+      ],
+    });
+    expect(view.device!.summaries).toEqual([
+      { kind: "dataItem", target: PROCESS_ID, dataSize: 1, anchor },
+      { kind: "dataItem", target: PROCESS_ID, dataSize: 1 },
+    ]);
+  });
+
+  it("summarizes an anchored AO Transfer item and an anchored collectible transfer with their anchors", async () => {
+    const anchor = "a".repeat(32);
+    const tags = (quantity: string) => [
+      { name: "Action", value: "Transfer" },
+      { name: "Recipient", value: RECIPIENT },
+      { name: "Quantity", value: quantity },
+    ];
+    const { view } = await approveOnDevice({
+      kind: "batchSignDataItem",
+      payload: new TextEncoder().encode(" "),
+      dataItems: [
+        { data: btoa(" "), tags: tags("5"), target: PROCESS_ID, anchor },
+        { data: btoa(" "), tags: tags("1"), target: PROCESS_ID, anchor },
+      ],
+      itemTokenMetadata: [
+        { tokenDenomination: null, tokenTicker: null, collectible: true },
+        { tokenDenomination: null, tokenTicker: null, collectible: true },
+      ],
+    });
+    expect(view.device!.summaries).toEqual([
+      { kind: "aoTransfer", process: PROCESS_ID, recipient: RECIPIENT, quantity: "5", anchor },
+      { kind: "collectibleTransfer", asset: PROCESS_ID, recipient: RECIPIENT, fee: "0", anchor },
+    ]);
+  });
+
   it("summarizes an AO Transfer item of 1 as the collectible the preview named, and a transfer of more as the token", async () => {
     const tags = (quantity: string) => [
       { name: "Action", value: "Transfer" },

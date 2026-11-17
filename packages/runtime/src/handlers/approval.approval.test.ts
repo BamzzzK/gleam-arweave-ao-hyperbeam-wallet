@@ -990,6 +990,31 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
     await expect(pending).rejects.toThrow();
   });
 
+  it("shows each data item's anchor, and none for an item without one", async () => {
+    const anchor = "a".repeat(32);
+    const pending = handler.requestApproval({
+      kind: "batchSignDataItem",
+      origin: "https://bazar.arweave.net",
+      walletId: WALLET_ID,
+      payload: new TextEncoder().encode("hello"),
+      dataItems: [
+        { data: btoa("hello"), tags: [], anchor },
+        { data: btoa("world"), tags: [] },
+      ],
+    });
+    pending.catch(() => {});
+    await vi.waitFor(() => expect(presenter.presented.length).toBe(1));
+    const request = await handler.getApproval({ requestId: presenter.presented[0]! });
+    if (request.preview.kind === "connect" || request.preview.kind === "addToken" || request.preview.kind === "scanAttestation") {
+      throw new Error("expected a signing preview");
+    }
+    expect(request.preview.items?.[0]?.anchor).toBe(anchor);
+    expect(request.preview.items?.[1]?.anchor).toBeNull();
+
+    await handler.resolveApproval({ requestId: presenter.presented[0]!, approved: false });
+    await expect(pending).rejects.toThrow();
+  });
+
   it("marks text cut at the preview limit and returns the whole text on request", async () => {
     const long = "A".repeat(100_000);
     const short = "B".repeat(4096);
@@ -1445,6 +1470,7 @@ describe("ApprovalHandler: signing approval preview + unlocked-session gate", ()
           dataSize: 5,
           tags: [{ name: "Action", value: "Eval" }],
           target,
+          anchor: null,
           payloadHash: request.preview.payloadHash,
           transfer: null,
         },
