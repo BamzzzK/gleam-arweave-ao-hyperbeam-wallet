@@ -208,6 +208,19 @@ export function runGate({ cwd = process.cwd() } = {}) {
   if (!top.ok) return { ok: false, reason: `not a git repository: ${cwd}` };
   const root = top.out;
 
+  // The surface comparison below is commit-to-HEAD, but the version, the
+  // audit file, the surface list and the version-only check all read the
+  // working tree. On a dirty tree the verdict would not describe HEAD: a
+  // HEAD change can be masked by a version-only working-tree copy, or a
+  // clean HEAD can be failed by an unrelated edit. Refuse a dirty tree up
+  // front, as release.mjs does, so the gate is a function of HEAD alone.
+  // Untracked files can't end up in the tagged commit, so they don't block.
+  const dirty = git(root, ["status", "--porcelain", "--untracked-files=no"]);
+  if (!dirty.ok) return { ok: false, reason: `git status failed: ${dirty.out}` };
+  if (dirty.out !== "") {
+    return { ok: false, reason: "working tree has uncommitted changes", details: dirty.out.split("\n") };
+  }
+
   let version;
   try {
     version = readVersion(root);
@@ -218,6 +231,28 @@ export function runGate({ cwd = process.cwd() } = {}) {
   const auditPath = `${AUDITS_DIR}/v${version}.md`;
   if (!existsSync(join(root, auditPath))) {
     return { ok: false, reason: `no audit for v${version}: ${auditPath} does not exist` };
+  }
+
+  // Untracked files can't end up in the tagged commit — but that only
+  // holds for files the gate never reads. The audit file, the surface
+  // list and the version files ARE read from the working tree (above and
+  // below), so an untracked file at one of those paths is the verdict's
+  // basis: a release whose audit file was written but never committed
+  // would otherwise pass, vouching for a HEAD no audit ever covered in
+  // git, while the tag points at a commit with no audit in its history.
+  // A stray untracked file anywhere else still doesn't block.
+  const gateInputs = [...new Set([auditPath, SURFACE_FILE, ...VERSION_ONLY_FILES])];
+  const untracked = git(root, ["status", "--porcelain", "--untracked-files=normal", "--", ...gateInputs]);
+  if (!untracked.ok) return { ok: false, reason: `git status failed: ${untracked.out}` };
+  const untrackedInputs =
+    untracked.out === ""
+      ? []
+      : untracked.out
+          .split("\n")
+          .filter((line) => line.startsWith("??"))
+          .map((line) => line.slice(3));
+  if (untrackedInputs.length > 0) {
+    return { ok: false, reason: `untracked file(s) the release gate reads: ${untrackedInputs.join(", ")}` };
   }
 
   let meta, findings;
