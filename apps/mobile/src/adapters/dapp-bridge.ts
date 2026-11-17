@@ -65,8 +65,19 @@ export function attestedOrigin(message: DappViewMessage): string | null {
   return isExactWebOrigin(message.origin) ? message.origin : null;
 }
 
-function parseEnvelope(data: unknown): PageMessageEnvelope | null {
+/**
+ * The largest envelope the bridge parses, in UTF-16 code units. A page
+ * message is JSON text, so a tagged-binary payload at the decode cap
+ * (16 MiB, `MAX_DECODE_TAGGED_BYTES`) expands to roughly four characters
+ * per byte; 64 MiB covers that worst case with headroom, and anything
+ * larger is refused before it is parsed — the decode limits in
+ * `decodeTaggedBinary` can only bound work after the parse.
+ */
+export const MAX_ENVELOPE_CHARS = 64 * 1024 * 1024;
+
+export function parseEnvelope(data: unknown): PageMessageEnvelope | null {
   if (typeof data !== "string") return null;
+  if (data.length > MAX_ENVELOPE_CHARS) return null;
   let envelope: unknown;
   try {
     envelope = JSON.parse(data);

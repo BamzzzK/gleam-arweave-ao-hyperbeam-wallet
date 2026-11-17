@@ -11,7 +11,7 @@ import {
 import { createRuntime } from "@gleam/runtime/src/create-runtime.ts";
 import { createInMemoryPlatform } from "@gleam/runtime/testing/index.ts";
 import { createRuntimeHost } from "../worker/host";
-import { attestedOrigin, createDappBridge, type DappViewBridgePlugin, type PageRuntime } from "./dapp-bridge";
+import { attestedOrigin, createDappBridge, parseEnvelope, type DappViewBridgePlugin, type PageRuntime } from "./dapp-bridge";
 
 const DAPP = "https://dapp.example";
 
@@ -62,6 +62,9 @@ function bridge(runtime: Partial<PageRuntime> = {}, pageOrigin?: string) {
 const request = (fields: Record<string, unknown> = {}) =>
   JSON.stringify({ type: REQUEST, id: "call-1", method: "getActiveAddress", params: {}, ...fields });
 
+const oversizedRequest = () =>
+  JSON.stringify({ type: REQUEST, id: "call-1", method: "getActiveAddress", params: { pad: "x".repeat(65 * 1024 * 1024) } });
+
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("attestedOrigin", () => {
@@ -87,6 +90,16 @@ describe("attestedOrigin", () => {
       expect(attestedOrigin({ origin, isMainFrame: true, data: "" })).toBeNull();
     },
   );
+});
+
+describe("parseEnvelope", () => {
+  it("refuses an envelope string over the size limit without parsing it", () => {
+    expect(parseEnvelope(oversizedRequest())).toBeNull();
+  });
+
+  it("still parses an envelope under the size limit", () => {
+    expect(parseEnvelope(request())).toEqual({ type: REQUEST, id: "call-1", method: "getActiveAddress", params: {} });
+  });
 });
 
 describe("createDappBridge", () => {
@@ -115,6 +128,18 @@ describe("createDappBridge", () => {
     view.message({ data: request() });
     await settle();
     expect(view.posted[0]?.envelope).toEqual({ type: RESPONSE, id: "call-1", error: { message: "Not connected." } });
+  });
+
+  it("drops an oversized envelope before it reaches the runtime", async () => {
+    const { view, runtime } = bridge();
+    view.message({ data: oversizedRequest() });
+    // Wait for the bridge to settle either way: on unfixed code the huge
+    // envelope parses and reaches pageCall; with the fix it is dropped.
+    const pageCall = vi.mocked(runtime.pageCall);
+    for (let i = 0; i < 200 && pageCall.mock.calls.length === 0 && view.posted.length === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(runtime.pageCall).not.toHaveBeenCalled();
   });
 
   it("takes the origin from native, never from the message", async () => {
