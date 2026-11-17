@@ -39,6 +39,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Signing payload (SHA-256)",
     copySigningPayloadHash: "Copy signing payload (sha-256)",
     payloadHash: "Payload (SHA-256)",
+    anchor: "Anchor",
     pointsProofIntro:
       "To use Gleam Points, your device signs a 0 AR transaction that proves you own this wallet. It is never posted and moves no AR.",
 
@@ -166,6 +167,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Contenido a firmar (SHA-256)",
     copySigningPayloadHash: "Copiar contenido a firmar (sha-256)",
     payloadHash: "Contenido (SHA-256)",
+    anchor: "Ancla",
     pointsProofIntro: "Para usar Gleam Points, tu dispositivo firma una transacción de 0 AR que prueba que esta billetera es tuya. Nunca se publica ni mueve AR.",
     actionSignAndSend: "Firmar y enviar",
     actionSignMessage: "Firmar mensaje",
@@ -279,6 +281,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Payload penandatanganan (SHA-256)",
     copySigningPayloadHash: "Salin payload penandatanganan (sha-256)",
     payloadHash: "Payload (SHA-256)",
+    anchor: "Anchor",
     pointsProofIntro: "Untuk memakai Gleam Points, perangkat Anda menandatangani transaksi 0 AR yang membuktikan Anda pemilik dompet ini. Transaksi ini tidak pernah dikirim dan tidak memindahkan AR.",
     actionSignAndSend: "Tanda tangani & kirim",
     actionSignMessage: "Tanda tangani pesan",
@@ -392,6 +395,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Payload de assinatura (SHA-256)",
     copySigningPayloadHash: "Copiar payload de assinatura (sha-256)",
     payloadHash: "Payload (SHA-256)",
+    anchor: "Âncora",
     pointsProofIntro: "Para usar o Gleam Points, seu dispositivo assina uma transação de 0 AR que prova que a carteira é sua. Ela nunca é publicada e não move AR.",
     actionSignAndSend: "Assinar e enviar",
     actionSignMessage: "Assinar mensagem",
@@ -505,6 +509,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Dữ liệu ký (SHA-256)",
     copySigningPayloadHash: "Sao chép dữ liệu ký (sha-256)",
     payloadHash: "Dữ liệu (SHA-256)",
+    anchor: "Neo",
     pointsProofIntro: "Để dùng Gleam Points, thiết bị của bạn ký một giao dịch 0 AR để chứng minh bạn sở hữu ví này. Giao dịch không bao giờ được gửi lên mạng và không chuyển AR nào.",
     actionSignAndSend: "Ký và gửi",
     actionSignMessage: "Ký tin nhắn",
@@ -618,6 +623,7 @@ export const approval = defineMessages({
     signingPayloadHash: "İmza yükü (SHA-256)",
     copySigningPayloadHash: "İmza yükünü kopyala (sha-256)",
     payloadHash: "Yük (SHA-256)",
+    anchor: "Çapa",
     pointsProofIntro: "Gleam Points'i kullanmak için cihazınız, bu cüzdanın size ait olduğunu kanıtlayan 0 AR'lik bir işlem imzalar. Bu işlem asla gönderilmez ve AR aktarmaz.",
     actionSignAndSend: "İmzala ve gönder",
     actionSignMessage: "Mesajı imzala",
@@ -731,6 +737,7 @@ export const approval = defineMessages({
     signingPayloadHash: "Подписываемые данные (SHA-256)",
     copySigningPayloadHash: "Копировать подписываемые данные (SHA-256)",
     payloadHash: "Данные (SHA-256)",
+    anchor: "Якорь",
     pointsProofIntro: "Для Gleam Points ваше устройство подписывает транзакцию на 0 AR, которая доказывает, что этот кошелёк ваш. Она никогда не публикуется и не перемещает AR.",
     actionSignAndSend: "Подписать и отправить",
     actionSignMessage: "Подписать сообщение",
@@ -844,6 +851,7 @@ export const approval = defineMessages({
     signingPayloadHash: "署名ペイロード（SHA-256）",
     copySigningPayloadHash: "署名ペイロード（SHA-256）をコピー",
     payloadHash: "ペイロード（SHA-256）",
+    anchor: "アンカー",
     pointsProofIntro: "Gleam Points を使うため、デバイスはこのウォレットの所有を証明する 0 AR のトランザクションに署名します。このトランザクションは送信されず、AR も移動しません。",
     actionSignAndSend: "署名して送信",
     actionSignMessage: "メッセージに署名",
@@ -957,6 +965,7 @@ export const approval = defineMessages({
     signingPayloadHash: "서명 페이로드 (SHA-256)",
     copySigningPayloadHash: "서명 페이로드 복사 (sha-256)",
     payloadHash: "페이로드 (SHA-256)",
+    anchor: "앵커",
     pointsProofIntro: "Gleam Points를 사용하려면 기기가 이 지갑의 소유를 증명하는 0 AR 트랜잭션에 서명해요. 이 트랜잭션은 게시되지 않으며 AR이 이동하지 않아요.",
     actionSignAndSend: "서명 후 보내기",
     actionSignMessage: "메시지 서명",
@@ -1070,6 +1079,7 @@ export const approval = defineMessages({
     signingPayloadHash: "签名内容（SHA-256）",
     copySigningPayloadHash: "复制签名内容（SHA-256）",
     payloadHash: "内容（SHA-256）",
+    anchor: "锚点",
     pointsProofIntro:
       "要使用 Gleam Points，你的设备会签署一笔 0 AR 的交易，用来证明你拥有此钱包。该交易不会被发布，也不会转移任何 AR。",
 
@@ -1195,6 +1205,7 @@ export const approval = defineMessages({
     signingPayloadHash: "簽名內容（SHA-256）",
     copySigningPayloadHash: "複製簽名內容（SHA-256）",
     payloadHash: "內容（SHA-256）",
+    anchor: "錨點",
     pointsProofIntro:
       "要使用 Gleam Points，你的裝置會簽署一筆 0 AR 的交易，用來證明你擁有此錢包。該交易不會被發佈，也不會轉移任何 AR。",
 
