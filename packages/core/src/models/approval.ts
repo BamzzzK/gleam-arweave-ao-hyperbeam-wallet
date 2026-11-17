@@ -102,6 +102,13 @@ export interface SigningApprovalPreview {
     dataTruncated?: true;
     tags: Array<{ name: string; value: string }>;
     target: string | null;
+    /**
+     * The item's ANS-104 anchor: 32 bytes the site chose, signed as part
+     * of the item, that a process can read and key behaviour off. `null`
+     * when the item carries none; shown so an anchored item never asks
+     * the user to sign bytes no approval surface displays.
+     */
+    anchor?: string | null;
     payloadHash: string;
     /** Set when the item is an AO `Transfer` message, read from its own target and tags. */
     transfer: DataItemTransferPreview | null;
@@ -227,7 +234,14 @@ export type DeviceSigningSummary =
       /** As `SigningApprovalPreview.unreadableTokenTransfer`. */
       unreadableTokenTransfer?: boolean;
     }
-  | { kind: "aoTransfer"; process: string; recipient: string; quantity: string }
+  | {
+      kind: "aoTransfer";
+      process: string;
+      recipient: string;
+      quantity: string;
+      /** The item's ANS-104 anchor, when it carries one; as the preview item's `anchor`. */
+      anchor?: string;
+    }
   /**
    * A zero-AR L1 transaction whose tags move `quantity` of an
    * `arweave-scheduler@1.0` token (`ao/l1-transfer.ts`). `fee` is the AR
@@ -235,11 +249,20 @@ export type DeviceSigningSummary =
    */
   | { kind: "l1TokenTransfer"; process: string; recipient: string; quantity: string; fee: string }
   /** A zero-AR L1 transaction whose tags move one collectible (`ao/collectible-transfer.ts`). */
-  | { kind: "collectibleTransfer"; asset: string; recipient: string; fee: string }
+  | {
+      kind: "collectibleTransfer";
+      asset: string;
+      recipient: string;
+      fee: string;
+      /** The item's ANS-104 anchor, when it carries one; as the preview item's `anchor`. */
+      anchor?: string;
+    }
   | {
       kind: "dataItem";
       target: string | null;
       dataSize: number;
+      /** The item's ANS-104 anchor, when it carries one; as the preview item's `anchor`. */
+      anchor?: string;
       /** As the preview item's `unreadableTokenTransfer`. */
       unreadableTokenTransfer?: boolean;
     }
